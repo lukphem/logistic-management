@@ -334,3 +334,49 @@ invoicing header/footer, waybill design, and scan-status list are all
 editable from the dashboard. Hub/zone location setup lives in its own
 screens (Increment 6) rather than on the settings page itself, since
 those are per-location records, not single values.
+
+## Increment 8 — Branded Error Pages
+
+Replaces Laravel's default error pages with ones matching the dashboard's
+look and giving the person a plain explanation of what happened.
+
+### Files
+
+```
+resources/views/components/error-page.blade.php   (shared shell — doesn't assume an authenticated user)
+resources/views/errors/401.blade.php
+resources/views/errors/403.blade.php
+resources/views/errors/404.blade.php
+resources/views/errors/419.blade.php   (CSRF token expired — the most common cause of an unexplained failed form submit)
+resources/views/errors/429.blade.php   (rate limited)
+resources/views/errors/500.blade.php
+resources/views/errors/503.blade.php   (maintenance mode)
+```
+
+Laravel auto-resolves these by HTTP status code — no route or controller
+changes needed. `error-page.blade.php` shows "Sign in" for guests and
+"Back to dashboard" for authenticated users, since 404/419/500 can happen
+to either.
+
+### One thing to know about local testing
+
+With `APP_DEBUG=true` (typical in local `.env`), Laravel still shows these
+custom views for 401/403/404/419/429 — but a genuine 500-level exception
+will show Laravel's detailed debug page (Ignition) instead, by design, so
+you can see the stack trace while developing. The custom `500.blade.php`
+only takes over once `APP_DEBUG=false` (production). To see it locally,
+temporarily set `APP_DEBUG=false` in `.env` and clear config cache
+(`php artisan config:clear`).
+
+### About your 403 just now
+
+That's expected if the signed-in user's role doesn't include the
+`settings:update`/`locations:*`/etc. permission a route requires — see
+Increment 6's guard fix. Check which role the test account has:
+
+```powershell
+php artisan tinker
+>>> \App\Models\User::where('email', 'test@example.com')->first()->getRoleNames();
+```
+
+If it doesn't list "Super Admin", re-run the seeders from Increment 6/7.
