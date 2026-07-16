@@ -26,6 +26,13 @@ class RiderController extends Controller
      * Records a scan event and advances the shipment's current_status to
      * match. Kept as a single action (rather than separate scan/update
      * endpoints) since in practice a rider's scan IS the status update.
+     *
+     * A scan at an outlet resolves both current_outlet_id AND
+     * current_hub_id (from the outlet's parent hub) together, so hub- and
+     * region-scoped staff still see the shipment via the hub rollup while
+     * outlet-scoped staff see it via the more specific outlet match. A
+     * scan at the hub itself (no outlet_id) clears current_outlet_id —
+     * the shipment is no longer "at" any particular outlet.
      */
     public function scan(Request $request): JsonResponse
     {
@@ -33,6 +40,7 @@ class RiderController extends Controller
             'shipment_id' => 'required|exists:shipments,id',
             'status' => 'required|string',
             'hub_id' => 'nullable|exists:hubs,id',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'photo_path' => 'nullable|string',
@@ -44,17 +52,34 @@ class RiderController extends Controller
         }
 
         $shipment = Shipment::findOrFail($request->shipment_id);
+        $data = $validator->validated();
+
+        $hubId = $data['hub_id'] ?? null;
+        $outletId = $data['outlet_id'] ?? null;
+
+        if ($outletId) {
+            $outlet = \App\Models\Outlet::find($outletId);
+            $hubId = $outlet?->hub_id ?? $hubId;
+        }
 
         $scanEvent = ScanEvent::create([
-            ...$validator->validated(),
+            ...$data,
+            'hub_id' => $hubId,
             'handled_by' => $request->user()->id,
             'scanned_at' => now(),
         ]);
 
-        $shipment->update([
+        $shipmentUpdate = [
             'current_status' => $request->status,
             'delivered_at' => $request->status === 'delivered' ? now() : $shipment->delivered_at,
-        ]);
+        ];
+
+        if ($hubId) {
+            $shipmentUpdate['current_hub_id'] = $hubId;
+            $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself
+        }
+
+        $shipment->update($shipmentUpdate);
 
         return response()->json($scanEvent, 201);
     }

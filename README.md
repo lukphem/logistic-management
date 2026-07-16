@@ -788,3 +788,79 @@ resources/views/users/form.blade.php, users/index.blade.php  (outlet option/colu
 ```powershell
 php artisan migrate
 ```
+
+## Increment 15 — Outlet-Level Shipment Visibility + Units
+
+Two separate additions, both requested together but conceptually
+distinct: shipments now actually track outlet location (so outlet-scoped
+staff see something real), and Units organize staff into teams within a
+hub (no effect on shipment visibility at all).
+
+### Outlet-level shipment visibility
+
+- `shipments.current_outlet_id` (nullable) — sits alongside the existing
+  `current_hub_id`. Null means "at the hub itself"; set means physically
+  at that specific outlet.
+- `scan_events.outlet_id` — history now records outlet granularity too,
+  not just hub.
+- `RiderController::scan` (API) resolves both together: scanning with an
+  `outlet_id` sets `current_outlet_id` AND looks up that outlet's parent
+  hub to set `current_hub_id` too — so hub/region-scoped staff still see
+  the shipment via the normal hub rollup, while outlet-scoped staff see
+  it via the more specific outlet match. Scanning with only a `hub_id`
+  (arriving back at the hub itself, no particular outlet) clears
+  `current_outlet_id`.
+- `User::canAccessShipment()` is the new precise single-shipment check —
+  outlet-scoped users are matched against `current_outlet_id` directly;
+  every other scope level still goes through `accessibleHubIds()`.
+  `ShipmentController::show()` now uses this instead of the old
+  hub-only comparison.
+- Shipment list/detail views show the current outlet when set (index:
+  under the route; detail: "Current location" row, plus outlet shown per
+  checkpoint in the scan timeline).
+
+This closes the gap flagged at the end of Increment 14 — outlet access
+now means something concrete, not just an inherited hub-level view.
+
+### Units — organizational sub-division within a hub
+
+Distinct from Outlet on purpose: a Unit has no address, no GPS location,
+and **never affects shipment visibility** — it's a team/department tag
+(Operations, Customer Service, Dispatch, Warehouse, Finance, etc.) for
+staff structure only. A hub can have both Outlets and Units,
+independently — one is physical, the other organizational.
+
+- `units` table: belongs to a hub (required), name, code
+- `users.unit_id` (nullable) — **not** part of the mutually-exclusive
+  access scale. It's an independent, optional tag that can be set
+  alongside a Hub or Outlet access scope (shown on the form only when
+  one of those two is selected, since Global/Region users aren't tied to
+  a specific hub's internal structure)
+- New `/units` screen, gated under the same `locations:*` permission,
+  added to Setups right after Outlets
+
+### Files
+
+```
+database/migrations/2026_01_09_000001_add_current_outlet_id_to_shipments_table.php
+database/migrations/2026_01_09_000002_add_outlet_id_to_scan_events_table.php
+database/migrations/2026_01_09_000003_create_units_table.php
+database/migrations/2026_01_09_000004_add_unit_id_to_users_table.php
+app/Models/Unit.php
+app/Models/Shipment.php   (current_outlet_id, currentOutlet(), currentHub())
+app/Models/ScanEvent.php  (outlet_id, outlet())
+app/Models/User.php       (unit(), canAccessShipment())
+app/Http/Controllers/Web/UnitController.php
+app/Http/Controllers/Web/ShipmentController.php   (outlet-aware filtering)
+app/Http/Controllers/Api/RiderController.php       (scan resolves hub+outlet together)
+app/Http/Controllers/Web/UserController.php        (unit_id, always optional)
+resources/views/units/index.blade.php, units/form.blade.php
+resources/views/shipments/index.blade.php, shipments/show.blade.php  (outlet display)
+resources/views/users/form.blade.php, users/index.blade.php          (unit field/column)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

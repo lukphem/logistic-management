@@ -26,4 +26,9 @@ class Hub extends Model
     {
         return $this->hasMany(Outlet::class);
     }
+
+    public function units(): HasMany
+    {
+        return $this->hasMany(Unit::class);
+    }
 }

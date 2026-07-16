@@ -55,6 +55,9 @@
                             @else
                                 {{ $user->hub?->name ?? '—' }} <span class="text-xs">(hub)</span>
                             @endif
+                            @if ($user->unit)
+                                <span class="block text-xs text-ink-500">Unit: {{ $user->unit->name }}</span>
+                            @endif
                         </td>
                         <td class="px-5 py-3">
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $statusStyles[$user->account_status] ?? 'bg-ink-500/10 text-ink-500' }}">

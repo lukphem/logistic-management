@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ScanEvent extends Model
 {
     protected $fillable = [
-        'shipment_id', 'status', 'handled_by', 'hub_id',
+        'shipment_id', 'status', 'handled_by', 'hub_id', 'outlet_id',
         'latitude', 'longitude', 'photo_path', 'signature_path', 'scanned_at',
     ];
 
@@ -22,5 +22,15 @@ class ScanEvent extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'handled_by');
+    }
+
+    public function hub(): BelongsTo
+    {
+        return $this->belongsTo(Hub::class);
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
     }
 }

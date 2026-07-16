@@ -31,6 +31,7 @@ class User extends Authenticatable
         'hub_id',
         'region_id',
         'outlet_id',
+        'unit_id',
         'account_status',
         'status_reason',
         'status_changed_at',
@@ -80,6 +81,16 @@ class User extends Authenticatable
     public function outlet(): BelongsTo
     {
         return $this->belongsTo(Outlet::class);
+    }
+
+    /**
+     * Independent of the access scale — an optional organizational tag
+     * ("which team is this person on"), not a scope level. Never affects
+     * accessibleHubIds() or canAccessShipment().
+     */
+    public function unit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class);
     }
 
     public function statusAudits(): HasMany
@@ -137,6 +148,26 @@ class User extends Authenticatable
         }
 
         return [$this->hub_id];
+    }
+
+    /**
+     * The precise check for a single shipment — used by
+     * ShipmentController::show(). Outlet-scoped users are checked against
+     * current_outlet_id specifically (not just the parent hub), since
+     * Increment 15 gave shipments real outlet-level tracking; every other
+     * scope level still resolves through accessibleHubIds().
+     */
+    public function canAccessShipment(Shipment $shipment): bool
+    {
+        if ($this->hasGlobalAccess()) {
+            return true;
+        }
+
+        if ($this->hasOutletAccess()) {
+            return $shipment->current_outlet_id === $this->outlet_id;
+        }
+
+        return in_array($shipment->current_hub_id, $this->accessibleHubIds());
     }
 
     /**

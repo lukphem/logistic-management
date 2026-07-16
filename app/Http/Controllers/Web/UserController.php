@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Hub;
 use App\Models\Outlet;
 use App\Models\Region;
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class UserController extends Controller
     public function index(): View
     {
         $users = User::where('user_type', 'staff')
-            ->with(['roles', 'hub', 'region', 'outlet'])
+            ->with(['roles', 'hub', 'region', 'outlet', 'unit'])
             ->orderBy('name')
             ->paginate(15);
 
@@ -34,6 +35,7 @@ class UserController extends Controller
             'hubs' => Hub::orderBy('name')->get(),
             'regions' => Region::orderBy('name')->get(),
             'outlets' => Outlet::orderBy('name')->get(),
+            'units' => Unit::with('hub')->orderBy('name')->get(),
         ]);
     }
 
@@ -49,6 +51,7 @@ class UserController extends Controller
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
             'outlet_id' => $data['outlet_id'],
+            'unit_id' => $data['unit_id'],
         ]);
 
         $this->assignRoleAcrossGuards($user, $data['role']);
@@ -66,6 +69,7 @@ class UserController extends Controller
             'hubs' => Hub::orderBy('name')->get(),
             'regions' => Region::orderBy('name')->get(),
             'outlets' => Outlet::orderBy('name')->get(),
+            'units' => Unit::with('hub')->orderBy('name')->get(),
         ]);
     }
 
@@ -81,6 +85,7 @@ class UserController extends Controller
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
             'outlet_id' => $data['outlet_id'],
+            'unit_id' => $data['unit_id'],
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
 
@@ -145,6 +150,7 @@ class UserController extends Controller
             'region_id' => 'required_if:access_scope,region|nullable|exists:regions,id',
             'hub_id' => 'required_if:access_scope,hub|nullable|exists:hubs,id',
             'outlet_id' => 'required_if:access_scope,outlet|nullable|exists:outlets,id',
+            'unit_id' => 'nullable|exists:units,id',
         ]);
 
         $validator->validate();
@@ -156,6 +162,8 @@ class UserController extends Controller
         $data['region_id'] = $data['access_scope'] === 'region' ? $data['region_id'] : null;
         $data['hub_id'] = $data['access_scope'] === 'hub' ? $data['hub_id'] : null;
         $data['outlet_id'] = $data['access_scope'] === 'outlet' ? $data['outlet_id'] : null;
+        // unit_id is independent of access_scope — an organizational tag,
+        // not a scope level, so it's never zeroed based on the selection.
 
         return $data;
     }

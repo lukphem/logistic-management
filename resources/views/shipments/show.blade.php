@@ -32,6 +32,17 @@
                     <dt class="text-ink-500">Assigned rider</dt>
                     <dd class="text-ink-900">{{ $shipment->assignedRider?->name ?? 'Unassigned' }}</dd>
 
+                    <dt class="text-ink-500">Current location</dt>
+                    <dd class="text-ink-900">
+                        @if ($shipment->currentOutlet)
+                            {{ $shipment->currentOutlet->name }} <span class="text-xs text-ink-500">(outlet)</span>
+                        @elseif ($shipment->currentHub)
+                            {{ $shipment->currentHub->name }} <span class="text-xs text-ink-500">(hub)</span>
+                        @else
+                            —
+                        @endif
+                    </dd>
+
                     <dt class="text-ink-500">COD</dt>
                     <dd class="text-ink-900">
                         @if ($shipment->is_cod)
@@ -83,6 +94,9 @@
                     <div class="pt-0.5">
                         <p class="text-sm font-semibold text-ink-900">{{ ucfirst(str_replace('_', ' ', $event->status)) }}</p>
                         <p class="font-mono text-xs text-ink-500">{{ $event->scanned_at->format('d M Y · H:i') }}</p>
+                        @if ($event->outlet)
+                            <p class="text-xs text-ink-500">{{ $event->outlet->name }}</p>
+                        @endif
                         @if ($event->handler)
                             <p class="text-xs text-ink-500">{{ $event->handler->name }}</p>
                         @endif

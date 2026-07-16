@@ -11,6 +11,7 @@ use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
+use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\ZoneController;
 use Illuminate\Support\Facades\Route;
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/regions', [RegionController::class, 'index'])->name('regions.index');
         Route::get('/hubs', [HubController::class, 'index'])->name('hubs.index');
         Route::get('/outlets', [OutletController::class, 'index'])->name('outlets.index');
+        Route::get('/units', [UnitController::class, 'index'])->name('units.index');
         Route::get('/zones', [ZoneController::class, 'index'])->name('zones.index');
     });
     Route::middleware('can:locations:create')->group(function () {
@@ -55,6 +57,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/hubs', [HubController::class, 'store'])->name('hubs.store');
         Route::get('/outlets/create', [OutletController::class, 'create'])->name('outlets.create');
         Route::post('/outlets', [OutletController::class, 'store'])->name('outlets.store');
+        Route::get('/units/create', [UnitController::class, 'create'])->name('units.create');
+        Route::post('/units', [UnitController::class, 'store'])->name('units.store');
         Route::get('/zones/create', [ZoneController::class, 'create'])->name('zones.create');
         Route::post('/zones', [ZoneController::class, 'store'])->name('zones.store');
     });
@@ -65,6 +69,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/hubs/{hub}', [HubController::class, 'update'])->name('hubs.update');
         Route::get('/outlets/{outlet}/edit', [OutletController::class, 'edit'])->name('outlets.edit');
         Route::put('/outlets/{outlet}', [OutletController::class, 'update'])->name('outlets.update');
+        Route::get('/units/{unit}/edit', [UnitController::class, 'edit'])->name('units.edit');
+        Route::put('/units/{unit}', [UnitController::class, 'update'])->name('units.update');
         Route::get('/zones/{zone}/edit', [ZoneController::class, 'edit'])->name('zones.edit');
         Route::put('/zones/{zone}', [ZoneController::class, 'update'])->name('zones.update');
     });
@@ -72,6 +78,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/regions/{region}', [RegionController::class, 'destroy'])->name('regions.destroy');
         Route::delete('/hubs/{hub}', [HubController::class, 'destroy'])->name('hubs.destroy');
         Route::delete('/outlets/{outlet}', [OutletController::class, 'destroy'])->name('outlets.destroy');
+        Route::delete('/units/{unit}', [UnitController::class, 'destroy'])->name('units.destroy');
         Route::delete('/zones/{zone}', [ZoneController::class, 'destroy'])->name('zones.destroy');
     });
 

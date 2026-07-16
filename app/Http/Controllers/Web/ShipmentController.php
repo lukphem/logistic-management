@@ -11,15 +11,19 @@ class ShipmentController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Shipment::with(['originZone', 'destinationZone', 'assignedRider']);
+        $query = Shipment::with(['originZone', 'destinationZone', 'assignedRider', 'currentOutlet']);
 
-        // Filters to whatever the viewer's access scope resolves to:
-        // every hub (global), every hub in their region, or just their
-        // one hub — see User::accessibleHubIds(). Skipped entirely for
-        // global users so their query never carries an unnecessary
-        // WHERE IN across every hub ID.
-        if (! auth()->user()->hasGlobalAccess()) {
-            $query->whereIn('current_hub_id', auth()->user()->accessibleHubIds());
+        $user = auth()->user();
+
+        // Outlet-scoped users see shipments physically at their outlet
+        // specifically (current_outlet_id) — a narrower check than the
+        // hub-level accessibleHubIds() filter everyone else uses. Skipped
+        // entirely for global users so their query never carries an
+        // unnecessary WHERE for no reason.
+        if ($user->hasOutletAccess()) {
+            $query->where('current_outlet_id', $user->outlet_id);
+        } elseif (! $user->hasGlobalAccess()) {
+            $query->whereIn('current_hub_id', $user->accessibleHubIds());
         }
 
         if ($request->filled('status')) {
@@ -37,11 +41,9 @@ class ShipmentController extends Controller
 
     public function show(Shipment $shipment): View
     {
-        if (! auth()->user()->hasGlobalAccess() && ! in_array($shipment->current_hub_id, auth()->user()->accessibleHubIds())) {
-            abort(403, "This shipment isn't at a hub you have access to.");
-        }
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
-        $shipment->load(['scanEvents.handler', 'rateCard', 'originZone', 'destinationZone', 'assignedRider']);
+        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'rateCard', 'originZone', 'destinationZone', 'assignedRider', 'currentOutlet']);
 
         return view('shipments.show', compact('shipment'));
     }
