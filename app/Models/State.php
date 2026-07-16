@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class State extends Model
 {
-    protected $fillable = ['country_id', 'name', 'code'];
+    protected $fillable = ['country_id', 'name', 'short_code', 'code'];
 
     public function country(): BelongsTo
     {
@@ -18,5 +18,22 @@ class State extends Model
     public function cities(): HasMany
     {
         return $this->hasMany(City::class);
+    }
+
+    /**
+     * `code` (the client-API-facing identifier) is always auto-composed
+     * from the parent country's code + this state's short_code — e.g.
+     * "NG" + "LA" -> "NG-LA". Staff only ever type short_code; `code` is
+     * recomputed on every save so it never drifts if the country or
+     * short_code changes later.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (State $state) {
+            if ($state->short_code) {
+                $country = $state->relationLoaded('country') ? $state->country : Country::find($state->country_id);
+                $state->code = $country ? strtoupper($country->code . '-' . $state->short_code) : strtoupper($state->short_code);
+            }
+        });
     }
 }

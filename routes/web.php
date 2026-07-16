@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\CityController;
 use App\Http\Controllers\Web\ClientBillingController;
 use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DistrictController;
 use App\Http\Controllers\Web\HubController;
 use App\Http\Controllers\Web\OutletController;
 use App\Http\Controllers\Web\RateCardController;
@@ -50,6 +51,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/countries', [CountryController::class, 'index'])->name('countries.index');
         Route::get('/states', [StateController::class, 'index'])->name('states.index');
         Route::get('/cities', [CityController::class, 'index'])->name('cities.index');
+        Route::get('/districts', [DistrictController::class, 'index'])->name('districts.index');
         Route::get('/regions', [RegionController::class, 'index'])->name('regions.index');
         Route::get('/hubs', [HubController::class, 'index'])->name('hubs.index');
         Route::get('/outlets', [OutletController::class, 'index'])->name('outlets.index');
@@ -63,6 +65,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/states', [StateController::class, 'store'])->name('states.store');
         Route::get('/cities/create', [CityController::class, 'create'])->name('cities.create');
         Route::post('/cities', [CityController::class, 'store'])->name('cities.store');
+        Route::get('/districts/create', [DistrictController::class, 'create'])->name('districts.create');
+        Route::post('/districts', [DistrictController::class, 'store'])->name('districts.store');
         Route::get('/regions/create', [RegionController::class, 'create'])->name('regions.create');
         Route::post('/regions', [RegionController::class, 'store'])->name('regions.store');
         Route::get('/hubs/create', [HubController::class, 'create'])->name('hubs.create');
@@ -81,6 +85,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/states/{state}', [StateController::class, 'update'])->name('states.update');
         Route::get('/cities/{city}/edit', [CityController::class, 'edit'])->name('cities.edit');
         Route::put('/cities/{city}', [CityController::class, 'update'])->name('cities.update');
+        Route::get('/districts/{district}/edit', [DistrictController::class, 'edit'])->name('districts.edit');
+        Route::put('/districts/{district}', [DistrictController::class, 'update'])->name('districts.update');
         Route::get('/regions/{region}/edit', [RegionController::class, 'edit'])->name('regions.edit');
         Route::put('/regions/{region}', [RegionController::class, 'update'])->name('regions.update');
         Route::get('/hubs/{hub}/edit', [HubController::class, 'edit'])->name('hubs.edit');
@@ -96,6 +102,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/countries/{country}', [CountryController::class, 'destroy'])->name('countries.destroy');
         Route::delete('/states/{state}', [StateController::class, 'destroy'])->name('states.destroy');
         Route::delete('/cities/{city}', [CityController::class, 'destroy'])->name('cities.destroy');
+        Route::delete('/districts/{district}', [DistrictController::class, 'destroy'])->name('districts.destroy');
         Route::delete('/regions/{region}', [RegionController::class, 'destroy'])->name('regions.destroy');
         Route::delete('/hubs/{hub}', [HubController::class, 'destroy'])->name('hubs.destroy');
         Route::delete('/outlets/{outlet}', [OutletController::class, 'destroy'])->name('outlets.destroy');

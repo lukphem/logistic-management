@@ -35,13 +35,21 @@ class LocationSeeder extends Seeder
             return;
         }
 
-        foreach ($this->nigeriaStatesAndCities() as $stateName => $cities) {
+        foreach ($this->nigeriaStatesAndCities() as $stateName => $data) {
             $state = State::firstOrCreate(
                 ['country_id' => $nigeria->id, 'name' => $stateName],
+                ['short_code' => $data['code']],
             );
 
-            foreach ($cities as $cityName) {
-                City::firstOrCreate(['state_id' => $state->id, 'name' => $cityName]);
+            if (! $state->short_code) {
+                $state->update(['short_code' => $data['code']]);
+            }
+
+            foreach ($data['cities'] as $cityName => $cityCode) {
+                City::firstOrCreate(
+                    ['state_id' => $state->id, 'name' => $cityName],
+                    ['short_code' => $cityCode],
+                );
             }
         }
     }
@@ -142,51 +150,52 @@ class LocationSeeder extends Seeder
     }
 
     /**
-     * All 36 Nigerian states + FCT, each with its capital plus one or two
-     * other major commercial cities — a practical working set, not an
-     * exhaustive city list (which would run into the thousands). Add more
-     * from Setups → Location → Cities as needed.
+     * All 36 Nigerian states + FCT, each with a unique 2-letter short_code
+     * and a practical set of major cities (state capital plus one or two
+     * other commercial centers), each with its own short_code unique
+     * within that state — not an exhaustive city list. Add more from
+     * Setups → Location → Cities as needed.
      */
     private function nigeriaStatesAndCities(): array
     {
         return [
-            'Abia' => ['Umuahia', 'Aba'],
-            'Adamawa' => ['Yola', 'Mubi'],
-            'Akwa Ibom' => ['Uyo', 'Ikot Ekpene'],
-            'Anambra' => ['Awka', 'Onitsha', 'Nnewi'],
-            'Bauchi' => ['Bauchi', 'Azare'],
-            'Bayelsa' => ['Yenagoa'],
-            'Benue' => ['Makurdi', 'Gboko'],
-            'Borno' => ['Maiduguri'],
-            'Cross River' => ['Calabar', 'Ikom'],
-            'Delta' => ['Asaba', 'Warri', 'Sapele'],
-            'Ebonyi' => ['Abakaliki'],
-            'Edo' => ['Benin City', 'Ekpoma'],
-            'Ekiti' => ['Ado-Ekiti'],
-            'Enugu' => ['Enugu', 'Nsukka'],
-            'FCT' => ['Abuja'],
-            'Gombe' => ['Gombe'],
-            'Imo' => ['Owerri', 'Orlu'],
-            'Jigawa' => ['Dutse'],
-            'Kaduna' => ['Kaduna', 'Zaria'],
-            'Kano' => ['Kano'],
-            'Katsina' => ['Katsina', 'Funtua'],
-            'Kebbi' => ['Birnin Kebbi'],
-            'Kogi' => ['Lokoja'],
-            'Kwara' => ['Ilorin'],
-            'Lagos' => ['Ikeja', 'Lagos Island', 'Surulere', 'Lekki', 'Ikorodu', 'Badagry'],
-            'Nasarawa' => ['Lafia'],
-            'Niger' => ['Minna', 'Bida'],
-            'Ogun' => ['Abeokuta', 'Sagamu', 'Ijebu-Ode'],
-            'Ondo' => ['Akure', 'Ondo City'],
-            'Osun' => ['Osogbo', 'Ile-Ife'],
-            'Oyo' => ['Ibadan', 'Ogbomoso'],
-            'Plateau' => ['Jos'],
-            'Rivers' => ['Port Harcourt', 'Bonny'],
-            'Sokoto' => ['Sokoto'],
-            'Taraba' => ['Jalingo'],
-            'Yobe' => ['Damaturu'],
-            'Zamfara' => ['Gusau'],
+            'Abia' => ['code' => 'AB', 'cities' => ['Umuahia' => 'UMU', 'Aba' => 'ABA']],
+            'Adamawa' => ['code' => 'AD', 'cities' => ['Yola' => 'YOL', 'Mubi' => 'MUB']],
+            'Akwa Ibom' => ['code' => 'AK', 'cities' => ['Uyo' => 'UYO', 'Ikot Ekpene' => 'IKO']],
+            'Anambra' => ['code' => 'AN', 'cities' => ['Awka' => 'AWK', 'Onitsha' => 'ONI', 'Nnewi' => 'NNE']],
+            'Bauchi' => ['code' => 'BA', 'cities' => ['Bauchi' => 'BAU', 'Azare' => 'AZA']],
+            'Bayelsa' => ['code' => 'BY', 'cities' => ['Yenagoa' => 'YEN']],
+            'Benue' => ['code' => 'BE', 'cities' => ['Makurdi' => 'MAK', 'Gboko' => 'GBO']],
+            'Borno' => ['code' => 'BO', 'cities' => ['Maiduguri' => 'MAI']],
+            'Cross River' => ['code' => 'CR', 'cities' => ['Calabar' => 'CAL', 'Ikom' => 'IKM']],
+            'Delta' => ['code' => 'DE', 'cities' => ['Asaba' => 'ASA', 'Warri' => 'WAR', 'Sapele' => 'SAP']],
+            'Ebonyi' => ['code' => 'EB', 'cities' => ['Abakaliki' => 'ABK']],
+            'Edo' => ['code' => 'ED', 'cities' => ['Benin City' => 'BEN', 'Ekpoma' => 'EKP']],
+            'Ekiti' => ['code' => 'EK', 'cities' => ['Ado-Ekiti' => 'ADO']],
+            'Enugu' => ['code' => 'EN', 'cities' => ['Enugu' => 'ENU', 'Nsukka' => 'NSU']],
+            'FCT' => ['code' => 'FC', 'cities' => ['Abuja' => 'ABU']],
+            'Gombe' => ['code' => 'GO', 'cities' => ['Gombe' => 'GOM']],
+            'Imo' => ['code' => 'IM', 'cities' => ['Owerri' => 'OWE', 'Orlu' => 'ORL']],
+            'Jigawa' => ['code' => 'JI', 'cities' => ['Dutse' => 'DUT']],
+            'Kaduna' => ['code' => 'KD', 'cities' => ['Kaduna' => 'KAD', 'Zaria' => 'ZAR']],
+            'Kano' => ['code' => 'KN', 'cities' => ['Kano' => 'KAN']],
+            'Katsina' => ['code' => 'KT', 'cities' => ['Katsina' => 'KAT', 'Funtua' => 'FUN']],
+            'Kebbi' => ['code' => 'KE', 'cities' => ['Birnin Kebbi' => 'BIR']],
+            'Kogi' => ['code' => 'KO', 'cities' => ['Lokoja' => 'LOK']],
+            'Kwara' => ['code' => 'KW', 'cities' => ['Ilorin' => 'ILO']],
+            'Lagos' => ['code' => 'LA', 'cities' => ['Ikeja' => 'IKE', 'Lagos Island' => 'LAG', 'Surulere' => 'SUR', 'Lekki' => 'LEK', 'Ikorodu' => 'IKD', 'Badagry' => 'BAD']],
+            'Nasarawa' => ['code' => 'NA', 'cities' => ['Lafia' => 'LAF']],
+            'Niger' => ['code' => 'NI', 'cities' => ['Minna' => 'MIN', 'Bida' => 'BID']],
+            'Ogun' => ['code' => 'OG', 'cities' => ['Abeokuta' => 'ABE', 'Sagamu' => 'SAG', 'Ijebu-Ode' => 'IJE']],
+            'Ondo' => ['code' => 'ON', 'cities' => ['Akure' => 'AKU', 'Ondo City' => 'OND']],
+            'Osun' => ['code' => 'OS', 'cities' => ['Osogbo' => 'OSO', 'Ile-Ife' => 'ILE']],
+            'Oyo' => ['code' => 'OY', 'cities' => ['Ibadan' => 'IBA', 'Ogbomoso' => 'OGB']],
+            'Plateau' => ['code' => 'PL', 'cities' => ['Jos' => 'JOS']],
+            'Rivers' => ['code' => 'RI', 'cities' => ['Port Harcourt' => 'POR', 'Bonny' => 'BON']],
+            'Sokoto' => ['code' => 'SO', 'cities' => ['Sokoto' => 'SOK']],
+            'Taraba' => ['code' => 'TA', 'cities' => ['Jalingo' => 'JAL']],
+            'Yobe' => ['code' => 'YO', 'cities' => ['Damaturu' => 'DAM']],
+            'Zamfara' => ['code' => 'ZA', 'cities' => ['Gusau' => 'GUS']],
         ];
     }
 }

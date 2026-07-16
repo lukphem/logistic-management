@@ -6,8 +6,25 @@
         </div>
     @endif
 
-    <div class="mb-5 flex items-center justify-between">
-        <p class="text-sm text-ink-500">The city a hub actually operates in — this is what ties a hub (and through it, units and staff) to a real place.</p>
+    <p class="mb-4 text-sm text-ink-500">The city a hub actually operates in — this is what ties a hub (and through it, units and staff) to a real place.</p>
+
+    <div class="mb-5 flex items-center justify-between gap-4">
+        <form method="GET" class="flex items-center gap-3">
+            <select name="country_id" onchange="this.form.submit()"
+                    class="rounded-md border border-line bg-surface-0 px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                <option value="">All countries</option>
+                @foreach ($countries as $country)
+                    <option value="{{ $country->id }}" @selected(request('country_id') == $country->id)>{{ $country->name }}</option>
+                @endforeach
+            </select>
+            <select name="state_id" onchange="this.form.submit()"
+                    class="rounded-md border border-line bg-surface-0 px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                <option value="">All states/provinces</option>
+                @foreach ($states as $state)
+                    <option value="{{ $state->id }}" @selected(request('state_id') == $state->id)>{{ $state->name }} ({{ $state->country->name }})</option>
+                @endforeach
+            </select>
+        </form>
         <a href="{{ route('cities.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
             + Add city
         </a>
@@ -20,6 +37,7 @@
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">State/Province</th>
                     <th class="px-5 py-3 font-medium">Country</th>
+                    <th class="px-5 py-3 font-medium">Code</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
@@ -29,6 +47,7 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $city->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->country->name }}</td>
+                        <td class="px-5 py-3 font-mono text-ink-500">{{ $city->code }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('cities.edit', $city) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                             <form method="POST" action="{{ route('cities.destroy', $city) }}" class="inline" onsubmit="return confirm('Remove this city? Any hub tied to it will simply become unassigned.')">
@@ -38,7 +57,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
+                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

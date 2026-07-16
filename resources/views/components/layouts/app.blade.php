@@ -53,6 +53,7 @@
                         ['label' => 'Countries', 'route' => 'countries.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'States/Provinces', 'route' => 'states.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Cities', 'route' => 'cities.index', 'icon' => 'building', 'permission' => 'locations:read'],
+                        ['label' => 'Districts/Areas', 'route' => 'districts.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Regions', 'route' => 'regions.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Hubs & Branches', 'route' => 'hubs.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Outlets', 'route' => 'outlets.index', 'icon' => 'building', 'permission' => 'locations:read'],

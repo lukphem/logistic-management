@@ -30,9 +30,15 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Code (optional)</label>
-            <input type="text" name="code" value="{{ old('code', $state->code) }}" placeholder="e.g. LA"
+            <label class="mb-1 block text-sm font-medium text-ink-900">Short code <x-required /></label>
+            <input type="text" name="short_code" value="{{ old('short_code', $state->short_code) }}" placeholder="e.g. LA"
                    class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            <p class="mt-1 text-xs text-ink-500">
+                The full client-facing code is composed automatically: country code + this short code.
+                @if ($state->exists && $state->code)
+                    Currently <span class="font-mono font-medium text-ink-900">{{ $state->code }}</span>.
+                @endif
+            </p>
         </div>
 
         <div class="flex justify-end gap-3 pt-2">

@@ -33,6 +33,18 @@
                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
         </div>
 
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Short code <x-required /></label>
+            <input type="text" name="short_code" value="{{ old('short_code', $city->short_code) }}" placeholder="e.g. IKJ"
+                   class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            <p class="mt-1 text-xs text-ink-500">
+                The full client-facing code is composed automatically: state code + this short code.
+                @if ($city->exists && $city->code)
+                    Currently <span class="font-mono font-medium text-ink-900">{{ $city->code }}</span>.
+                @endif
+            </p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ route('cities.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

@@ -1080,3 +1080,74 @@ resources/views/users/form.blade.php   (Operating location panel)
 php artisan migrate
 php artisan db:seed --class=LocationSeeder
 ```
+
+## Increment 19 — Hierarchical Codes, Districts/Areas, Filterable Location Setup
+
+### Auto-composed hierarchical codes
+
+Every level below Country now auto-composes its own client-API-facing
+`code` from its parent's code — staff only ever type a short suffix:
+
+- State: staff types `short_code` (e.g. "LA"); `code` becomes
+  `{country.code}-{short_code}` → **"NG-LA"**
+- City: staff types `short_code` (e.g. "IKJ"); `code` becomes
+  `{state.code}-{short_code}` → **"NG-LA-IKJ"**
+- District: staff types `short_code` (e.g. "GRA"); `code` becomes
+  `{city.code}-{short_code}` → **"NG-LA-IKJ-GRA"**
+
+Each model recomputes `code` in a `saving` hook, so it never drifts if
+the parent changes later. `short_code` only needs to be unique **within
+its parent** (e.g. two different countries can both have a state with
+short_code "LA" without colliding), enforced via scoped `Rule::unique()`
+in each controller — not a blanket global-uniqueness rule, since that
+would be the wrong constraint.
+
+**Client API calls should reference `code`, not `short_code`** —
+`short_code` is a data-entry convenience, `code` is the stable identifier.
+
+### Districts/Areas — a new level under City
+
+Completes the hierarchy: **Country > State > City > District/Area**. Same
+auto-composed-code pattern, same CRUD pattern as State/City. New
+`/districts` screen added to Setups → Location, right after Cities.
+
+### Filterable location setup
+
+`/states` now filters by Country; `/cities` filters by State (or
+Country, which narrows to every state in it); `/districts` filters by
+State or City — each via a simple `<select onchange="submit">` dropdown,
+consistent with the shipment list's existing filter pattern. All three
+index pages also now show the composed `code` column.
+
+### Seeded data updated
+
+`LocationSeeder` now assigns a hand-checked-unique `short_code` to every
+seeded Nigerian state (2-letter) and city (3-letter, unique within its
+state) — without this, the seeded data would have had no `code` at all,
+since codes only compose when a `short_code` is present.
+
+### Files
+
+```
+database/migrations/2026_01_13_000001_add_short_code_to_states_table.php
+database/migrations/2026_01_13_000002_add_codes_to_cities_table.php
+database/migrations/2026_01_13_000003_create_districts_table.php
+app/Models/State.php, City.php   (auto-compose code on saving)
+app/Models/District.php
+app/Http/Controllers/Web/StateController.php, CityController.php   (short_code, scoped uniqueness, filters)
+app/Http/Controllers/Web/DistrictController.php
+resources/views/states/, cities/   (filter dropdown + code column + short_code field)
+resources/views/districts/   (index + form)
+database/seeders/LocationSeeder.php   (short codes added)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=LocationSeeder
+```
+
+Re-running `LocationSeeder` is safe (`firstOrCreate` throughout) and will
+backfill `short_code`/`code` on any existing seeded rows that predate
+this increment.
