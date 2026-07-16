@@ -43,17 +43,24 @@
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
                     ];
 
-                    // Ordered by setup dependency: company profile/branding has
-                    // no prerequisites; hubs must exist before zones can
-                    // reference one; scan statuses are independent but belong
-                    // here as the last operational-config step.
-                    $setupItems = [
-                        ['label' => 'Company Settings', 'route' => 'settings.edit', 'icon' => 'sliders', 'permission' => 'settings:update'],
+                    // Ordered by setup dependency. Location-related screens
+                    // (geography down to individual hubs/outlets/zones) are
+                    // grouped in their own nested submenu since they're all
+                    // one conceptual area and were cluttering the flat list.
+                    $topSetupItem = ['label' => 'Company Settings', 'route' => 'settings.edit', 'icon' => 'sliders', 'permission' => 'settings:update'];
+
+                    $locationItems = [
+                        ['label' => 'Countries', 'route' => 'countries.index', 'icon' => 'building', 'permission' => 'locations:read'],
+                        ['label' => 'States/Provinces', 'route' => 'states.index', 'icon' => 'building', 'permission' => 'locations:read'],
+                        ['label' => 'Cities', 'route' => 'cities.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Regions', 'route' => 'regions.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Hubs & Branches', 'route' => 'hubs.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Outlets', 'route' => 'outlets.index', 'icon' => 'building', 'permission' => 'locations:read'],
-                        ['label' => 'Units', 'route' => 'units.index', 'icon' => 'sliders', 'permission' => 'locations:read'],
                         ['label' => 'Zones', 'route' => 'zones.index', 'icon' => 'layers', 'permission' => 'locations:read'],
+                    ];
+
+                    $restSetupItems = [
+                        ['label' => 'Units', 'route' => 'units.index', 'icon' => 'sliders', 'permission' => 'locations:read'],
                         ['label' => 'Rate Cards', 'route' => 'rate-cards.index', 'icon' => 'sliders', 'permission' => 'rates:read'],
                         ['label' => 'Client Billing', 'route' => 'client-billing.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Scan Statuses', 'route' => 'scan-statuses.index', 'icon' => 'list-check', 'permission' => 'settings:update'],
@@ -61,11 +68,18 @@
                         ['label' => 'Staff Users', 'route' => 'users.index', 'icon' => 'building', 'permission' => 'users:read'],
                     ];
 
-                    $visibleSetupItems = collect($setupItems)->filter(
+                    $visibleLocationItems = collect($locationItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
+                    $visibleRestSetupItems = collect($restSetupItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $topSetupItemVisible = ! $topSetupItem['permission'] || auth()->user()->can($topSetupItem['permission']);
 
-                    $setupsActive = collect($setupItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
+                    $locationActive = collect($locationItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
+                    $setupsActive = $locationActive
+                        || request()->routeIs($topSetupItem['route'] . '*')
+                        || collect($restSetupItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
                 @endphp
 
                 @foreach ($navItems as $item)
@@ -82,7 +96,7 @@
                     </a>
                 @endforeach
 
-                @if ($visibleSetupItems->isNotEmpty())
+                @if ($topSetupItemVisible || $visibleLocationItems->isNotEmpty() || $visibleRestSetupItems->isNotEmpty())
                     <details class="group/setups" @if($setupsActive) open @endif>
                         <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
                             <x-icon name="setups" class="h-[18px] w-[18px] shrink-0" />
@@ -91,7 +105,38 @@
                         </summary>
 
                         <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
-                            @foreach ($visibleSetupItems as $item)
+                            @if ($topSetupItemVisible)
+                                @php $active = request()->routeIs($topSetupItem['route'] . '*'); @endphp
+                                <a href="{{ route($topSetupItem['route']) }}"
+                                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                                          {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
+                                    <x-icon :name="$topSetupItem['icon']" class="h-4 w-4 shrink-0" />
+                                    {{ $topSetupItem['label'] }}
+                                </a>
+                            @endif
+
+                            @if ($visibleLocationItems->isNotEmpty())
+                                <details class="group/location" @if($locationActive) open @endif>
+                                    <summary class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white">
+                                        <x-icon name="layers" class="h-4 w-4 shrink-0" />
+                                        <span class="flex-1">Location</span>
+                                        <x-icon name="chevron" class="h-3.5 w-3.5 shrink-0 transition-transform group-open/location:rotate-180" />
+                                    </summary>
+                                    <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                                        @foreach ($visibleLocationItems as $item)
+                                            @php $active = request()->routeIs($item['route'] . '*'); @endphp
+                                            <a href="{{ route($item['route']) }}"
+                                               class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors
+                                                      {{ $active ? 'bg-white/10 text-white' : 'text-white/55 hover:bg-white/5 hover:text-white' }}">
+                                                <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0" />
+                                                {{ $item['label'] }}
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </details>
+                            @endif
+
+                            @foreach ($visibleRestSetupItems as $item)
                                 @php $active = request()->routeIs($item['route'] . '*'); @endphp
                                 <a href="{{ route($item['route']) }}"
                                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors

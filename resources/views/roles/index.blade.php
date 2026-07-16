@@ -14,7 +14,7 @@
 
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">The five default roles are protected from deletion — edit their permissions instead of removing them.</p>
-        <a href="{{ route('roles.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+        <a href="{{ route('roles.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
             + Add custom role
         </a>
     </div>
@@ -31,7 +31,7 @@
             </thead>
             <tbody>
                 @forelse ($roles as $role)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3">
                             <p class="font-medium text-ink-900">{{ $role->name }}</p>
                             @if (in_array($role->name, $protectedRoles))
@@ -45,7 +45,7 @@
                             @unless (in_array($role->name, $protectedRoles))
                                 <form method="POST" action="{{ route('roles.destroy', $role) }}" class="inline" onsubmit="return confirm('Remove this role? Staff assigned to it will lose these permissions.')">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
+                                    <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                 </form>
                             @endunless
                         </td>

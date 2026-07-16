@@ -14,7 +14,7 @@
 
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">Dashboard accounts — riders and clients are managed separately, not here.</p>
-        <a href="{{ route('users.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+        <a href="{{ route('users.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
             + Add staff user
         </a>
     </div>
@@ -41,7 +41,7 @@
                             'terminated' => 'bg-ink-500/10 text-ink-500',
                         ];
                     @endphp
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3">
                             <div class="flex items-center gap-3">
                                 <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-50 ring-1 ring-line">

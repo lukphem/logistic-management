@@ -922,3 +922,79 @@ resources/views/users/index.blade.php  (photo thumbnail + staff ID)
 php artisan migrate
 php artisan storage:link
 ```
+
+## Increment 17 — Location Nested Menu + Country/State/City + Visual Polish Pass
+
+### Location grouped under one nested submenu
+
+All location-related screens (Countries, States/Provinces, Cities,
+Regions, Hubs & Branches, Outlets, Zones) now sit inside a single
+**Location** submenu nested inside Setups, instead of seven flat items
+cluttering the list. Setups top level is now: Company Settings → Location
+(nested) → Units → Rate Cards → Client Billing → Scan Statuses → Roles &
+Permissions → Staff Users. Both the outer Setups group and the inner
+Location group auto-expand when the active page is inside them, same
+pattern as before.
+
+### Country → State → City (the "operating countries/states/cities" setup)
+
+A real geography hierarchy, additive to (not replacing) Region:
+
+- `countries` (name, ISO code)
+- `states` (belongs to a country; name, optional code)
+- `cities` (belongs to a state)
+- `hubs.city_id` (nullable) — the actual operating location. **Region**
+  stays what it was: an access-scoping grouping
+  (Global > Region > Hub > Outlet). **City** is "where is this place,
+  physically." A hub can — and typically should — have both, for
+  different reasons.
+
+This is what actually ties a unit/user to a real place: a user's access
+scope resolves to a hub (or region, or outlet); that hub now optionally
+carries a city, which carries a state, which carries a country. The Hub
+form's City field groups options by "State, Country" so the picker stays
+readable without needing full cascading-select JavaScript.
+
+New screens: `/countries`, `/states`, `/cities` — same CRUD pattern as
+Regions/Hubs/Outlets, same `locations:*` permission gate.
+
+### Visual polish pass
+
+Applied consistently across every list/form view, not just the new ones:
+
+- **Buttons** — primary "+Add" actions now carry `shadow-sm` and lift to
+  `shadow-md` on hover, instead of a flat opacity change only
+- **Tables** — every row now has subtle zebra striping
+  (`odd:bg-surface-0 even:bg-surface-50/50`) plus a brand-tinted hover
+  (`hover:bg-[var(--brand-primary)]/5`) instead of a flat gray hover —
+  ties the interaction color back to the deployment's brand color
+- **Danger links** ("Remove"/"Delete") — fade on hover instead of a plain
+  underline, consistent everywhere
+- **Dashboard stat cards** — the `accent` field on each card was defined
+  back in Increment 4 but never actually used. Now each card gets a
+  colored left border and matching number color (brand/blue/green/red)
+  instead of every card looking identical regardless of what it means
+
+### Files
+
+```
+database/migrations/2026_01_11_000001_create_countries_table.php
+database/migrations/2026_01_11_000002_create_states_table.php
+database/migrations/2026_01_11_000003_create_cities_table.php
+database/migrations/2026_01_11_000004_add_city_id_to_hubs_table.php
+app/Models/Country.php, State.php, City.php
+app/Models/Hub.php   (city() relation)
+app/Http/Controllers/Web/CountryController.php, StateController.php, CityController.php
+app/Http/Controllers/Web/HubController.php   (city_id support)
+resources/views/countries/, states/, cities/   (index + form each)
+resources/views/hubs/form.blade.php, hubs/index.blade.php   (city field/column)
+resources/views/components/layouts/app.blade.php   (nested Location submenu)
+resources/views/dashboard/index.blade.php   (accent colors actually applied)
++ repo-wide button/table/link visual upgrades across every existing list view
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

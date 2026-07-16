@@ -78,7 +78,7 @@
                 <input type="checkbox" name="is_terminal" value="1" class="rounded border-line">
                 Ends shipment
             </label>
-            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
                 Add status
             </button>
         </form>

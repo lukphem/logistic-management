@@ -8,7 +8,7 @@
 
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">The standard rate every client is charged unless placed on a special (discounted) billing profile.</p>
-        <a href="{{ route('rate-cards.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+        <a href="{{ route('rate-cards.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
             + Add rate card
         </a>
     </div>
@@ -27,7 +27,7 @@
             </thead>
             <tbody>
                 @forelse ($rateCards as $rateCard)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $rateCard->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ ucfirst($rateCard->service_type) }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $billingModels[$rateCard->billing_model] ?? $rateCard->billing_model }}</td>
@@ -41,7 +41,7 @@
                             <a href="{{ route('rate-cards.edit', $rateCard) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                             <form method="POST" action="{{ route('rate-cards.destroy', $rateCard) }}" class="inline" onsubmit="return confirm('Remove this rate card?')">
                                 @csrf @method('DELETE')
-                                <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
+                                <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>
                         </td>
                     </tr>

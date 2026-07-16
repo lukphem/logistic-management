@@ -8,13 +8,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Hub extends Model
 {
-    protected $fillable = ['region_id', 'name', 'code', 'address', 'latitude', 'longitude', 'is_active'];
+    protected $fillable = ['region_id', 'city_id', 'name', 'code', 'address', 'latitude', 'longitude', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 
     public function region(): BelongsTo
     {
         return $this->belongsTo(Region::class);
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
     }
 
     public function zones(): HasMany

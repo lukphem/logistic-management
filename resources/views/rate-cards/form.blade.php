@@ -189,7 +189,7 @@
                             <td class="py-2 text-right">
                                 <form method="POST" action="{{ route('rate-cards.zone-prices.destroy', [$rateCard, $entry]) }}" onsubmit="return confirm('Remove this price pair?')">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="text-sm font-medium text-status-exception hover:underline">Remove</button>
+                                    <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                 </form>
                             </td>
                         </tr>
@@ -221,7 +221,7 @@
                     <label class="mb-1 block text-sm font-medium text-ink-900">Price</label>
                     <input type="number" step="0.01" name="price" class="w-32 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 </div>
-                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
                     Save price
                 </button>
             </form>

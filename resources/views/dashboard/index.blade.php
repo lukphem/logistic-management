@@ -10,10 +10,20 @@
             ];
         @endphp
 
+        @php
+            $accentStyles = [
+                'brand' => ['border' => 'border-l-[var(--brand-primary)]', 'text' => 'text-[var(--brand-primary)]'],
+                'transit' => ['border' => 'border-l-status-transit', 'text' => 'text-status-transit'],
+                'delivered' => ['border' => 'border-l-status-delivered', 'text' => 'text-status-delivered'],
+                'exception' => ['border' => 'border-l-status-exception', 'text' => 'text-status-exception'],
+            ];
+        @endphp
+
         @foreach ($cards as $card)
-            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            @php $accent = $accentStyles[$card['accent']]; @endphp
+            <div class="rounded-xl border border-line {{ $accent['border'] }} border-l-4 bg-surface-0 p-5 shadow-sm transition-shadow hover:shadow-md">
                 <p class="text-sm font-medium text-ink-500">{{ $card['label'] }}</p>
-                <p class="mt-2 font-mono text-3xl font-semibold text-ink-900">{{ number_format($card['value']) }}</p>
+                <p class="mt-2 font-mono text-3xl font-semibold {{ $accent['text'] }}">{{ number_format($card['value']) }}</p>
             </div>
         @endforeach
     </div>
@@ -36,7 +46,7 @@
             </thead>
             <tbody>
                 @forelse ($recentShipments as $shipment)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3">
                             <a href="{{ route('shipments.show', $shipment) }}" class="font-mono text-sm text-[var(--brand-primary)] hover:underline">
                                 {{ $shipment->tracking_number }}

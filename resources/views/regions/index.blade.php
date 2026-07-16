@@ -8,7 +8,7 @@
 
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">Groups multiple hubs — used for region-level staff access as well as reporting.</p>
-        <a href="{{ route('regions.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+        <a href="{{ route('regions.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
             + Add region
         </a>
     </div>
@@ -25,7 +25,7 @@
             </thead>
             <tbody>
                 @forelse ($regions as $region)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $region->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $region->code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $region->hubs_count }}</td>
@@ -33,7 +33,7 @@
                             <a href="{{ route('regions.edit', $region) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                             <form method="POST" action="{{ route('regions.destroy', $region) }}" class="inline" onsubmit="return confirm('Remove this region? Its hubs will simply become unassigned, not deleted.')">
                                 @csrf @method('DELETE')
-                                <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
+                                <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>
                         </td>
                     </tr>

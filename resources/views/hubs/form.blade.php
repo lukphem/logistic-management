@@ -34,6 +34,22 @@
                     <option value="{{ $region->id }}" @selected(old('region_id', $hub->region_id) == $region->id)>{{ $region->name }}</option>
                 @endforeach
             </select>
+            <p class="mt-1 text-xs text-ink-500">Access-scope grouping — separate from the city below, which is the actual operating location.</p>
+        </div>
+
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">City</label>
+            <select name="city_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">No city set</option>
+                @foreach ($cities->groupBy(fn ($city) => $city->state->name . ', ' . $city->state->country->name) as $groupLabel => $groupCities)
+                    <optgroup label="{{ $groupLabel }}">
+                        @foreach ($groupCities as $city)
+                            <option value="{{ $city->id }}" @selected(old('city_id', $hub->city_id) == $city->id)>{{ $city->name }}</option>
+                        @endforeach
+                    </optgroup>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-500">The actual city this hub operates in. Manage the list under Setups → Location → Countries/States/Cities.</p>
         </div>
 
         <div>

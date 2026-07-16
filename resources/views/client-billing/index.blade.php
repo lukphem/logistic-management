@@ -26,7 +26,7 @@
             <tbody>
                 @forelse ($clients as $client)
                     @php $profile = $client['profile']; @endphp
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3">
                             <p class="font-medium text-ink-900">{{ $client['name'] }}</p>
                             <p class="text-xs text-ink-500">{{ $client['identifier'] }}</p>
