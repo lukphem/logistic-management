@@ -36,14 +36,15 @@ class ShipmentPricingService
         $discountFraction = $billingProfile?->discountFraction() ?? 0.0;
         $discountAmount = round(($baseAmount + $surchargeAmount) * $discountFraction, 2);
 
-        // Discount applies to freight + surcharges only — insurance is a
-        // pass-through cost tied to declared value, not a negotiated rate,
-        // so it is never discounted.
+        // Discount applies to freight + surcharges only — insurance and
+        // onforwarding are pass-through costs, not part of the negotiated
+        // rate, so neither is ever discounted.
         $discountedFreight = ($baseAmount + $surchargeAmount) - $discountAmount;
         $insuranceAmount = $this->calculateInsurance($context);
+        $onforwardingAmount = $this->calculateOnforwarding($context);
 
         $vatPercentage = (float) ($context['vat_percentage'] ?? config('branding.vat_percentage', 0));
-        $taxableAmount = $discountedFreight + $insuranceAmount;
+        $taxableAmount = $discountedFreight + $insuranceAmount + $onforwardingAmount;
         $vatAmount = round($taxableAmount * ($vatPercentage / 100), 2);
 
         $total = round($taxableAmount + $vatAmount, 2);
@@ -51,6 +52,7 @@ class ShipmentPricingService
         return [
             'base_amount' => round($baseAmount, 2),
             'surcharge_amount' => round($surchargeAmount, 2),
+            'onforwarding_amount' => round($onforwardingAmount, 2),
             'discount_amount' => $discountAmount,
             'insurance_amount' => round($insuranceAmount, 2),
             'vat_amount' => $vatAmount,
@@ -79,5 +81,39 @@ class ShipmentPricingService
         $rate = (float) ($context['insurance_rate_percentage'] ?? 1); // default 1% of declared value
 
         return round(((float) $context['declared_value']) * ($rate / 100), 2);
+    }
+
+    /**
+     * Sums whichever onforwarding fee applies on each side of the
+     * shipment — origin and destination are checked independently, so a
+     * shipment onforwarding on both ends is charged for both. District
+     * classification takes priority over city classification when a
+     * district is set, since it's the more specific match.
+     */
+    private function calculateOnforwarding(array $context): float
+    {
+        return $this->resolveOnforwardingFee($context['origin_district_id'] ?? null, $context['origin_city_id'] ?? null)
+            + $this->resolveOnforwardingFee($context['destination_district_id'] ?? null, $context['destination_city_id'] ?? null);
+    }
+
+    private function resolveOnforwardingFee(?int $districtId, ?int $cityId): float
+    {
+        if ($districtId) {
+            $district = \App\Models\District::with('onforwardingClassification')->find($districtId);
+
+            if ($district?->onforwardingClassification) {
+                return (float) $district->onforwardingClassification->surcharge_amount;
+            }
+        }
+
+        if ($cityId) {
+            $city = \App\Models\City::with('onforwardingClassification')->find($cityId);
+
+            if ($city?->onforwardingClassification) {
+                return (float) $city->onforwardingClassification->surcharge_amount;
+            }
+        }
+
+        return 0.0;
     }
 }

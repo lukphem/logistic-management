@@ -74,6 +74,9 @@
                 <dl class="space-y-2 text-sm">
                     <div class="flex justify-between"><dt class="text-ink-500">Base</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->base_amount, 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-ink-500">Surcharges</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->surcharge_amount, 2) }}</dd></div>
+                    @if ($shipment->onforwarding_amount > 0)
+                        <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->onforwarding_amount, 2) }}</dd></div>
+                    @endif
                     @if ($shipment->discount_amount > 0)
                         <div class="flex justify-between"><dt class="text-ink-500">Discount</dt><dd class="font-mono text-status-delivered">−{{ number_format($shipment->discount_amount, 2) }}</dd></div>
                     @endif

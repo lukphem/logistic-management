@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\City;
 use App\Models\Country;
 use App\Models\Hub;
+use App\Models\OnforwardingClassification;
 use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class CityController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = City::with(['state.country', 'operationalHub']);
+        $query = City::with(['state.country', 'operationalHub', 'onforwardingClassification']);
 
         if ($request->filled('state_id')) {
             $query->where('state_id', $request->state_id);
@@ -40,6 +41,7 @@ class CityController extends Controller
             'city' => new City(),
             'states' => State::with('country')->orderBy('name')->get(),
             'hubs' => Hub::with('city.state')->orderBy('name')->get(),
+            'classifications' => OnforwardingClassification::orderBy('name')->get(),
         ]);
     }
 
@@ -56,6 +58,7 @@ class CityController extends Controller
             'city' => $city,
             'states' => State::with('country')->orderBy('name')->get(),
             'hubs' => Hub::with('city.state')->orderBy('name')->get(),
+            'classifications' => OnforwardingClassification::orderBy('name')->get(),
         ]);
     }
 
@@ -87,16 +90,19 @@ class CityController extends Controller
             // Optional — only needed to disambiguate when the city's
             // state is covered by more than one hub. See City::operationalHub().
             'operational_hub_id' => 'nullable|exists:hubs,id',
+            'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // Blank "No specific hub" option submits as an empty string, not
-        // null — normalize it immediately, the same class of bug fixed
-        // in Increment 20.
-        if (($data['operational_hub_id'] ?? null) === '') {
-            $data['operational_hub_id'] = null;
+        // Blank "No specific hub"/"No classification" options submit as
+        // an empty string, not null — normalize immediately, the same
+        // class of bug fixed in Increment 20.
+        foreach (['operational_hub_id', 'onforwarding_classification_id'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
         }
 
         return $data;

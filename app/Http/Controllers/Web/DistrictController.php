@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\City;
 use App\Models\District;
+use App\Models\OnforwardingClassification;
 use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class DistrictController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = District::with('city.state.country');
+        $query = District::with(['city.state.country', 'onforwardingClassification']);
 
         if ($request->filled('city_id')) {
             $query->where('city_id', $request->city_id);
@@ -35,7 +36,11 @@ class DistrictController extends Controller
 
     public function create(): View
     {
-        return view('districts.form', ['district' => new District(), 'cities' => City::with('state.country')->orderBy('name')->get()]);
+        return view('districts.form', [
+            'district' => new District(),
+            'cities' => City::with('state.country')->orderBy('name')->get(),
+            'classifications' => OnforwardingClassification::orderBy('name')->get(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,7 +52,11 @@ class DistrictController extends Controller
 
     public function edit(District $district): View
     {
-        return view('districts.form', ['district' => $district, 'cities' => City::with('state.country')->orderBy('name')->get()]);
+        return view('districts.form', [
+            'district' => $district,
+            'cities' => City::with('state.country')->orderBy('name')->get(),
+            'classifications' => OnforwardingClassification::orderBy('name')->get(),
+        ]);
     }
 
     public function update(Request $request, District $district): RedirectResponse
@@ -75,10 +84,19 @@ class DistrictController extends Controller
                     ->where('city_id', $request->city_id)
                     ->ignore($ignoreId),
             ],
+            'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
         ]);
 
         $validator->validate();
+        $data = $validator->validated();
 
-        return $validator->validated();
+        // Blank "No classification" option submits as an empty string,
+        // not null — normalize immediately, the same class of bug fixed
+        // in Increment 20.
+        if (($data['onforwarding_classification_id'] ?? null) === '') {
+            $data['onforwarding_classification_id'] = null;
+        }
+
+        return $data;
     }
 }

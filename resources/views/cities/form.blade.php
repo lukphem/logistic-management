@@ -63,6 +63,22 @@
             </p>
         </div>
 
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Onforwarding classification <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <select name="onforwarding_classification_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">No classification (no extra charge)</option>
+                @foreach ($classifications as $classification)
+                    <option value="{{ $classification->id }}" @selected(old('onforwarding_classification_id', $city->onforwarding_classification_id) == $classification->id)>
+                        {{ $classification->name }} (+{{ number_format($classification->surcharge_amount, 2) }})
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-500">
+                If set, any shipment originating from or destined to this city is charged this extra amount automatically.
+                Manage the available classifications under Setups → Client Billing → Onforwarding Classifications.
+            </p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ route('cities.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

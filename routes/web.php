@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DistrictController;
 use App\Http\Controllers\Web\HubController;
+use App\Http\Controllers\Web\OnforwardingClassificationController;
 use App\Http\Controllers\Web\OutletController;
 use App\Http\Controllers\Web\RateCardController;
 use App\Http\Controllers\Web\RegionController;
@@ -131,9 +132,15 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:billing:read')->group(function () {
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
+        Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
     });
     Route::middleware('can:billing:update')->group(function () {
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
+        Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
+        Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');
+        Route::get('/onforwarding-classifications/{onforwardingClassification}/edit', [OnforwardingClassificationController::class, 'edit'])->name('onforwarding-classifications.edit');
+        Route::put('/onforwarding-classifications/{onforwardingClassification}', [OnforwardingClassificationController::class, 'update'])->name('onforwarding-classifications.update');
+        Route::delete('/onforwarding-classifications/{onforwardingClassification}', [OnforwardingClassificationController::class, 'destroy'])->name('onforwarding-classifications.destroy');
     });
 
     // Staff user management + roles/permissions.

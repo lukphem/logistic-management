@@ -1395,3 +1395,72 @@ resources/views/cities/form.blade.php   (dropdown shows hub location, clarified 
 ```
 
 No migration needed.
+
+## Increment 26 — Onforwarding Classification (Billing Module)
+
+Cities and Districts can now carry an **Onforwarding Classification** —
+a billing concept for locations outside the direct hub network that need
+handing off to a third party/local courier to complete delivery,
+typically at an extra charge.
+
+### Why a separate lookup table, not a boolean
+
+Kept as its own small table (`onforwarding_classifications`: name,
+surcharge_amount, is_default) rather than a flag on City/District, so
+more than one tier can exist at different fee levels (e.g.
+"Onforwarding - Near" vs "Onforwarding - Remote"), and so the fee amount
+lives in one place instead of being duplicated per location. Managed
+under **Setups → Client Billing → Onforwarding Classifications**, since
+this is fundamentally a billing configuration, not a location one.
+
+### How it applies
+
+Every city — and, more specifically, every district — can have a
+classification assigned, whether or not there's an actual reason to
+(same "no restriction" principle as the operational hub override in
+Increment 24/25). When set, `ShipmentPricingService::calculateOnforwarding()`
+checks **both sides of the shipment independently**:
+
+- If a district is specified (new `origin_district_id`/
+  `destination_district_id` on shipments, mirroring the city fields),
+  its classification takes priority — being the more specific match
+- Otherwise falls back to the city's own classification
+- Origin and destination are summed separately, so a shipment
+  onforwarding on *both* ends is charged for both
+
+Treated like insurance in the pricing waterfall: **not** discounted (it's
+a pass-through cost, not part of the negotiated rate), but **is** subject
+to VAT. Recorded as its own `onforwarding_amount` line on the shipment,
+shown separately in the billing breakdown rather than folded into
+"surcharges."
+
+### Files
+
+```
+database/migrations/2026_01_18_000001_create_onforwarding_classifications_table.php
+database/migrations/2026_01_18_000002_add_onforwarding_classification_to_cities_and_districts_table.php
+database/migrations/2026_01_18_000003_add_district_and_onforwarding_to_shipments_table.php
+app/Models/OnforwardingClassification.php
+app/Models/City.php, District.php   (onforwardingClassification() relation)
+app/Models/Shipment.php   (origin_district_id/destination_district_id, onforwarding_amount)
+app/Services/ShipmentPricingService.php   (calculateOnforwarding())
+app/Http/Controllers/Web/OnforwardingClassificationController.php
+app/Http/Controllers/Web/CityController.php, DistrictController.php   (classification field)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php   (district fields accepted)
+resources/views/onforwarding-classifications/   (index + form)
+resources/views/cities/, districts/   (classification field/column)
+resources/views/shipments/show.blade.php   (onforwarding line in billing breakdown)
+```
+
+### Known gap (pre-existing, not new)
+
+Staff walk-in bookings (`ShipmentController::store`, API) still don't run
+through `ShipmentPricingService` at all — same gap flagged since
+Increment 10 — so `onforwarding_amount` (like every other pricing field)
+stays at 0 for those until that's wired up.
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

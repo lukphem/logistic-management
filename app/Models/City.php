@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class City extends Model
 {
-    protected $fillable = ['state_id', 'name', 'short_code', 'code', 'operational_hub_id'];
+    protected $fillable = ['state_id', 'name', 'short_code', 'code', 'operational_hub_id', 'onforwarding_classification_id'];
 
     public function state(): BelongsTo
     {
@@ -23,6 +23,11 @@ class City extends Model
     public function districts(): HasMany
     {
         return $this->hasMany(District::class);
+    }
+
+    public function onforwardingClassification(): BelongsTo
+    {
+        return $this->belongsTo(OnforwardingClassification::class);
     }
 
     /**

@@ -7,11 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class District extends Model
 {
-    protected $fillable = ['city_id', 'name', 'short_code', 'code'];
+    protected $fillable = ['city_id', 'name', 'short_code', 'code', 'onforwarding_classification_id'];
 
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    public function onforwardingClassification(): BelongsTo
+    {
+        return $this->belongsTo(OnforwardingClassification::class);
     }
 
     /**

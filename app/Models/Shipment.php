@@ -11,9 +11,9 @@ class Shipment extends Model
 {
     protected $fillable = [
         'tracking_number', 'client_user_id', 'api_client_id', 'service_type', 'rate_card_id',
-        'origin_address', 'origin_zone_id', 'origin_city_id', 'destination_address', 'destination_zone_id', 'destination_city_id', 'distance_km',
+        'origin_address', 'origin_zone_id', 'origin_city_id', 'origin_district_id', 'destination_address', 'destination_zone_id', 'destination_city_id', 'destination_district_id', 'distance_km',
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg',
-        'base_amount', 'surcharge_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
+        'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
         'sla_breached', 'promised_delivery_at', 'delivered_at',
     ];
@@ -139,6 +139,16 @@ class Shipment extends Model
     public function destinationCity(): BelongsTo
     {
         return $this->belongsTo(City::class, 'destination_city_id');
+    }
+
+    public function originDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'origin_district_id');
+    }
+
+    public function destinationDistrict(): BelongsTo
+    {
+        return $this->belongsTo(District::class, 'destination_district_id');
     }
 
     public function assignedRider(): BelongsTo
