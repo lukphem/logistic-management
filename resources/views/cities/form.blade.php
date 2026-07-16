@@ -15,7 +15,7 @@
         @endif
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">State/Province</label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">State/Province <x-required /></label>
             <select name="state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 @foreach ($states->groupBy('country_id') as $countryStates)
                     <optgroup label="{{ $countryStates->first()->country->name }}">
@@ -28,7 +28,7 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">City name</label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">City name <x-required /></label>
             <input type="text" name="name" value="{{ old('name', $city->name) }}" placeholder="e.g. Ikeja"
                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
         </div>

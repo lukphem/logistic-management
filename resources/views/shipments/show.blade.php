@@ -4,9 +4,9 @@
         <div>
             <p class="font-mono text-2xl font-semibold text-ink-900">{{ $shipment->tracking_number }}</p>
             <p class="mt-1 text-sm text-ink-500">
-                {{ $shipment->originZone?->name ?? $shipment->origin_address }}
+                {{ $shipment->originCity?->name ?? $shipment->originZone?->name ?? $shipment->origin_address }}
                 <span class="mx-1">→</span>
-                {{ $shipment->destinationZone?->name ?? $shipment->destination_address }}
+                {{ $shipment->destinationCity?->name ?? $shipment->destinationZone?->name ?? $shipment->destination_address }}
             </p>
         </div>
         <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />

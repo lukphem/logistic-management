@@ -11,7 +11,7 @@ class Shipment extends Model
 {
     protected $fillable = [
         'tracking_number', 'client_user_id', 'api_client_id', 'service_type', 'rate_card_id',
-        'origin_address', 'origin_zone_id', 'destination_address', 'destination_zone_id', 'distance_km',
+        'origin_address', 'origin_zone_id', 'origin_city_id', 'destination_address', 'destination_zone_id', 'destination_city_id', 'distance_km',
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg',
         'base_amount', 'surcharge_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_outlet_id',
@@ -49,6 +49,16 @@ class Shipment extends Model
     public function destinationZone(): BelongsTo
     {
         return $this->belongsTo(Zone::class, 'destination_zone_id');
+    }
+
+    public function originCity(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'origin_city_id');
+    }
+
+    public function destinationCity(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'destination_city_id');
     }
 
     public function assignedRider(): BelongsTo

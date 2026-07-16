@@ -40,7 +40,7 @@
                             </a>
                         </td>
                         <td class="px-5 py-3 text-ink-500">
-                            {{ $shipment->originZone?->name ?? '—' }} → {{ $shipment->destinationZone?->name ?? '—' }}
+                            {{ $shipment->originCity?->name ?? $shipment->originZone?->name ?? '—' }} → {{ $shipment->destinationCity?->name ?? $shipment->destinationZone?->name ?? '—' }}
                             @if ($shipment->currentOutlet)
                                 <span class="block text-xs">At {{ $shipment->currentOutlet->name }}</span>
                             @endif

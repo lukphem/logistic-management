@@ -15,13 +15,13 @@
         @endif
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Hub name</label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Hub name <x-required /></label>
             <input type="text" name="name" value="{{ old('name', $hub->name) }}"
                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Code</label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Code <x-required /></label>
             <input type="text" name="code" value="{{ old('code', $hub->code) }}" placeholder="e.g. LOS-01"
                    class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
         </div>
@@ -53,7 +53,7 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Address</label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Address <x-required /></label>
             <textarea name="address" rows="2"
                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('address', $hub->address) }}</textarea>
         </div>

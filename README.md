@@ -998,3 +998,85 @@ resources/views/dashboard/index.blade.php   (accent colors actually applied)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 18 — Location Data Seeded, Cities Wired into Shipments, Required-Field Markers
+
+### Country/State/City population
+
+`LocationSeeder` (called from `DatabaseSeeder`) populates:
+- **All ~195 world countries** (name + ISO2 code) — a fixed, small
+  reference set, seeded in full
+- **Nigeria's 36 states + FCT**, each with its capital plus one or two
+  other major commercial cities (~80 cities total)
+
+Deliberately **not** attempting every city for every country — that's
+hundreds of thousands of rows and not a reasonable thing to hand-seed.
+Nigeria is seeded in full detail since it's this deployment's home
+operating country; staff add states/cities for any other country they
+expand into from Setups → Location → Countries/States/Cities, which
+already supports it.
+
+```powershell
+php artisan db:seed --class=LocationSeeder
+```
+
+### Cities wired into shipment origin/destination
+
+`shipments.origin_city_id` / `destination_city_id` (nullable, additive to
+the existing `origin_zone_id`/`destination_zone_id`) — accepted now by:
+- `ClientController::quote()`
+- `ClientShipmentController::store()` (client portal + external
+  integration)
+- `ShipmentController::store()` (staff walk-in booking, API)
+
+**Important distinction kept intentional:** Zone stays the actual
+rate-calculation key for the `zone_to_zone` billing model — that
+architecture doesn't change. City is what a client-facing quote/booking
+screen actually lets someone *pick*, since "choose a city" is far more
+usable than "choose a zone" for someone who has no concept of your
+internal zone map. The shipment list and detail views now show the city
+name first, falling back to zone, then the raw address string, wherever
+origin/destination is displayed.
+
+### Required-field markers
+
+A small `<x-required />` component (red asterisk, tooltip "Required")
+now marks every field that's actually `required` in its controller's
+validation rules — applied precisely, not decoratively, across: staff
+users, hubs, regions, outlets, units, countries, states, cities, rate
+cards, settings, login, and the scan-status quick-add form. Optional
+fields (region/city on a hub, invoice header/footer, notes, etc.) are
+deliberately left unmarked.
+
+### Unit + operating location, made visible together
+
+The staff user form already had Unit and access-scope (Global/Region/
+Hub/Outlet) selection from Increments 15–16. Added: a read-only
+**"Operating location"** panel right below the Unit field, on the edit
+page, showing the resolved City/State/Country from the person's hub (or
+their outlet's parent hub) — e.g. "Ikeja, Lagos, Nigeria" — sourced
+directly from the new Country/State/City data. This is what actually
+connects "which unit/hub someone belongs to" to "what real place that
+is," without duplicating a separate location picker on the user record
+itself (the hub's city is the single source of truth).
+
+### Files
+
+```
+database/seeders/LocationSeeder.php   (called from DatabaseSeeder)
+database/migrations/2026_01_12_000001_add_city_ids_to_shipments_table.php
+app/Models/Shipment.php   (origin_city_id/destination_city_id, relations)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php
+resources/views/components/required.blade.php
+resources/views/shipments/index.blade.php, shipments/show.blade.php   (city display fallback chain)
+resources/views/users/form.blade.php   (Operating location panel)
++ required-field markers across users, hubs, regions, outlets, units, countries,
+  states, cities, rate-cards, settings, login, scan-statuses forms
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=LocationSeeder
+```

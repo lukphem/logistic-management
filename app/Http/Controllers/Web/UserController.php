@@ -79,7 +79,7 @@ class UserController extends Controller
         abort_unless($user->user_type === 'staff', 404);
 
         return view('users.form', [
-            'user' => $user->load('statusAudits.changedBy'),
+            'user' => $user->load('statusAudits.changedBy', 'hub.city.state.country', 'outlet.hub.city.state.country'),
             'roles' => $this->webRoles(),
             'hubs' => Hub::orderBy('name')->get(),
             'regions' => Region::orderBy('name')->get(),

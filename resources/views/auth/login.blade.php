@@ -39,12 +39,12 @@
                 <form method="POST" action="{{ route('login') }}" class="space-y-4">
                     @csrf
                     <div>
-                        <label for="email" class="mb-1 block text-sm font-medium text-ink-900">Email</label>
+                        <label for="email" class="mb-1 block text-sm font-medium text-ink-900">Email <x-required /></label>
                         <input id="email" name="email" type="email" required autofocus value="{{ old('email') }}"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
-                        <label for="password" class="mb-1 block text-sm font-medium text-ink-900">Password</label>
+                        <label for="password" class="mb-1 block text-sm font-medium text-ink-900">Password <x-required /></label>
                         <input id="password" name="password" type="password" required
                                class="w-full rounded-md border border-line px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>

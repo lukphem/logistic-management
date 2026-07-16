@@ -30,6 +30,8 @@ class ClientController extends Controller
             'service_type' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'destination_zone_id' => 'nullable|exists:zones,id',
+            'origin_city_id' => 'nullable|exists:cities,id',
+            'destination_city_id' => 'nullable|exists:cities,id',
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
             'length_cm' => 'nullable|numeric',

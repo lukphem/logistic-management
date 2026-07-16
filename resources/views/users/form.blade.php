@@ -54,24 +54,24 @@
                     <div class="space-y-4">
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-ink-900">First name</label>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">First name <x-required /></label>
                                 <input type="text" name="first_name" value="{{ old('first_name', $user->first_name) }}"
                                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-ink-900">Last name</label>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Last name <x-required /></label>
                                 <input type="text" name="last_name" value="{{ old('last_name', $user->last_name) }}"
                                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                             </div>
                         </div>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-ink-900">Email</label>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Email <x-required /></label>
                                 <input type="email" name="email" value="{{ old('email', $user->email) }}"
                                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                             </div>
                             <div>
-                                <label class="mb-1 block text-sm font-medium text-ink-900">Phone number</label>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Phone number <x-required /></label>
                                 <input type="text" name="phone_number" value="{{ old('phone_number', $user->phone_number) }}"
                                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                             </div>
@@ -79,6 +79,7 @@
                         <div>
                             <label class="mb-1 block text-sm font-medium text-ink-900">
                                 {{ $user->exists ? 'New password' : 'Password' }}
+                                @unless ($user->exists) <x-required /> @endunless
                             </label>
                             <input type="password" name="password"
                                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
@@ -87,7 +88,7 @@
                             @endif
                         </div>
                         <div>
-                            <label class="mb-1 block text-sm font-medium text-ink-900">Role</label>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Role <x-required /></label>
                             <select name="role" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 @php $currentRole = $user->roles->first()?->name; @endphp
                                 @foreach ($roles as $role)
@@ -185,6 +186,20 @@
                         </select>
                         <p class="mt-1 text-xs text-ink-500">Which team within the hub — never changes what shipments they can see.</p>
                     </div>
+
+                    @php
+                        $resolvedHub = $user->hasOutletAccess() ? $user->outlet?->hub : ($user->hub ?? null);
+                        $resolvedCity = $resolvedHub?->city;
+                    @endphp
+                    @if ($user->exists && $resolvedCity)
+                        <div class="mt-4 rounded-lg border border-line bg-surface-50 p-3">
+                            <p class="text-xs font-medium text-ink-500">Operating location</p>
+                            <p class="text-sm text-ink-900">
+                                {{ $resolvedCity->name }}, {{ $resolvedCity->state->name }}, {{ $resolvedCity->state->country->name }}
+                            </p>
+                            <p class="mt-0.5 text-xs text-ink-500">Resolved from {{ $resolvedHub->name }}'s city — set under Setups → Location → Hubs.</p>
+                        </div>
+                    @endif
                 </div>
 
                 <details class="group rounded-xl border border-line bg-surface-0 shadow-sm">

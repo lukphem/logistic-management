@@ -64,13 +64,13 @@
         <form method="POST" action="{{ route('scan-statuses.store') }}" class="flex flex-wrap items-end gap-4">
             @csrf
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Key</label>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Key <x-required /></label>
                 <input type="text" name="key" placeholder="e.g. customs_hold" value="{{ old('key') }}"
                        class="w-48 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <p class="mt-1 text-xs text-ink-500">Letters, numbers, dashes/underscores. Cannot change later.</p>
             </div>
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Label</label>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Label <x-required /></label>
                 <input type="text" name="label" placeholder="Customs Hold" value="{{ old('label') }}"
                        class="w-48 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
             </div>

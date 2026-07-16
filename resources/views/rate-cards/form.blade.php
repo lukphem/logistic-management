@@ -24,12 +24,12 @@
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Basics</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Name</label>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Name <x-required /></label>
                     <input type="text" name="name" value="{{ old('name', $rateCard->name) }}" placeholder="e.g. Express — Lagos Intra-city"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Service type</label>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
                     <select name="service_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         @foreach ($serviceNames as $key => $label)
                             <option value="{{ $key }}" @selected(old('service_type', $rateCard->service_type) === $key)>{{ $label }}</option>
@@ -52,7 +52,7 @@
         </div>
 
         <div class="rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-            <h2 class="mb-1 text-sm font-semibold text-ink-900">Billing model</h2>
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Billing model <x-required /></h2>
             <p class="mb-4 text-xs text-ink-500">Determines how the price is calculated. Fields below change based on your selection.</p>
 
             <select id="billing_model" name="billing_model"
