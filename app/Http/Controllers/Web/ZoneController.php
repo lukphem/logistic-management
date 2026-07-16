@@ -62,6 +62,14 @@ class ZoneController extends Controller
             'hub_id' => 'nullable|exists:hubs,id',
         ]);
 
-        return $validator->validate();
+        $data = $validator->validate();
+
+        // Blank "— None —" option submits as an empty string, not null —
+        // see the fuller explanation in UserController's matching fix.
+        if (($data['hub_id'] ?? null) === '') {
+            $data['hub_id'] = null;
+        }
+
+        return $data;
     }
 }

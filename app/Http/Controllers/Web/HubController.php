@@ -79,6 +79,17 @@ class HubController extends Controller
         $data = $validator->validated();
         $data['is_active'] = $request->boolean('is_active', true);
 
+        // HTML blank options ("No region", "No city set") submit as an
+        // empty string, not null — and validated() passes that straight
+        // through. Inserting '' into a nullable foreign key column fails
+        // the FK constraint, silently breaking the whole save. See the
+        // matching fix and fuller explanation in UserController.
+        foreach (['region_id', 'city_id'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
+        }
+
         return $data;
     }
 }

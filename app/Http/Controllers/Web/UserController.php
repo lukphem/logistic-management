@@ -200,6 +200,20 @@ class UserController extends Controller
         $validator->validate();
         $data = $validator->validated();
 
+        // HTML <select> "blank" options submit as an empty string, not
+        // null — and Validator::validated() passes that through
+        // unchanged. Inserting '' into a nullable foreign key column
+        // fails the FK constraint (or an integer type check on strict
+        // MySQL), which silently breaks the *entire* save, not just the
+        // one field — this is what was blocking every staff form
+        // submission where "No unit" was selected. Normalize every
+        // nullable FK to true null before it goes anywhere near a query.
+        foreach (['region_id', 'hub_id', 'outlet_id', 'unit_id', 'employment_type'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
+        }
+
         // access_scope is a form-only concept — the four levels are
         // mutually exclusive, so only ever one of region_id/hub_id/
         // outlet_id is actually stored, regardless of what was posted.

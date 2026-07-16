@@ -1151,3 +1151,65 @@ php artisan db:seed --class=LocationSeeder
 Re-running `LocationSeeder` is safe (`firstOrCreate` throughout) and will
 backfill `short_code`/`code` on any existing seeded rows that predate
 this increment.
+
+## Increment 20 — Fixed: Empty-Select Foreign Keys Breaking Saves
+
+### The confirmed bug
+
+Every "blank" option in a `<select>` — "No unit", "No region", "No city
+set", "— None —" — submits as an **empty string**, not `null`.
+`Validator::validated()` passes that empty string straight through
+unchanged. Inserting `''` into a nullable foreign-key column fails the
+FK constraint (or an enum-type check, for `employment_type`), which
+**silently breaks the entire form save** — not just the one field. Since
+"No unit" / "No region" is the default state for most staff and hub
+records, this was blocking saves broadly, which is what surfaced as
+"can't attach user to unit or location."
+
+Fixed in three controllers — every place with a blank-option select that
+wasn't already protected:
+
+- `UserController` — `unit_id`, and defensively `region_id`/`hub_id`/
+  `outlet_id`/`employment_type` too (the first three were already safe
+  via the access-scope ternary, but explicit is better than relying on
+  that alone)
+- `HubController` — `region_id`, `city_id`
+- `ZoneController` — `hub_id`
+
+Each now normalizes `''` → `null` right after validation, before the
+data ever reaches a query.
+
+### On the permission/role issue
+
+I re-read `RolePermissionSeeder`, the guard/permission chain, and
+`bootstrap/app.php` line by line and can't find a code-level bug through
+static review — it's internally consistent (both guards seeded, roles
+assigned to both, no alias conflicts). Rather than ship another
+unverified guess after the sanctum-guard fix didn't fully resolve it
+last time, I need exact diagnostic output. **Please run this in Tinker
+and share what comes back:**
+
+```powershell
+php artisan tinker
+```
+```php
+$u = \App\Models\User::where('email', 'test@example.com')->first();
+$u->getRoleNames();
+$u->getAllPermissions()->pluck('name');
+\Spatie\Permission\Models\Permission::where('name', 'roles:read')->get(['name', 'guard_name']);
+```
+
+And separately: what exactly happens when you try to open Roles &
+Permissions — a 403 page, a blank page, a 500 error, something else?
+The exact wording or a screenshot description will tell me precisely
+where it's failing instead of me guessing again.
+
+### Files
+
+```
+app/Http/Controllers/Web/UserController.php
+app/Http/Controllers/Web/HubController.php
+app/Http/Controllers/Web/ZoneController.php
+```
+
+No migration needed — this is a validation-handling fix only.
