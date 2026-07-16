@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hub;
+use App\Models\Region;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class UserController extends Controller
     public function index(): View
     {
         $users = User::where('user_type', 'staff')
-            ->with(['roles', 'hub'])
+            ->with(['roles', 'hub', 'region'])
             ->orderBy('name')
             ->paginate(15);
 
@@ -30,6 +31,7 @@ class UserController extends Controller
             'user' => new User(),
             'roles' => $this->webRoles(),
             'hubs' => Hub::orderBy('name')->get(),
+            'regions' => Region::orderBy('name')->get(),
         ]);
     }
 
@@ -43,6 +45,7 @@ class UserController extends Controller
             'password' => Hash::make($data['password']),
             'user_type' => 'staff',
             'hub_id' => $data['hub_id'],
+            'region_id' => $data['region_id'],
         ]);
 
         $this->assignRoleAcrossGuards($user, $data['role']);
@@ -58,6 +61,7 @@ class UserController extends Controller
             'user' => $user->load('statusAudits.changedBy'),
             'roles' => $this->webRoles(),
             'hubs' => Hub::orderBy('name')->get(),
+            'regions' => Region::orderBy('name')->get(),
         ]);
     }
 
@@ -71,6 +75,7 @@ class UserController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'hub_id' => $data['hub_id'],
+            'region_id' => $data['region_id'],
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
 
@@ -131,17 +136,18 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email' . ($ignoreUserId ? ",{$ignoreUserId}" : ''),
             'password' => $ignoreUserId ? 'nullable|string|min:8' : 'required|string|min:8',
             'role' => 'required|string|exists:roles,name',
-            'access_scope' => 'required|in:global,hub',
+            'access_scope' => 'required|in:global,region,hub',
+            'region_id' => 'required_if:access_scope,region|nullable|exists:regions,id',
             'hub_id' => 'required_if:access_scope,hub|nullable|exists:hubs,id',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // access_scope is a form-only concept — the database just stores
-        // hub_id null-or-not. Collapsing it here keeps that single-column
-        // design from Migration 2026_01_06_000001 while still giving the
-        // form two clear, mutually exclusive options.
+        // access_scope is a form-only concept — the three levels are
+        // mutually exclusive, so only ever one of region_id/hub_id is
+        // actually stored, regardless of what values were posted.
+        $data['region_id'] = $data['access_scope'] === 'region' ? $data['region_id'] : null;
         $data['hub_id'] = $data['access_scope'] === 'hub' ? $data['hub_id'] : null;
 
         return $data;

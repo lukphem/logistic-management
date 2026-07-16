@@ -13,13 +13,13 @@ class ShipmentController extends Controller
     {
         $query = Shipment::with(['originZone', 'destinationZone', 'assignedRider']);
 
-        // Hub-restricted staff only see shipments currently sitting at
-        // their hub — global staff (hub_id null) see everything. Applied
-        // here rather than in a global scope so it's obvious from reading
-        // this controller alone, and so a global user's query never pays
-        // the extra WHERE for no reason.
+        // Filters to whatever the viewer's access scope resolves to:
+        // every hub (global), every hub in their region, or just their
+        // one hub — see User::accessibleHubIds(). Skipped entirely for
+        // global users so their query never carries an unnecessary
+        // WHERE IN across every hub ID.
         if (! auth()->user()->hasGlobalAccess()) {
-            $query->where('current_hub_id', auth()->user()->hub_id);
+            $query->whereIn('current_hub_id', auth()->user()->accessibleHubIds());
         }
 
         if ($request->filled('status')) {
@@ -37,7 +37,7 @@ class ShipmentController extends Controller
 
     public function show(Shipment $shipment): View
     {
-        if (! auth()->user()->hasGlobalAccess() && $shipment->current_hub_id !== auth()->user()->hub_id) {
+        if (! auth()->user()->hasGlobalAccess() && ! in_array($shipment->current_hub_id, auth()->user()->accessibleHubIds())) {
             abort(403, "This shipment isn't at a hub you have access to.");
         }
 

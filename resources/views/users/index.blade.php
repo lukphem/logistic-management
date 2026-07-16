@@ -45,7 +45,15 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $user->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->email }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->roles->pluck('name')->unique()->join(', ') ?: '—' }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ $user->hasGlobalAccess() ? 'Global' : ($user->hub?->name ?? '—') }}</td>
+                        <td class="px-5 py-3 text-ink-500">
+                            @if ($user->hasGlobalAccess())
+                                Global
+                            @elseif ($user->hasRegionAccess())
+                                {{ $user->region?->name ?? '—' }} <span class="text-xs">(region)</span>
+                            @else
+                                {{ $user->hub?->name ?? '—' }} <span class="text-xs">(hub)</span>
+                            @endif
+                        </td>
                         <td class="px-5 py-3">
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $statusStyles[$user->account_status] ?? 'bg-ink-500/10 text-ink-500' }}">
                                 {{ ucfirst($user->account_status) }}

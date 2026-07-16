@@ -49,6 +49,7 @@
                     // here as the last operational-config step.
                     $setupItems = [
                         ['label' => 'Company Settings', 'route' => 'settings.edit', 'icon' => 'sliders', 'permission' => 'settings:update'],
+                        ['label' => 'Regions', 'route' => 'regions.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Hubs & Branches', 'route' => 'hubs.index', 'icon' => 'building', 'permission' => 'locations:read'],
                         ['label' => 'Zones', 'route' => 'zones.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Rate Cards', 'route' => 'rate-cards.index', 'icon' => 'sliders', 'permission' => 'rates:read'],

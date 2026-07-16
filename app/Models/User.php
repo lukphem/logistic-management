@@ -29,6 +29,7 @@ class User extends Authenticatable
         'user_type',
         'is_active',
         'hub_id',
+        'region_id',
         'account_status',
         'status_reason',
         'status_changed_at',
@@ -70,19 +71,55 @@ class User extends Authenticatable
         return $this->belongsTo(Hub::class);
     }
 
+    public function region(): BelongsTo
+    {
+        return $this->belongsTo(Region::class);
+    }
+
     public function statusAudits(): HasMany
     {
         return $this->hasMany(UserStatusAudit::class)->latest();
     }
 
     /**
-     * null hub_id = global access (every hub). Set = restricted to that
-     * one hub. Use this rather than reading hub_id directly, so the
-     * meaning of "global" stays in one place.
+     * The access scale, broadest to narrowest: Global > Region > Hub.
+     * The three are mutually exclusive — a user has exactly one of them,
+     * never a combination — so region_id and hub_id are never both set
+     * at once (enforced in UserController::validateForm).
      */
     public function hasGlobalAccess(): bool
     {
-        return $this->hub_id === null;
+        return $this->hub_id === null && $this->region_id === null;
+    }
+
+    public function hasRegionAccess(): bool
+    {
+        return $this->region_id !== null && $this->hub_id === null;
+    }
+
+    public function hasHubAccess(): bool
+    {
+        return $this->hub_id !== null;
+    }
+
+    /**
+     * Resolves the scale down to the one thing every consumer actually
+     * needs: which hub IDs this user is allowed to see. Global returns
+     * every hub; Region returns every hub under that region; Hub returns
+     * just the one. Callers (e.g. ShipmentController) never need to know
+     * which scope level produced the list.
+     */
+    public function accessibleHubIds(): array
+    {
+        if ($this->hasGlobalAccess()) {
+            return Hub::pluck('id')->all();
+        }
+
+        if ($this->hasRegionAccess()) {
+            return Hub::where('region_id', $this->region_id)->pluck('id')->all();
+        }
+
+        return [$this->hub_id];
     }
 
     /**

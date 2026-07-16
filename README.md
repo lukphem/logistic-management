@@ -659,3 +659,74 @@ php artisan migrate
 ```
 
 (No reseed needed for this one — no new permission modules.)
+
+## Increment 13 — Regions: A Third Access-Scope Level
+
+Extends the access scale from Increment 12 (Global / Hub) into three
+levels: **Global > Region > Hub (Station)**. A Region groups multiple
+Hubs — the exact "region contains multiple stations" hierarchy asked for.
+
+### Data model
+
+- `regions` table (name, code) — sits above Hub
+- `hubs.region_id` (nullable) — a hub optionally belongs to one region
+- `users.region_id` (nullable, alongside the existing `hub_id`) — the
+  three scope levels are mutually exclusive: both null = Global,
+  `region_id` set = Region, `hub_id` set = Hub. Never two at once —
+  enforced in `UserController::validateForm()`, which zeroes out
+  whichever field doesn't match the selected `access_scope`.
+
+### `User` model additions
+
+- `hasGlobalAccess()` / `hasRegionAccess()` / `hasHubAccess()` — the
+  three checks
+- `accessibleHubIds()` — resolves any of the three straight down to
+  "which hub IDs can this person see," so `ShipmentController` (and
+  anything scoped the same way later) never needs to know which level
+  produced the list. Global returns every hub, Region returns every hub
+  under that region, Hub returns just the one.
+
+### Where it's enforced right now
+
+`ShipmentController` (staff) — both the list and the individual-shipment
+view now filter through `accessibleHubIds()` instead of a single hub_id
+comparison. Same 403-on-out-of-scope behavior as before, now correctly
+covering the region case too.
+
+**Not yet extended to:** rider assignment, reports, rate cards — same gap
+noted in Increment 12, now also applies to the region level.
+
+### New screen
+
+`/regions` — simple CRUD (name, code), gated under the existing
+`locations:*` permission alongside Hubs and Zones, since it's the same
+conceptual area. Added to the Setups menu right before Hubs & Branches,
+since a hub's region picker needs regions to exist first.
+
+The Hub form now has a region dropdown ("No region" is valid — a hub
+doesn't have to belong to one). The staff user form gained a third radio
+option between Global and Specific Hub.
+
+### Files
+
+```
+database/migrations/2026_01_07_000001_create_regions_table.php
+database/migrations/2026_01_07_000002_add_region_id_to_hubs_table.php
+database/migrations/2026_01_07_000003_add_region_id_to_users_table.php
+app/Models/Region.php
+app/Models/Hub.php               (region() relation)
+app/Models/User.php               (hasRegionAccess, accessibleHubIds)
+app/Http/Controllers/Web/RegionController.php
+app/Http/Controllers/Web/HubController.php    (region_id added)
+app/Http/Controllers/Web/UserController.php   (three-way access_scope)
+app/Http/Controllers/Web/ShipmentController.php  (accessibleHubIds)
+resources/views/regions/index.blade.php, regions/form.blade.php
+resources/views/hubs/form.blade.php, hubs/index.blade.php  (region field/column)
+resources/views/users/form.blade.php, users/index.blade.php  (region option/column)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

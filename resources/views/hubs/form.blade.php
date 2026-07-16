@@ -27,6 +27,16 @@
         </div>
 
         <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Region</label>
+            <select name="region_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">No region</option>
+                @foreach ($regions as $region)
+                    <option value="{{ $region->id }}" @selected(old('region_id', $hub->region_id) == $region->id)>{{ $region->name }}</option>
+                @endforeach
+            </select>
+        </div>
+
+        <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Address</label>
             <textarea name="address" rows="2"
                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('address', $hub->address) }}</textarea>
