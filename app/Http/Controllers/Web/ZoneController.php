@@ -60,18 +60,28 @@ class ZoneController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:zones,code,' . $request->route('zone')?->id,
             'hub_id' => 'nullable|exists:hubs,id',
+            'type' => 'required|in:' . implode(',', array_keys(\App\Models\Zone::TYPES)),
             'tier' => 'nullable|in:' . implode(',', array_keys(\App\Models\Zone::TIERS)),
-            'coverage_description' => 'nullable|string|max:255',
+            'coverage_description' => 'required|string|max:255',
         ]);
 
         $data = $validator->validate();
 
         // Blank "— None —" option submits as an empty string, not null —
         // see the fuller explanation in UserController's matching fix.
-        foreach (['hub_id', 'tier'] as $field) {
-            if (($data[$field] ?? null) === '') {
-                $data[$field] = null;
-            }
+        if (($data['hub_id'] ?? null) === '') {
+            $data['hub_id'] = null;
+        }
+        if (($data['tier'] ?? null) === '') {
+            $data['tier'] = null;
+        }
+
+        // Tier is a domestic-only refinement — an international zone
+        // grouped by region has no A–F tariff tier, so clear it
+        // regardless of what was posted (the form hides the tier field
+        // for international zones, but don't rely on that alone).
+        if ($data['type'] === 'international') {
+            $data['tier'] = null;
         }
 
         // Suggest the tier's standard coverage description when none was

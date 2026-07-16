@@ -27,6 +27,24 @@
         </div>
 
         <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Type <x-required /></label>
+            <div class="flex gap-3">
+                @foreach (\App\Models\Zone::TYPES as $key => $label)
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" id="type-{{ $key }}" name="type" value="{{ $key }}"
+                               @checked(old('type', $zone->type ?? 'domestic') === $key)
+                               onchange="document.getElementById('tier-field').style.display = this.value === 'domestic' ? '' : 'none';">
+                        {{ $label }}
+                    </label>
+                @endforeach
+            </div>
+            <p class="mt-1 text-xs text-ink-500">
+                International zones are grouped by region (e.g. West Africa, Europe) rather than by tier — the tier
+                picker below only applies to domestic zones.
+            </p>
+        </div>
+
+        <div id="tier-field" style="{{ old('type', $zone->type ?? 'domestic') === 'domestic' ? '' : 'display:none' }}">
             <label class="mb-1 block text-sm font-medium text-ink-900">Tier <span class="text-xs font-normal text-ink-500">(optional)</span></label>
             <select id="tier" name="tier" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">No tier set</option>
@@ -35,15 +53,15 @@
                 @endforeach
             </select>
             <p class="mt-1 text-xs text-ink-500">
-                The standard courier zone-tier model — classifies what kind of coverage this is. The actual price
-                between zones is still set under Billing → Zone Mapping, not here.
+                The standard courier zone-tier model — classifies what kind of domestic coverage this is. The actual
+                price between zones is still set under Billing → Zone Mapping, not here.
             </p>
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Coverage description <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Coverage description <x-required /></label>
             <input id="coverage_description" type="text" name="coverage_description" value="{{ old('coverage_description', $zone->coverage_description) }}"
-                   placeholder="e.g. Nearby towns within the same state"
+                   placeholder="e.g. Nearby towns within the same state, or West Africa for an international zone"
                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
             <p class="mt-1 text-xs text-ink-500">Filled in automatically from the tier's standard description if left blank — override it anytime.</p>
         </div>

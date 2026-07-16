@@ -7,18 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Zone extends Model
 {
-    protected $fillable = ['name', 'code', 'tier', 'coverage_description', 'hub_id', 'geofence'];
+    protected $fillable = ['name', 'code', 'type', 'tier', 'coverage_description', 'hub_id', 'geofence'];
 
     protected $casts = ['geofence' => 'array'];
 
     /**
-     * The standard courier-industry zone-tier model. Each entry is
-     * [label, default coverage description, billing purpose] — used to
-     * populate the tier picker and to suggest a coverage description
-     * when one hasn't been typed. Purely reference data for the UI; the
-     * actual tariff itself still lives in ZoneRateMatrix (Zone Mapping),
-     * not here — a tier describes WHAT KIND of zone this is, not its
-     * price.
+     * The A–F courier-industry tier model — only meaningful for
+     * DOMESTIC zones (a "Zone C" doesn't describe an international
+     * grouping the way "West Africa" does). `type` (domestic/
+     * international) is the required, primary classification when
+     * creating a zone; `tier` is an optional refinement only offered in
+     * the UI when type = domestic. Reference data only — the actual
+     * price between zones still lives entirely in ZoneRateMatrix
+     * (Billing → Zone Mapping).
      */
     public const TIERS = [
         'A' => ['label' => 'Zone A', 'coverage' => 'Same city / Local delivery', 'purpose' => 'Lowest tariff'],
@@ -27,7 +28,11 @@ class Zone extends Model
         'D' => ['label' => 'Zone D', 'coverage' => 'Regional destinations', 'purpose' => 'Higher tariff'],
         'E' => ['label' => 'Zone E', 'coverage' => 'Long-distance/interstate', 'purpose' => 'Premium tariff'],
         'F' => ['label' => 'Zone F', 'coverage' => 'Remote or hard-to-reach areas', 'purpose' => 'Highest tariff, possible surcharge'],
-        'international' => ['label' => 'International', 'coverage' => 'Countries grouped by region (e.g. West Africa, Europe, North America, Asia)', 'purpose' => 'International tariffs'],
+    ];
+
+    public const TYPES = [
+        'domestic' => 'Domestic',
+        'international' => 'International',
     ];
 
     public function hub(): BelongsTo
@@ -43,5 +48,10 @@ class Zone extends Model
     public function tierPurpose(): ?string
     {
         return self::TIERS[$this->tier]['purpose'] ?? null;
+    }
+
+    public function typeLabel(): string
+    {
+        return self::TYPES[$this->type] ?? ucfirst($this->type);
     }
 }

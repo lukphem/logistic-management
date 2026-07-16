@@ -19,6 +19,7 @@
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Type</th>
                     <th class="px-5 py-3 font-medium">Tier</th>
                     <th class="px-5 py-3 font-medium">Hub</th>
                     <th class="px-5 py-3"></th>
@@ -29,6 +30,11 @@
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $zone->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $zone->code }}</td>
+                        <td class="px-5 py-3">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $zone->type === 'international' ? 'bg-status-transit/10 text-status-transit' : 'bg-ink-500/10 text-ink-500' }}">
+                                {{ $zone->typeLabel() }}
+                            </span>
+                        </td>
                         <td class="px-5 py-3">
                             @if ($zone->tier)
                                 <span class="inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--brand-primary)]" title="{{ $zone->tierPurpose() }}">
@@ -48,7 +54,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No zones configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No zones configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

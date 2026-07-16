@@ -1628,3 +1628,41 @@ resources/views/zones/index.blade.php   (tier badge column)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 31 — Simplified Zone Creation: Domestic/International + Coverage Description
+
+Simplifies what's actually required when creating a zone, per feedback
+that the full tier picker (Increment 30) was more than needed up front:
+
+- **Type** (`domestic` / `international`) — now the required, primary
+  classification. Shown as two clear options, domestic selected by
+  default.
+- **Coverage description** — now required too (e.g. "Nearby towns within
+  the same state" for a domestic zone, or "West Africa" for an
+  international one)
+- **Tier (A–F)** — demoted to an optional refinement, and now **only
+  shown/relevant for domestic zones** — the field hides itself via a
+  small script when International is selected, and the controller clears
+  `tier` server-side regardless of what was posted if type is
+  international (doesn't rely on the UI hiding alone). This matches the
+  original table directly: A–F are domestic tariff tiers; international
+  zones are grouped by region instead, which has no equivalent tier.
+
+`Zone::TIERS` no longer includes an `international` entry — that's now
+`Zone::TYPES`, a separate, simpler two-value reference table.
+
+### Files
+
+```
+database/migrations/2026_01_21_000001_add_type_to_zones_table.php
+app/Models/Zone.php   (TYPES constant, tier removed from TIERS, typeLabel())
+app/Http/Controllers/Web/ZoneController.php   (type required, tier cleared for international)
+resources/views/zones/form.blade.php   (Type radio first, Tier hidden for international)
+resources/views/zones/index.blade.php   (Type column added)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
