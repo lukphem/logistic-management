@@ -39,4 +39,9 @@ class Setting extends Model
             'waybill_show_qr' => config('branding.waybill.show_qr'),
         ]);
     }
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->logo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->logo_path) : null;
+    }
 }

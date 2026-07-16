@@ -10,50 +10,64 @@ class RolePermissionSeeder extends Seeder
 {
     /**
      * Modules and actions match what's referenced throughout the API
-     * controllers/routes. Extend this list as new modules are added
-     * (e.g. 'hubs', 'zones', 'webhooks') rather than hardcoding checks
-     * elsewhere.
+     * controllers/routes and the Blade admin. Extend this list as new
+     * modules are added rather than hardcoding checks elsewhere.
      */
-    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles'];
+    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations'];
     private array $actions = ['create', 'read', 'update', 'delete'];
 
     private array $defaultRoles = [
         'Super Admin' => '*', // gets every permission
-        'Ops Manager' => ['shipments', 'riders', 'reports'],
-        'Hub Staff' => ['shipments:read', 'shipments:update'],
+        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read'],
+        'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read'],
         'Finance' => ['reports:read', 'settings:read'],
         'Support' => ['shipments:read'],
     ];
 
+    /**
+     * Seeded under both guards because this app authenticates two ways
+     * against the same users table: the Blade admin via the 'web' session
+     * guard, and mobile/external API clients via the 'sanctum' guard.
+     * Spatie resolves permissions per-guard, so a permission that only
+     * exists under 'sanctum' silently fails every check made from a web
+     * session request (and vice versa) — seeding both avoids that trap
+     * rather than relying on everyone remembering which guard is active.
+     */
+    private array $guards = ['web', 'sanctum'];
+
     public function run(): void
     {
-        foreach ($this->modules as $module) {
-            foreach ($this->actions as $action) {
-                Permission::firstOrCreate([
-                    'name' => "{$module}:{$action}",
-                    'guard_name' => 'sanctum',
-                ]);
-            }
-        }
-
-        foreach ($this->defaultRoles as $roleName => $scope) {
-            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'sanctum']);
-
-            if ($scope === '*') {
-                $role->syncPermissions(Permission::all());
-                continue;
+        foreach ($this->guards as $guard) {
+            foreach ($this->modules as $module) {
+                foreach ($this->actions as $action) {
+                    Permission::firstOrCreate([
+                        'name' => "{$module}:{$action}",
+                        'guard_name' => $guard,
+                    ]);
+                }
             }
 
-            $permissionNames = collect($scope)->flatMap(function ($entry) {
-                // "shipments" (whole module) vs "shipments:read" (specific action)
-                if (str_contains($entry, ':')) {
-                    return [$entry];
+            foreach ($this->defaultRoles as $roleName => $scope) {
+                $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => $guard]);
+
+                if ($scope === '*') {
+                    $role->syncPermissions(Permission::where('guard_name', $guard)->get());
+                    continue;
                 }
 
-                return collect($this->actions)->map(fn ($action) => "{$entry}:{$action}");
-            });
+                $permissionNames = collect($scope)->flatMap(function ($entry) {
+                    // "shipments" (whole module) vs "shipments:read" (specific action)
+                    if (str_contains($entry, ':')) {
+                        return [$entry];
+                    }
 
-            $role->syncPermissions($permissionNames->all());
+                    return collect($this->actions)->map(fn ($action) => "{$entry}:{$action}");
+                });
+
+                $role->syncPermissions(
+                    Permission::where('guard_name', $guard)->whereIn('name', $permissionNames)->get()
+                );
+            }
         }
     }
 }

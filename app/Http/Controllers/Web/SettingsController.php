@@ -22,6 +22,7 @@ class SettingsController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'company_name' => 'required|string|max:255',
+            'logo' => 'nullable|image|max:2048',
             'service_names' => 'required|array|min:1',
             'service_names.*' => 'required|string|max:100',
             'color_primary' => 'required|string|max:20',
@@ -38,12 +39,24 @@ class SettingsController extends Controller
         }
 
         $data = $validator->validated();
+        unset($data['logo']);
+
         $data['waybill_show_qr'] = $request->boolean('waybill_show_qr');
         $data['operating_regions'] = $request->filled('operating_regions')
             ? array_map('trim', explode(',', $request->operating_regions))
             : [];
 
-        Setting::current()->update($data);
+        $settings = Setting::current();
+
+        if ($request->hasFile('logo')) {
+            if ($settings->logo_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($settings->logo_path);
+            }
+
+            $data['logo_path'] = $request->file('logo')->store('branding', 'public');
+        }
+
+        $settings->update($data);
 
         return back()->with('status', 'Settings updated.');
     }

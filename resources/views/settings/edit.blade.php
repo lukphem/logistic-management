@@ -17,13 +17,24 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ route('settings.update') }}" class="space-y-6">
+    <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="space-y-6">
         @csrf
         @method('PUT')
 
         {{-- Company Profile --}}
         <div class="rounded-lg border border-line bg-surface-0 p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Company profile</h2>
+            <div class="mb-4 flex items-center gap-4">
+                @if ($settings->logo_url)
+                    <img src="{{ $settings->logo_url }}" alt="Current logo" class="h-14 w-14 rounded-md border border-line object-cover">
+                @endif
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Logo</label>
+                    <input type="file" name="logo" accept="image/*"
+                           class="text-sm text-ink-500 file:mr-3 file:rounded-md file:border-0 file:bg-surface-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink-900 hover:file:bg-line">
+                    <p class="mt-1 text-xs text-ink-500">PNG or JPG, up to 2MB.</p>
+                </div>
+            </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Business name</label>

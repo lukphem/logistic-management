@@ -24,22 +24,29 @@
         {{-- Sidebar --}}
         <aside class="flex w-60 shrink-0 flex-col bg-[var(--brand-primary)] text-white">
             <div class="flex h-16 items-center gap-2 px-5 border-b border-white/10">
-                <span class="grid h-8 w-8 place-items-center rounded-md bg-[var(--brand-secondary)] font-mono text-sm font-bold text-ink-900">
-                    {{ strtoupper(substr(config('branding.company_name'), 0, 2)) }}
-                </span>
+                @if (config('branding.logo_url'))
+                    <img src="{{ config('branding.logo_url') }}" alt="{{ config('branding.company_name') }}" class="h-8 w-8 rounded-md object-cover">
+                @else
+                    <span class="grid h-8 w-8 place-items-center rounded-md bg-[var(--brand-secondary)] font-mono text-sm font-bold text-ink-900">
+                        {{ strtoupper(substr(config('branding.company_name'), 0, 2)) }}
+                    </span>
+                @endif
                 <span class="truncate text-sm font-semibold tracking-wide">{{ config('branding.company_name') }}</span>
             </div>
 
             <nav class="flex-1 space-y-1 px-3 py-4">
                 @php
                     $navItems = [
-                        ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'grid'],
-                        ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box'],
-                        ['label' => 'Settings', 'route' => 'settings.edit', 'icon' => 'gear'],
+                        ['label' => 'Dashboard', 'route' => 'dashboard', 'permission' => null],
+                        ['label' => 'Shipments', 'route' => 'shipments.index', 'permission' => null],
+                        ['label' => 'Hubs', 'route' => 'hubs.index', 'permission' => 'locations:read'],
+                        ['label' => 'Zones', 'route' => 'zones.index', 'permission' => 'locations:read'],
+                        ['label' => 'Settings', 'route' => 'settings.edit', 'permission' => 'settings:update'],
                     ];
                 @endphp
 
                 @foreach ($navItems as $item)
+                    @continue($item['permission'] && auth()->user()->cannot($item['permission']))
                     @php $active = request()->routeIs($item['route'] . '*'); @endphp
                     <a href="{{ route($item['route']) }}"
                        class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition

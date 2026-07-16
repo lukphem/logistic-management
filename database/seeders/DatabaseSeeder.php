@@ -19,10 +19,13 @@ class DatabaseSeeder extends Seeder
 
         // User::factory(10)->create();
 
-        User::factory()->create([
+        $user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
             'user_type' => 'staff',
-        ])->assignRole('Super Admin');
+        ]);
+
+        $user->assignRole(\Spatie\Permission\Models\Role::where('name', 'Super Admin')->where('guard_name', 'web')->first());
+        $user->assignRole(\Spatie\Permission\Models\Role::where('name', 'Super Admin')->where('guard_name', 'sanctum')->first());
     }
 }

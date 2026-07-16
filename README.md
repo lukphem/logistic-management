@@ -214,3 +214,63 @@ resources/views/settings/edit.blade.php
   per-location, not single-value settings)
 - Permission-gating who can reach `/settings` beyond "any staff account" —
   add a `settings:update` permission check once role assignment UI exists
+
+## Increment 6 — Full Settings Setup (Logo, Locations, Permission-Gating)
+
+Completes the setup module started in Increment 5.
+
+### Guard fix (important — read this one)
+
+`RolePermissionSeeder` previously seeded all permissions/roles under a
+single `sanctum` guard. That's fine for the API, but the Blade admin
+authenticates via the `web` session guard — Spatie checks permissions
+per-guard, so a `web`-guard request checking a `sanctum`-only permission
+silently fails every time, with no obvious error. The seeder now creates
+every permission and role under **both** `web` and `sanctum`, and
+`DatabaseSeeder` assigns Super Admin under both for the test user. If you
+already ran the old seeder, re-run it — `firstOrCreate`/`syncPermissions`
+make it safe to run again.
+
+### Logo upload
+
+- `settings.logo` (file) → stored on the `public` disk under
+  `storage/app/public/branding/`, path saved as `logo_path`
+- `Setting::logo_url` accessor resolves the public URL; old file is
+  deleted when a new one is uploaded
+- Sidebar and login page now show the uploaded logo, falling back to
+  initials when none is set
+- **Requires** `php artisan storage:link` to be run once, or uploaded
+  logos will save but not be reachable over HTTP
+
+### Location setup (Hubs & Zones)
+
+Full CRUD screens for hubs/branches and zones/regions — this is the
+"location setup" from the original feature spec, previously only
+API-backed:
+
+```
+app/Http/Controllers/Web/HubController.php
+app/Http/Controllers/Web/ZoneController.php
+resources/views/hubs/index.blade.php, hubs/form.blade.php
+resources/views/zones/index.blade.php, zones/form.blade.php
+```
+
+Zones can optionally belong to a hub (dropdown on the zone form). A new
+`locations` permission module (create/read/update/delete) gates every
+route.
+
+### Permission-gating
+
+`/settings` now requires `settings:update`; hub/zone routes require the
+matching `locations:*` permission per action. Sidebar nav items hide
+themselves automatically for users without the relevant permission
+(`@continue` check against `auth()->user()->cannot(...)`) — so a Finance
+user, for example, sees Dashboard and Shipments but not Hubs/Zones/Settings.
+
+### To apply locally
+
+```powershell
+php artisan storage:link
+php artisan migrate
+php artisan db:seed --class=RolePermissionSeeder
+```

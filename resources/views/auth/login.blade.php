@@ -16,9 +16,13 @@
     <div class="grid h-full place-items-center px-4">
         <div class="w-full max-w-sm">
             <div class="mb-8 flex flex-col items-center gap-3">
-                <span class="grid h-12 w-12 place-items-center rounded-lg bg-[var(--brand-primary)] font-mono text-lg font-bold text-white">
-                    {{ strtoupper(substr(config('branding.company_name'), 0, 2)) }}
-                </span>
+                @if (config('branding.logo_url'))
+                    <img src="{{ config('branding.logo_url') }}" alt="{{ config('branding.company_name') }}" class="h-12 w-12 rounded-lg object-cover">
+                @else
+                    <span class="grid h-12 w-12 place-items-center rounded-lg bg-[var(--brand-primary)] font-mono text-lg font-bold text-white">
+                        {{ strtoupper(substr(config('branding.company_name'), 0, 2)) }}
+                    </span>
+                @endif
                 <div class="text-center">
                     <p class="text-sm font-medium text-ink-500">{{ config('branding.company_name') }}</p>
                     <h1 class="text-xl font-semibold text-ink-900">Staff sign in</h1>
