@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class City extends Model
 {
-    protected $fillable = ['state_id', 'name', 'short_code', 'code'];
+    protected $fillable = ['state_id', 'name', 'short_code', 'code', 'operational_hub_id'];
 
     public function state(): BelongsTo
     {
@@ -23,6 +23,19 @@ class City extends Model
     public function districts(): HasMany
     {
         return $this->hasMany(District::class);
+    }
+
+    /**
+     * The hub that operationally handles THIS city specifically — an
+     * explicit override for when the city's state is covered by more
+     * than one hub (Hub::states()) and the automatic "any covering hub"
+     * fallback in Shipment::resolveHubForCity() would otherwise be
+     * ambiguous. Optional; leave unset when there's no ambiguity to
+     * resolve.
+     */
+    public function operationalHub(): BelongsTo
+    {
+        return $this->belongsTo(Hub::class, 'operational_hub_id');
     }
 
     /**

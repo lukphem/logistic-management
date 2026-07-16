@@ -45,6 +45,20 @@
             </p>
         </div>
 
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Operational hub <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <select name="operational_hub_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">No specific hub</option>
+                @foreach ($hubs as $hub)
+                    <option value="{{ $hub->id }}" @selected(old('operational_hub_id', $city->operational_hub_id) == $hub->id)>{{ $hub->name }} ({{ $hub->code }})</option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-500">
+                Only needed if this city's state is covered by more than one hub (Hubs → Operating states) —
+                pins down exactly which hub handles shipments for this specific city instead of leaving it ambiguous.
+            </p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ route('cities.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

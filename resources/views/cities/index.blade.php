@@ -38,6 +38,7 @@
                     <th class="px-5 py-3 font-medium">State/Province</th>
                     <th class="px-5 py-3 font-medium">Country</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Operational hub</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
@@ -48,6 +49,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->country->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $city->code }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $city->operationalHub?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('cities.edit', $city) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                             <form method="POST" action="{{ route('cities.destroy', $city) }}" class="inline" onsubmit="return confirm('Remove this city? Any hub tied to it will simply become unassigned.')">
@@ -57,7 +59,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

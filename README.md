@@ -1335,3 +1335,35 @@ resources/views/shipments/show.blade.php   (shows both hub codes)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 24 — City-Level Operational Hub Override (Resolves Multi-Hub-Per-State Ambiguity)
+
+`Hub::states()` (Increment 22) allows more than one hub to cover the same
+state — correct for coverage, but ambiguous the moment `Shipment` needs
+to resolve exactly ONE hub for a city and that city's state has multiple
+covering hubs. Previously it just took whichever hub came first.
+
+`cities.operational_hub_id` (nullable) fixes that: an explicit,
+optional pin — "this specific city is handled by THIS hub," regardless
+of how many hubs cover its state. `Shipment::resolveHubForCity()` now
+checks this first, before the home-city match, before the
+(now-disambiguated) state-coverage fallback.
+
+Only needed where the ambiguity actually exists — leave it unset for any
+city whose state has just one covering hub.
+
+### Files
+
+```
+database/migrations/2026_01_17_000001_add_operational_hub_id_to_cities_table.php
+app/Models/City.php   (operationalHub() relation)
+app/Models/Shipment.php   (resolveHubForCity() checks the override first)
+app/Http/Controllers/Web/CityController.php   (operational_hub_id, empty-string normalized from the start)
+resources/views/cities/form.blade.php, cities/index.blade.php   (field + column)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

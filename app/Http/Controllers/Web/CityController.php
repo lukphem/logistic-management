@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\City;
 use App\Models\Country;
+use App\Models\Hub;
 use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class CityController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = City::with('state.country');
+        $query = City::with(['state.country', 'operationalHub']);
 
         if ($request->filled('state_id')) {
             $query->where('state_id', $request->state_id);
@@ -35,7 +36,11 @@ class CityController extends Controller
 
     public function create(): View
     {
-        return view('cities.form', ['city' => new City(), 'states' => State::with('country')->orderBy('name')->get()]);
+        return view('cities.form', [
+            'city' => new City(),
+            'states' => State::with('country')->orderBy('name')->get(),
+            'hubs' => Hub::orderBy('name')->get(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -47,7 +52,11 @@ class CityController extends Controller
 
     public function edit(City $city): View
     {
-        return view('cities.form', ['city' => $city, 'states' => State::with('country')->orderBy('name')->get()]);
+        return view('cities.form', [
+            'city' => $city,
+            'states' => State::with('country')->orderBy('name')->get(),
+            'hubs' => Hub::orderBy('name')->get(),
+        ]);
     }
 
     public function update(Request $request, City $city): RedirectResponse
@@ -75,10 +84,21 @@ class CityController extends Controller
                     ->where('state_id', $request->state_id)
                     ->ignore($ignoreId),
             ],
+            // Optional — only needed to disambiguate when the city's
+            // state is covered by more than one hub. See City::operationalHub().
+            'operational_hub_id' => 'nullable|exists:hubs,id',
         ]);
 
         $validator->validate();
+        $data = $validator->validated();
 
-        return $validator->validated();
+        // Blank "No specific hub" option submits as an empty string, not
+        // null — normalize it immediately, the same class of bug fixed
+        // in Increment 20.
+        if (($data['operational_hub_id'] ?? null) === '') {
+            $data['operational_hub_id'] = null;
+        }
+
+        return $data;
     }
 }

@@ -74,13 +74,25 @@ class Shipment extends Model
         return $prefix . now()->format('ymd') . strtoupper(Str::random(6));
     }
 
+    /**
+     * Resolution order: (1) the city's explicit operational_hub_id
+     * override — the only way to disambiguate when a state is covered by
+     * more than one hub; (2) a hub whose home city matches; (3) any hub
+     * covering the city's state, which is ambiguous if more than one
+     * exists and picks whichever comes first — set operational_hub_id on
+     * the city to make that deterministic instead.
+     */
     private static function resolveHubForCity(int $cityId): ?Hub
     {
+        $city = City::find($cityId);
+
+        if ($city?->operational_hub_id) {
+            return $city->operationalHub;
+        }
+
         if ($hub = Hub::where('city_id', $cityId)->first()) {
             return $hub;
         }
-
-        $city = City::find($cityId);
 
         if (! $city) {
             return null;
