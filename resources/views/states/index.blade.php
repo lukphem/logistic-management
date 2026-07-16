@@ -28,6 +28,7 @@
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Country</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Postal code</th>
                     <th class="px-5 py-3 font-medium">Cities</th>
                     <th class="px-5 py-3"></th>
                 </tr>
@@ -38,6 +39,7 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $state->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $state->country->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $state->code }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $state->postal_code ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $state->cities_count }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('states.edit', $state) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
@@ -48,7 +50,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No states/provinces configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No states/provinces configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

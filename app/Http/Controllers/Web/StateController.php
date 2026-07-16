@@ -75,6 +75,7 @@ class StateController extends Controller
                     ->where('country_id', $request->country_id)
                     ->ignore($ignoreId),
             ],
+            'postal_code' => 'nullable|string|max:20',
         ]);
 
         $validator->validate();

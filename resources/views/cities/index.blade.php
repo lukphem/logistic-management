@@ -38,6 +38,7 @@
                     <th class="px-5 py-3 font-medium">State/Province</th>
                     <th class="px-5 py-3 font-medium">Country</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Postal code</th>
                     <th class="px-5 py-3 font-medium">Operational hub</th>
                     <th class="px-5 py-3 font-medium">Onforwarding</th>
                     <th class="px-5 py-3"></th>
@@ -50,6 +51,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->state->country->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $city->code }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $city->postal_code ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->operationalHub?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $city->onforwardingClassification?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right">
@@ -61,7 +63,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="7" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
+                    <tr><td colspan="8" class="px-5 py-8 text-center text-sm text-ink-500">No cities configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

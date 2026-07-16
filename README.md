@@ -1464,3 +1464,30 @@ stays at 0 for those until that's wired up.
 ```powershell
 php artisan migrate
 ```
+
+## Increment 27 — Postal Codes for State, City, District
+
+Plain optional `postal_code` field added to all three — unlike `code`
+(the auto-composed hierarchical identifier from Increment 19),
+`postal_code` is a real-world value staff type directly, since actual
+postal/zip systems don't compose from a parent the way this app's
+internal codes do.
+
+Shown as a column on each of the three list pages, editable on each
+form. No validation beyond a sensible length cap — postal code formats
+vary too widely across countries to usefully constrain further.
+
+### Files
+
+```
+database/migrations/2026_01_19_000001_add_postal_code_to_states_cities_districts_table.php
+app/Models/State.php, City.php, District.php
+app/Http/Controllers/Web/StateController.php, CityController.php, DistrictController.php
+resources/views/states/, cities/, districts/   (form field + index column, all three)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

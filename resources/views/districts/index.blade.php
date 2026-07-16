@@ -38,6 +38,7 @@
                     <th class="px-5 py-3 font-medium">City</th>
                     <th class="px-5 py-3 font-medium">State/Province</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Postal code</th>
                     <th class="px-5 py-3 font-medium">Onforwarding</th>
                     <th class="px-5 py-3"></th>
                 </tr>
@@ -49,6 +50,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $district->city->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $district->city->state->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $district->code }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $district->postal_code ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $district->onforwardingClassification?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('districts.edit', $district) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
@@ -59,7 +61,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No districts/areas configured yet.</td></tr>
+                    <tr><td colspan="7" class="px-5 py-8 text-center text-sm text-ink-500">No districts/areas configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

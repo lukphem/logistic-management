@@ -85,6 +85,7 @@ class DistrictController extends Controller
                     ->ignore($ignoreId),
             ],
             'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
+            'postal_code' => 'nullable|string|max:20',
         ]);
 
         $validator->validate();

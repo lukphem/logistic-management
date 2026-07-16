@@ -91,6 +91,7 @@ class CityController extends Controller
             // state is covered by more than one hub. See City::operationalHub().
             'operational_hub_id' => 'nullable|exists:hubs,id',
             'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
+            'postal_code' => 'nullable|string|max:20',
         ]);
 
         $validator->validate();
