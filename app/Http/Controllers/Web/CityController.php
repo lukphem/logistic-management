@@ -39,7 +39,7 @@ class CityController extends Controller
         return view('cities.form', [
             'city' => new City(),
             'states' => State::with('country')->orderBy('name')->get(),
-            'hubs' => Hub::orderBy('name')->get(),
+            'hubs' => Hub::with('city.state')->orderBy('name')->get(),
         ]);
     }
 
@@ -55,7 +55,7 @@ class CityController extends Controller
         return view('cities.form', [
             'city' => $city,
             'states' => State::with('country')->orderBy('name')->get(),
-            'hubs' => Hub::orderBy('name')->get(),
+            'hubs' => Hub::with('city.state')->orderBy('name')->get(),
         ]);
     }
 

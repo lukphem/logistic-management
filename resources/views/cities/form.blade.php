@@ -50,12 +50,16 @@
             <select name="operational_hub_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">No specific hub</option>
                 @foreach ($hubs as $hub)
-                    <option value="{{ $hub->id }}" @selected(old('operational_hub_id', $city->operational_hub_id) == $hub->id)>{{ $hub->name }} ({{ $hub->code }})</option>
+                    <option value="{{ $hub->id }}" @selected(old('operational_hub_id', $city->operational_hub_id) == $hub->id)>
+                        {{ $hub->name }} ({{ $hub->code }}){{ $hub->city ? ' — ' . $hub->city->name . ', ' . $hub->city->state->name : '' }}
+                    </option>
                 @endforeach
             </select>
             <p class="mt-1 text-xs text-ink-500">
-                Only needed if this city's state is covered by more than one hub (Hubs → Operating states) —
-                pins down exactly which hub handles shipments for this specific city instead of leaving it ambiguous.
+                Every city can have one, whether or not there's an actual conflict — set it whenever you want shipments
+                originating from or destined to this city to always use that hub's code, in place of whatever the
+                automatic resolution would otherwise pick. The hub doesn't have to be based in this city's own state —
+                pick any hub from anywhere in the network if that's genuinely the one handling this city.
             </p>
         </div>
 

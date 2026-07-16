@@ -1367,3 +1367,31 @@ resources/views/cities/form.blade.php, cities/index.blade.php   (field + column)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 25 — Clarified: Operational Hub Has No State Restriction
+
+Confirms and clarifies what Increment 24 already did, since it wasn't
+obvious from the UI alone: **every** city can have an operational hub
+set, whether or not there's an actual multi-hub conflict on its state,
+and the hub picked can be based in **any** state — nothing ties the
+override to the city's own state or region. `resolveHubForCity()` was
+already unconstrained; this increment just makes that visible:
+
+- The hub dropdown on the City form now shows each hub's own home city
+  and state (e.g. "Lagos Hub (LOS-01) — Ikeja, Lagos"), so picking one
+  from a different state is a clear, deliberate choice rather than a
+  guess
+- Updated the field's help text to say this outright, rather than
+  implying it's "only" for resolving conflicts
+
+No functional/model change — `Shipment::resolveHubForCity()` already
+worked exactly this way in Increment 24; this is a UI-clarity pass only.
+
+### Files
+
+```
+app/Http/Controllers/Web/CityController.php   (eager-loads hub's city/state for the dropdown)
+resources/views/cities/form.blade.php   (dropdown shows hub location, clarified help text)
+```
+
+No migration needed.
