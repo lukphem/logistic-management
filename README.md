@@ -1666,3 +1666,98 @@ resources/views/zones/index.blade.php   (Type column added)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 32 — Zone Redefined as a Relationship Classifier + Three New Billing Models
+
+Significant redefinition, based directly on your clarification of what
+"Zone" and "Zone Mapping" actually mean.
+
+### Assumption made — please confirm
+
+**"Zone Mapping" now means: each city is assigned to exactly one Zone**
+(e.g. "Port Harcourt = Zone 2"), not a direct city-PAIR-to-zone lookup.
+This is what lets a rate table with "From Zone"/"To Zone" columns
+resolve pricing for *any* route between two mapped cities automatically
+— you only assign each city once, not every possible pair. If you
+actually meant a direct pair mapping ("Lagos→PHC" as one specific
+route, distinct from "Lagos→Enugu" even though both might go through
+PHC's zone), tell me and I'll adjust — that's a materially different
+(and more tedious to maintain) design.
+
+### `zone_mappings` — city → zone assignment
+
+New screen at **Billing → Zone Mapping** (repurposed from what it
+briefly was in Increment 28 — a shortcut into the old zone-to-zone price
+matrix. That matrix still exists and still works exactly as before, just
+managed from each `zone_to_zone` rate card's own edit page again, the
+way it was before Increment 28 added the shortcut). Assign a city to a
+zone; re-assigning updates rather than duplicating.
+
+### `zone_weight_rates` — the origin-destination + weight rate table
+
+Backs the new **origin_destination_weight** billing model, matching
+exactly the table you described:
+
+> From Zone | To Zone | Min weight | Max weight | Service Type | Price | Transit days | Extra amount per extra kg
+
+Managed on the rate card's own edit page (same pattern as the
+zone-to-zone matrix). At quote time: the shipment's origin/destination
+cities resolve to zones via `zone_mappings`, then the matching row for
+(from zone, to zone, service type, weight band) gives the price. Weight
+beyond a matched row's `max_weight` is charged at that row's
+`extra_amount_per_extra_kg`. If the shipment is heavier than every band
+defined for that zone pair/service, the highest band is used as the
+base with the overage still applied — so a shipment never fails to
+price just for being heavier than anticipated.
+
+One simplification from your spec: your table listed both "extra-kg"
+and "extra-amount-per-extra-kg" as separate columns — I've treated these
+as one field (the per-kg overage rate), since a separate "extra-kg"
+value didn't have a distinct role I could resolve confidently. Flag it
+if you meant something more specific there (e.g. a rounding increment
+size).
+
+### `truckload` and `carton_rate` — new flat-rate-per-unit models
+
+Both are `quantity × rate` — identical mechanically, just naming the
+unit differently. `shipments.quantity` (nullable integer) holds "number
+of truckloads" or "number of cartons" depending on which billing model
+applies; accepted now by every booking/quote endpoint.
+
+### `rate_cards.billing_model` converted from enum to string
+
+Was a fixed 9-value DB enum; adding 3 more this way isn't sustainable.
+Converted to a plain string with the allowed list enforced by
+`RateCardController`'s validation instead (same pattern as `Zone::TYPES`
+elsewhere in this app). **Requires `doctrine/dbal`** for the migration's
+`->change()` call:
+
+```powershell
+composer require doctrine/dbal
+```
+
+### Files
+
+```
+database/migrations/2026_01_22_000001_convert_rate_cards_billing_model_to_string.php
+database/migrations/2026_01_22_000002_create_zone_mappings_table.php
+database/migrations/2026_01_22_000003_create_zone_weight_rates_table.php
+database/migrations/2026_01_22_000004_add_quantity_to_shipments_table.php
+app/Models/ZoneMapping.php, ZoneWeightRate.php
+app/Models/Zone.php, City.php   (zoneMapping(s) relations)
+app/Models/Shipment.php   (quantity)
+app/Services/RateEngine.php   (originDestinationWeight(), perUnit() for truckload/carton_rate)
+app/Http/Controllers/Web/RateCardController.php   (3 new models, weight-rate table CRUD)
+app/Http/Controllers/Web/ZoneMappingController.php   (rewritten: city->zone, not zone-pair pricing)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php   (quantity accepted)
+resources/views/rate-cards/form.blade.php   (new config fields + rate-table editor)
+resources/views/zone-mappings/index.blade.php   (rewritten for city assignment)
+routes/web.php   (weight-rates routes)
+```
+
+### To apply locally
+
+```powershell
+composer require doctrine/dbal
+php artisan migrate
+```

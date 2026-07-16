@@ -32,6 +32,9 @@ class RateEngine
             'service_multiplier' => $this->serviceMultiplier($rateCard, $context),
             'time_surcharge' => $this->timeSurcharge($rateCard, $context),
             'contract' => $this->contract($rateCard),
+            'origin_destination_weight' => $this->originDestinationWeight($rateCard, $context),
+            'truckload' => $this->perUnit($rateCard, $context, 'rate_per_truckload'),
+            'carton_rate' => $this->perUnit($rateCard, $context, 'rate_per_carton'),
             default => throw new InvalidArgumentException("Unsupported billing model: {$rateCard->billing_model}"),
         };
     }
@@ -133,6 +136,78 @@ class RateEngine
     private function contract(RateCard $rateCard): float
     {
         return (float) ($rateCard->model_config['fixed_amount'] ?? 0);
+    }
+
+    /**
+     * Looks up origin/destination city → Zone (ZoneMapping), then finds
+     * the matching zone_weight_rates row for that (from_zone, to_zone,
+     * service_type) combination whose weight band contains the
+     * shipment's chargeable weight. Weight beyond the matched band's
+     * max_weight is charged at that row's extra_amount_per_extra_kg.
+     */
+    private function originDestinationWeight(RateCard $rateCard, array $context): float
+    {
+        $fromZoneId = $this->resolveZoneId($context['origin_city_id'] ?? null);
+        $toZoneId = $this->resolveZoneId($context['destination_city_id'] ?? null);
+
+        if (! $fromZoneId || ! $toZoneId) {
+            throw new InvalidArgumentException('Both origin and destination cities must be mapped to a zone (see Zone Mapping) to use origin_destination_weight pricing.');
+        }
+
+        $weight = (float) ($context['chargeable_weight_kg'] ?? $context['weight_kg'] ?? 0);
+        $serviceType = $context['service_type'] ?? $rateCard->service_type;
+
+        $rate = \App\Models\ZoneWeightRate::where('rate_card_id', $rateCard->id)
+            ->where('from_zone_id', $fromZoneId)
+            ->where('to_zone_id', $toZoneId)
+            ->where('service_type', $serviceType)
+            ->where('min_weight', '<=', $weight)
+            ->where('max_weight', '>=', $weight)
+            ->first();
+
+        // Falls back to the highest-weight band for this zone pair/service
+        // if nothing matched (i.e. the shipment is heavier than every
+        // defined band) — that band's extra-per-kg rate then covers the
+        // overage rather than the shipment having no price at all.
+        if (! $rate) {
+            $rate = \App\Models\ZoneWeightRate::where('rate_card_id', $rateCard->id)
+                ->where('from_zone_id', $fromZoneId)
+                ->where('to_zone_id', $toZoneId)
+                ->where('service_type', $serviceType)
+                ->orderByDesc('max_weight')
+                ->first();
+        }
+
+        if (! $rate) {
+            throw new InvalidArgumentException('No rate configured for this zone pair and service type.');
+        }
+
+        $overage = max(0, $weight - (float) $rate->max_weight);
+
+        return (float) $rate->price + ($overage * (float) $rate->extra_amount_per_extra_kg);
+    }
+
+    private function resolveZoneId(?int $cityId): ?int
+    {
+        if (! $cityId) {
+            return null;
+        }
+
+        return \App\Models\ZoneMapping::where('city_id', $cityId)->value('zone_id');
+    }
+
+    /**
+     * Shared by 'truckload' and 'carton_rate' — both are simply
+     * quantity × a flat per-unit rate, just naming the unit differently
+     * (truckloads vs cartons) and therefore reading a different
+     * model_config key.
+     */
+    private function perUnit(RateCard $rateCard, array $context, string $rateConfigKey): float
+    {
+        $quantity = (float) ($context['quantity'] ?? 0);
+        $rate = (float) ($rateCard->model_config[$rateConfigKey] ?? 0);
+
+        return $quantity * $rate;
     }
 
     /**

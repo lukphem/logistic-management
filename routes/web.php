@@ -127,6 +127,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/rate-cards/{rateCard}', [RateCardController::class, 'update'])->name('rate-cards.update');
         Route::post('/rate-cards/{rateCard}/zone-prices', [RateCardController::class, 'setZonePrice'])->name('rate-cards.zone-prices.store');
         Route::delete('/rate-cards/{rateCard}/zone-prices/{zonePrice}', [RateCardController::class, 'destroyZonePrice'])->name('rate-cards.zone-prices.destroy');
+        Route::post('/rate-cards/{rateCard}/weight-rates', [RateCardController::class, 'addWeightRate'])->name('rate-cards.weight-rates.store');
+        Route::delete('/rate-cards/{rateCard}/weight-rates/{weightRate}', [RateCardController::class, 'destroyWeightRate'])->name('rate-cards.weight-rates.destroy');
         Route::post('/zone-mappings', [ZoneMappingController::class, 'store'])->name('zone-mappings.store');
         Route::delete('/zone-mappings/{zoneMapping}', [ZoneMappingController::class, 'destroy'])->name('zone-mappings.destroy');
     });

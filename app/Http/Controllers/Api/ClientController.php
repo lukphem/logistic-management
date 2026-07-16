@@ -36,6 +36,7 @@ class ClientController extends Controller
             'destination_district_id' => 'nullable|exists:districts,id',
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
+            'quantity' => 'nullable|integer|min:1',
             'length_cm' => 'nullable|numeric',
             'width_cm' => 'nullable|numeric',
             'height_cm' => 'nullable|numeric',

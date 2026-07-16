@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\RateCard;
 use App\Models\Zone;
 use App\Models\ZoneRateMatrix;
+use App\Models\ZoneWeightRate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -17,12 +18,15 @@ class RateCardController extends Controller
         'flat' => 'Flat Rate',
         'distance' => 'Distance-Based',
         'zone_to_zone' => 'Zone-to-Zone (Origin-Destination)',
+        'origin_destination_weight' => 'Origin-Destination + Weight (by Service Type)',
         'weight' => 'Weight-Based',
         'volumetric' => 'Volumetric/Dimensional',
         'hybrid' => 'Hybrid (Base + Distance + Weight)',
         'service_multiplier' => 'Service-Type Multiplier',
         'time_surcharge' => 'Time-Based Surcharge',
         'contract' => 'Client-Specific Contract Rate',
+        'truckload' => 'Truckload (Flat Rate per Truck)',
+        'carton_rate' => 'Carton Rate (Flat Rate per Carton)',
     ];
 
     public function index(): View
@@ -51,8 +55,13 @@ class RateCardController extends Controller
     public function edit(RateCard $rateCard): View
     {
         $zones = Zone::orderBy('name')->get();
+
         $matrixEntries = $rateCard->billing_model === 'zone_to_zone'
             ? $rateCard->zoneMatrixEntries()->with(['originZone', 'destinationZone'])->get()
+            : collect();
+
+        $weightRates = $rateCard->billing_model === 'origin_destination_weight'
+            ? ZoneWeightRate::where('rate_card_id', $rateCard->id)->with(['fromZone', 'toZone'])->orderBy('from_zone_id')->orderBy('min_weight')->get()
             : collect();
 
         return view('rate-cards.form', [
@@ -61,6 +70,7 @@ class RateCardController extends Controller
             'serviceNames' => config('branding.service_names', []),
             'zones' => $zones,
             'matrixEntries' => $matrixEntries,
+            'weightRates' => $weightRates,
         ]);
     }
 
@@ -112,6 +122,41 @@ class RateCardController extends Controller
         return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Zone price removed.');
     }
 
+    /**
+     * Adds one row to the origin_destination_weight rate table: a
+     * (From Zone, To Zone, weight band, service type) combination with
+     * its price, transit days, and per-extra-kg overage rate.
+     */
+    public function addWeightRate(Request $request, RateCard $rateCard): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'from_zone_id' => 'required|exists:zones,id',
+            'to_zone_id' => 'required|exists:zones,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|gt:min_weight',
+            'service_type' => 'required|string|max:100',
+            'price' => 'required|numeric|min:0',
+            'transit_days' => 'nullable|integer|min:0',
+            'extra_amount_per_extra_kg' => 'nullable|numeric|min:0',
+        ]);
+
+        $validator->validate();
+        $data = $validator->validated();
+        $data['rate_card_id'] = $rateCard->id;
+        $data['extra_amount_per_extra_kg'] = $data['extra_amount_per_extra_kg'] ?? 0;
+
+        ZoneWeightRate::create($data);
+
+        return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Rate row added.');
+    }
+
+    public function destroyWeightRate(RateCard $rateCard, ZoneWeightRate $weightRate): RedirectResponse
+    {
+        $weightRate->delete();
+
+        return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Rate row removed.');
+    }
+
     private function validated(Request $request): array
     {
         $validator = Validator::make($request->all(), [
@@ -132,6 +177,8 @@ class RateCardController extends Controller
             'peak_multiplier' => 'nullable|numeric',
             'weekend_multiplier' => 'nullable|numeric',
             'fixed_amount' => 'nullable|numeric',
+            'rate_per_truckload' => 'nullable|numeric',
+            'rate_per_carton' => 'nullable|numeric',
         ]);
 
         $validator->validate();
@@ -150,6 +197,9 @@ class RateCardController extends Controller
             'time_surcharge' => ['peak_multiplier', 'weekend_multiplier'],
             'contract' => ['fixed_amount'],
             'zone_to_zone' => [], // prices live in zone_rate_matrix instead
+            'origin_destination_weight' => [], // prices live in zone_weight_rates instead
+            'truckload' => ['rate_per_truckload'],
+            'carton_rate' => ['rate_per_carton'],
         ];
 
         $relevantKeys = $configKeysByModel[$data['billing_model']] ?? [];

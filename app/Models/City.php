@@ -25,6 +25,17 @@ class City extends Model
         return $this->hasMany(District::class);
     }
 
+    /**
+     * This city's assigned Zone classification (e.g. "Port Harcourt =
+     * Zone 2") — used to resolve from_zone/to_zone for the
+     * origin_destination_weight billing model without needing an entry
+     * per city PAIR.
+     */
+    public function zoneMapping(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ZoneMapping::class);
+    }
+
     public function onforwardingClassification(): BelongsTo
     {
         return $this->belongsTo(OnforwardingClassification::class);

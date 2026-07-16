@@ -40,6 +40,14 @@ class Zone extends Model
         return $this->belongsTo(Hub::class);
     }
 
+    /**
+     * Every city assigned to this zone — see ZoneMapping.
+     */
+    public function zoneMappings(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ZoneMapping::class);
+    }
+
     public function tierLabel(): ?string
     {
         return self::TIERS[$this->tier]['label'] ?? null;
