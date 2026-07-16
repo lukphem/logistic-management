@@ -1298,3 +1298,40 @@ resources/views/shipments/show.blade.php   (originating hub display)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 23 — Waybill Code Shows Both Origin and Destination Hubs
+
+Extends Increment 22: the tracking number now composes from **both**
+hub codes, not just the origin — e.g. a shipment from hub `LOS` to hub
+`PHC` gets a tracking number starting `LOS-PHC-...` instead of just
+`LOS-...`.
+
+`destination_hub_id` mirrors `origin_hub_id` exactly — resolved in the
+same order (explicit choice → home-city match → state coverage → none
+found), fixed at booking, and never changes as the shipment physically
+moves through the network (`current_hub_id`/`current_outlet_id` still
+do that job).
+
+If only one side resolves (e.g. destination has no hub coverage yet),
+the tracking number falls back to just that one hub's code, same as
+before this increment. If neither resolves, it falls back to the
+original generic `LM` prefix.
+
+The shipment detail page now shows `{origin hub} ({code}) → {destination
+hub} ({code})` when both are known.
+
+### Files
+
+```
+database/migrations/2026_01_16_000001_add_destination_hub_id_to_shipments_table.php
+app/Models/Shipment.php   (destination_hub_id, composeTrackingNumber() now takes both hubs)
+app/Http/Controllers/Api/ClientShipmentController.php, ShipmentController.php   (destination_hub_id accepted)
+app/Http/Controllers/Web/ShipmentController.php   (eager-loads destinationHub)
+resources/views/shipments/show.blade.php   (shows both hub codes)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

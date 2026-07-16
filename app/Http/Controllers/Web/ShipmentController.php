@@ -43,7 +43,7 @@ class ShipmentController extends Controller
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
-        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'rateCard', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet', 'originHub']);
+        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'rateCard', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet', 'originHub', 'destinationHub']);
 
         return view('shipments.show', compact('shipment'));
     }

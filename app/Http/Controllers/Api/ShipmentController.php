@@ -79,6 +79,7 @@ class ShipmentController extends Controller
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
+            'destination_hub_id' => 'nullable|exists:hubs,id',
             'destination_address' => 'required|string',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',
