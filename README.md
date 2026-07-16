@@ -106,3 +106,68 @@ fail.
 - SLA breach detection scheduled job
 - Waybill generation (thermal ZPL + A4 PDF)
 - Formal invoice documents (currently just a shipment-list view)
+
+## Increment 4 — Staff Admin Dashboard (Blade)
+
+First frontend increment. Session-based (not Sanctum) auth, since this is
+a server-rendered dashboard for staff only — riders and clients never get
+a web session.
+
+**Design approach:** brand primary/secondary colors are injected as CSS
+custom properties at the layout root (`components/layouts/app.blade.php`),
+read live from `config('branding.colors')` — this is the entire per-client
+theming mechanism from earlier discussions, now implemented. Static tokens
+(status colors, ink/surface/line neutrals, the mono font used for tracking
+numbers) live in `resources/css/app.css`'s `@theme` block since those are
+compiled by Tailwind and aren't client-configurable.
+
+**Signature element:** the shipment detail page's checkpoint trail
+(`shipments/show.blade.php`) is styled as a waybill stamp trail — dashed
+square "stamps" alternating a slight rotation, connected by a dashed line —
+rather than a generic dot-and-line timeline, since the subject (a courier
+waybill) already has its own physical vocabulary of stamps and checkpoints.
+
+### Files
+
+```
+app/Http/Controllers/Web/Auth/LoginController.php
+app/Http/Controllers/Web/DashboardController.php
+app/Http/Controllers/Web/ShipmentController.php
+app/Http/Middleware/EnsureStaffUser.php   (registered as 'staff' alias)
+resources/views/components/layouts/app.blade.php
+resources/views/components/status-pill.blade.php
+resources/views/auth/login.blade.php
+resources/views/dashboard/index.blade.php
+resources/views/shipments/index.blade.php
+resources/views/shipments/show.blade.php
+routes/web.php                             (replaces the default welcome route)
+resources/css/app.css                      (adds status/ink/surface/mono tokens)
+bootstrap/app.php                          (registers the 'staff' middleware alias)
+```
+
+### Try it locally
+
+```powershell
+npm install
+npm run dev    # or npm run build for production assets
+php artisan serve
+```
+
+Sign in with the seeded test user (`test@example.com`) — set its password
+first via Tinker, since the factory generates a random hashed one:
+
+```powershell
+php artisan tinker
+>>> $u = \App\Models\User::where('email', 'test@example.com')->first();
+>>> $u->password = bcrypt('password');
+>>> $u->save();
+```
+
+### Still to come (frontend)
+
+- Rate card management screens (this needs the most UI thought — the
+  `model_config` form fields change shape per billing_model)
+- Roles & permissions management screen
+- Reports/exceptions screen
+- Client self-service portal (separate Blade area, different layout shell)
+- Rider mobile app (separate stack entirely — not Blade)
