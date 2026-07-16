@@ -151,6 +151,16 @@ class Shipment extends Model
         return $this->belongsTo(District::class, 'destination_district_id');
     }
 
+    public function clientUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'client_user_id');
+    }
+
+    public function apiClient(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ApiClient::class);
+    }
+
     public function assignedRider(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'assigned_rider_id');

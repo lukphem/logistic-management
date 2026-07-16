@@ -1491,3 +1491,68 @@ resources/views/states/, cities/, districts/   (form field + index column, all t
 ```powershell
 php artisan migrate
 ```
+
+## Increment 28 — Billing as a Top-Level Module + Units Moved to Location
+
+### Nav restructure
+
+**Billing** is now its own top-level sidebar group, parallel to Setups —
+not nested inside it, since billing configuration (rates, zone pricing,
+onforwarding, invoicing, client discounts) is distinct enough to warrant
+its own primary group. Contains:
+
+- Zones
+- Rate Cards
+- Onforwarding
+- Zone Mapping (new — see below)
+- Invoice (new — see below)
+- Client Billing
+
+**Units** moved from a flat item under Setups into the **Location**
+submenu, alongside Countries/States/Cities/Districts/Regions/Hubs/
+Outlets — it's organizational structure within a hub, the same
+conceptual area as the rest of Location.
+
+Note: this is a **visual/navigation change only** — none of the
+underlying route permissions changed. Zones is still gated to
+`locations:read`, Rate Cards to `rates:read`, etc. Moving a screen in the
+sidebar doesn't change who can already reach it.
+
+### Zone Mapping — new screen
+
+Surfaces `ZoneRateMatrix` (the zone-to-zone price pairs from Increment 2)
+in its own centralized view, filterable by rate card, instead of only
+being reachable from inside one specific zone-to-zone rate card's edit
+page. Same underlying upsert/delete as
+`RateCardController::setZonePrice()`/`destroyZonePrice()` — this is a
+second entry point into the same operation, not a duplicate
+implementation.
+
+### Invoice — new screen
+
+A staff-facing billing statement across every client's shipments —
+filterable by portal client, API integration, or date range. Same design
+decision as `Api\ClientController::invoices()` (Increment 10): **there's
+no separate invoice-document entity in this system** — each shipment's
+own billing breakdown (base, onforwarding, VAT, total) is the invoice.
+This is that same statement view, just staff-facing across everyone
+instead of scoped to one client.
+
+Added `Shipment::clientUser()` / `Shipment::apiClient()` relations (were
+missing before — the columns existed since early on, but nothing had
+needed the relation itself until now).
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php
+app/Http/Controllers/Web/InvoiceController.php
+app/Models/Shipment.php   (clientUser(), apiClient() relations)
+resources/views/zone-mappings/index.blade.php
+resources/views/invoices/index.blade.php
+resources/views/components/layouts/app.blade.php   (Billing top-level group, Units moved)
+routes/web.php   (zone-mappings.*, invoices.index routes)
+```
+
+No migration needed — this increment is entirely nav/screens, no schema
+changes.

@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DistrictController;
 use App\Http\Controllers\Web\HubController;
+use App\Http\Controllers\Web\InvoiceController;
 use App\Http\Controllers\Web\OnforwardingClassificationController;
 use App\Http\Controllers\Web\OutletController;
 use App\Http\Controllers\Web\RateCardController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Web\StateController;
 use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\ZoneController;
+use App\Http\Controllers\Web\ZoneMappingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
@@ -114,6 +116,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     // Billing setup: rate cards (the standard rate) + per-client standard/special assignment.
     Route::middleware('can:rates:read')->group(function () {
         Route::get('/rate-cards', [RateCardController::class, 'index'])->name('rate-cards.index');
+        Route::get('/zone-mappings', [ZoneMappingController::class, 'index'])->name('zone-mappings.index');
     });
     Route::middleware('can:rates:create')->group(function () {
         Route::get('/rate-cards/create', [RateCardController::class, 'create'])->name('rate-cards.create');
@@ -124,6 +127,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/rate-cards/{rateCard}', [RateCardController::class, 'update'])->name('rate-cards.update');
         Route::post('/rate-cards/{rateCard}/zone-prices', [RateCardController::class, 'setZonePrice'])->name('rate-cards.zone-prices.store');
         Route::delete('/rate-cards/{rateCard}/zone-prices/{zonePrice}', [RateCardController::class, 'destroyZonePrice'])->name('rate-cards.zone-prices.destroy');
+        Route::post('/zone-mappings', [ZoneMappingController::class, 'store'])->name('zone-mappings.store');
+        Route::delete('/zone-mappings/{zoneMapping}', [ZoneMappingController::class, 'destroy'])->name('zone-mappings.destroy');
     });
     Route::middleware('can:rates:delete')->group(function () {
         Route::delete('/rate-cards/{rateCard}', [RateCardController::class, 'destroy'])->name('rate-cards.destroy');
@@ -133,6 +138,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
         Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
+        Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     });
     Route::middleware('can:billing:update')->group(function () {
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
