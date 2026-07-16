@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\Auth\LoginController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\HubController;
+use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\ZoneController;
@@ -27,6 +28,11 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:settings:update')->group(function () {
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
         Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+
+        Route::get('/scan-statuses', [ScanStatusController::class, 'index'])->name('scan-statuses.index');
+        Route::post('/scan-statuses', [ScanStatusController::class, 'store'])->name('scan-statuses.store');
+        Route::put('/scan-statuses/{scanStatus}', [ScanStatusController::class, 'update'])->name('scan-statuses.update');
+        Route::delete('/scan-statuses/{scanStatus}', [ScanStatusController::class, 'destroy'])->name('scan-statuses.destroy');
     });
 
     // Location setup (hubs/branches, zones/regions) — gated per-action.

@@ -38,6 +38,8 @@ class BrandingServiceProvider extends ServiceProvider
             'branding.currency' => $settings->currency ?? config('branding.currency'),
             'branding.waybill.thermal_size' => $settings->waybill_thermal_size ?? config('branding.waybill.thermal_size'),
             'branding.waybill.show_qr' => $settings->waybill_show_qr ?? config('branding.waybill.show_qr'),
+            'branding.invoice.header' => $settings->invoice_header,
+            'branding.invoice.footer' => $settings->invoice_footer,
         ]);
     }
 }

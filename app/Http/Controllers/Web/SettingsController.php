@@ -32,6 +32,8 @@ class SettingsController extends Controller
             'waybill_thermal_size' => 'required|in:2x1,4x6',
             'waybill_show_qr' => 'sometimes|boolean',
             'operating_regions' => 'nullable|string',
+            'invoice_header' => 'nullable|string|max:2000',
+            'invoice_footer' => 'nullable|string|max:2000',
         ]);
 
         if ($validator->fails()) {

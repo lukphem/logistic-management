@@ -274,3 +274,63 @@ php artisan storage:link
 php artisan migrate
 php artisan db:seed --class=RolePermissionSeeder
 ```
+
+## Increment 7 — Settings Module Completed (Invoicing + Scan Statuses)
+
+Closes the last two gaps from the original setup-wizard spec that
+Increment 6 didn't cover.
+
+### Invoicing
+
+- `invoice_header` / `invoice_footer` (free text) added to `settings`,
+  exposed on the setup page, overlaid onto
+  `config('branding.invoice.header'/'footer')` for whenever invoice/PDF
+  generation is built
+
+### Configurable scan statuses
+
+- `scan_statuses` table: `key` (stable, stored on shipments/scan_events —
+  never editable once created), `label` (editable), `sort_order`
+  (editable, drives display order), `is_terminal` (marks
+  delivered/cancelled/returned-style end states)
+- `ScanStatusSeeder` populates the same 9 default statuses used
+  throughout the API/dashboard so far (booked → delivered/exception/etc.)
+- `/scan-statuses` page: inline edit label/order/terminal-flag per row,
+  plus an add-new-status form. Gated to `settings:update`, same as the
+  general settings page — this is still "system setup," not a separate
+  permission module.
+
+### Files
+
+```
+database/migrations/2026_01_04_000002_add_invoice_fields_to_settings_table.php
+database/migrations/2026_01_04_000003_create_scan_statuses_table.php
+app/Models/ScanStatus.php
+database/seeders/ScanStatusSeeder.php        (called from DatabaseSeeder)
+app/Http/Controllers/Web/ScanStatusController.php
+resources/views/scan-statuses/index.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=ScanStatusSeeder
+```
+
+### Note on ScanEvent/Shipment status columns
+
+`ScanEvent.status` and `Shipment.current_status` are still plain strings
+(from Increment 2) — they store the `key`, not a foreign key to
+`scan_statuses`. That's deliberate: relabeling a status here never
+touches historical records. If you later want referential integrity
+instead (so an invalid key can't be scanned), that's a bigger change —
+flag it if you want that tightened.
+
+### Settings module — now complete
+
+Company profile, logo, service names, branding colors, VAT/currency,
+invoicing header/footer, waybill design, and scan-status list are all
+editable from the dashboard. Hub/zone location setup lives in its own
+screens (Increment 6) rather than on the settings page itself, since
+those are per-location records, not single values.

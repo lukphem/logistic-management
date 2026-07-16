@@ -109,6 +109,24 @@
             </div>
         </div>
 
+        {{-- Invoicing --}}
+        <div class="rounded-lg border border-line bg-surface-0 p-5">
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Invoicing</h2>
+            <p class="mb-4 text-xs text-ink-500">Shown on generated invoice documents, above and below the line items.</p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Invoice header</label>
+                    <textarea name="invoice_header" rows="3" placeholder="Business address, tax ID, etc."
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('invoice_header', $settings->invoice_header) }}</textarea>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Invoice footer</label>
+                    <textarea name="invoice_footer" rows="3" placeholder="Payment terms, bank details, thank-you note, etc."
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('invoice_footer', $settings->invoice_footer) }}</textarea>
+                </div>
+            </div>
+        </div>
+
         {{-- Waybill --}}
         <div class="rounded-lg border border-line bg-surface-0 p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Waybill design</h2>

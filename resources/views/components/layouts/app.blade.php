@@ -42,6 +42,7 @@
                         ['label' => 'Hubs', 'route' => 'hubs.index', 'permission' => 'locations:read'],
                         ['label' => 'Zones', 'route' => 'zones.index', 'permission' => 'locations:read'],
                         ['label' => 'Settings', 'route' => 'settings.edit', 'permission' => 'settings:update'],
+                        ['label' => 'Scan Statuses', 'route' => 'scan-statuses.index', 'permission' => 'settings:update'],
                     ];
                 @endphp
 

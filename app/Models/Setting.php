@@ -11,7 +11,7 @@ class Setting extends Model
         'color_primary', 'color_secondary',
         'vat_percentage', 'currency',
         'waybill_thermal_size', 'waybill_show_qr',
-        'operating_regions',
+        'operating_regions', 'invoice_header', 'invoice_footer',
     ];
 
     protected $casts = [
