@@ -380,3 +380,50 @@ php artisan tinker
 ```
 
 If it doesn't list "Super Admin", re-run the seeders from Increment 6/7.
+
+## Increment 9 — Setups Menu Consolidation + Visual Refresh
+
+### Navigation restructure
+
+All setup screens now live under a single collapsible **Setups** menu
+item in the sidebar, ordered by dependency rather than alphabetically:
+
+1. **Company Settings** — no prerequisites, configure first
+2. **Hubs & Branches** — no prerequisites
+3. **Zones** — optionally references a hub, so hubs should exist first
+4. **Scan Statuses** — independent, but this is still setup, not a
+   day-to-day operational screen
+
+The group is a native `<details>`/`<summary>` element — no JS dependency,
+fully keyboard/accessible by default — and auto-expands when the active
+page is one of its children. It hides entirely for a user (e.g. Support
+role) who holds none of the underlying permissions, same as before.
+
+### Visual refresh
+
+- Added `resources/views/components/icon.blade.php` — a small set of
+  hand-drawn line icons (dashboard, box, setups/gear, building, layers,
+  list-check, sliders, chevron, logout, search) so nav items read at a
+  glance instead of relying on a plain dot. No icon library dependency
+  added.
+- Sidebar: subtle depth gradient, thicker active-item accent bar, smooth
+  color transitions on hover instead of instant state changes
+- Topbar: translucent/blurred on scroll, shows a small "Setups" eyebrow
+  label above the page title when inside any setup screen — so someone
+  deep in "Zones" still sees they're in Setups without checking the
+  sidebar
+- All card containers repo-wide: `rounded-lg` → `rounded-xl` with a
+  subtle `shadow-sm`, for a softer, more modern surface than sharp
+  corners with only a hairline border
+- Table row hovers now transition smoothly rather than snapping
+
+### Files
+
+```
+resources/views/components/icon.blade.php
+resources/views/components/layouts/app.blade.php   (nav restructure + visual pass)
++ minor radius/transition touch-ups across dashboard, shipments, hubs, zones,
+  scan-statuses, settings, and login views
+```
+
+No backend changes, no migration needed for this increment.

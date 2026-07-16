@@ -1,6 +1,6 @@
 <x-layouts.app :title="$zone->exists ? 'Edit Zone' : 'Add Zone'">
 
-    <form method="POST" action="{{ $zone->exists ? route('zones.update', $zone) : route('zones.store') }}" class="max-w-xl space-y-4 rounded-lg border border-line bg-surface-0 p-5">
+    <form method="POST" action="{{ $zone->exists ? route('zones.update', $zone) : route('zones.store') }}" class="max-w-xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         @csrf
         @if ($zone->exists) @method('PUT') @endif
 

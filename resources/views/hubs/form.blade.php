@@ -1,6 +1,6 @@
 <x-layouts.app :title="$hub->exists ? 'Edit Hub' : 'Add Hub'">
 
-    <form method="POST" action="{{ $hub->exists ? route('hubs.update', $hub) : route('hubs.store') }}" class="max-w-xl space-y-4 rounded-lg border border-line bg-surface-0 p-5">
+    <form method="POST" action="{{ $hub->exists ? route('hubs.update', $hub) : route('hubs.store') }}" class="max-w-xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         @csrf
         @if ($hub->exists) @method('PUT') @endif
 

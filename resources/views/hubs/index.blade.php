@@ -13,7 +13,7 @@
         </a>
     </div>
 
-    <div class="overflow-hidden rounded-lg border border-line bg-surface-0">
+    <div class="overflow-hidden rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
@@ -27,7 +27,7 @@
             </thead>
             <tbody>
                 @forelse ($hubs as $hub)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50">
+                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $hub->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $hub->code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $hub->address }}</td>

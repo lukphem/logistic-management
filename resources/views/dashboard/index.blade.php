@@ -11,14 +11,14 @@
         @endphp
 
         @foreach ($cards as $card)
-            <div class="rounded-lg border border-line bg-surface-0 p-5">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
                 <p class="text-sm font-medium text-ink-500">{{ $card['label'] }}</p>
                 <p class="mt-2 font-mono text-3xl font-semibold text-ink-900">{{ number_format($card['value']) }}</p>
             </div>
         @endforeach
     </div>
 
-    <div class="mt-8 rounded-lg border border-line bg-surface-0">
+    <div class="mt-8 rounded-xl border border-line bg-surface-0 shadow-sm">
         <div class="flex items-center justify-between border-b border-line px-5 py-4">
             <h2 class="text-sm font-semibold text-ink-900">Recent shipments</h2>
             <a href="{{ route('shipments.index') }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">View all</a>
@@ -36,7 +36,7 @@
             </thead>
             <tbody>
                 @forelse ($recentShipments as $shipment)
-                    <tr class="border-b border-line last:border-0 hover:bg-surface-50">
+                    <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
                         <td class="px-5 py-3">
                             <a href="{{ route('shipments.show', $shipment) }}" class="font-mono text-sm text-[var(--brand-primary)] hover:underline">
                                 {{ $shipment->tracking_number }}

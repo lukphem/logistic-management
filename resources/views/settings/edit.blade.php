@@ -22,7 +22,7 @@
         @method('PUT')
 
         {{-- Company Profile --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Company profile</h2>
             <div class="mb-4 flex items-center gap-4">
                 @if ($settings->logo_url)
@@ -53,7 +53,7 @@
         </div>
 
         {{-- Service Names --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-1 text-sm font-semibold text-ink-900">Service names</h2>
             <p class="mb-4 text-xs text-ink-500">These map to the <code class="font-mono">service_type</code> used when configuring rate cards.</p>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -69,7 +69,7 @@
         </div>
 
         {{-- Branding --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Branding</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -93,7 +93,7 @@
         </div>
 
         {{-- Billing Defaults --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Billing defaults</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -110,7 +110,7 @@
         </div>
 
         {{-- Invoicing --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-1 text-sm font-semibold text-ink-900">Invoicing</h2>
             <p class="mb-4 text-xs text-ink-500">Shown on generated invoice documents, above and below the line items.</p>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -128,7 +128,7 @@
         </div>
 
         {{-- Waybill --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Waybill design</h2>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>

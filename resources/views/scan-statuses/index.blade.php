@@ -17,7 +17,7 @@
         Reordering here changes display order only; the underlying <code class="font-mono">key</code> on past shipments is never touched.
     </p>
 
-    <div class="overflow-hidden rounded-lg border border-line bg-surface-0">
+    <div class="overflow-hidden rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
@@ -59,7 +59,7 @@
         </table>
     </div>
 
-    <div class="mt-6 rounded-lg border border-line bg-surface-0 p-5">
+    <div class="mt-6 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         <h2 class="mb-4 text-sm font-semibold text-ink-900">Add a scan status</h2>
         <form method="POST" action="{{ route('scan-statuses.store') }}" class="flex flex-wrap items-end gap-4">
             @csrf

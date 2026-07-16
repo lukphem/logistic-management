@@ -17,7 +17,7 @@
         {{-- Left: details --}}
         <div class="space-y-6 lg:col-span-2">
 
-            <div class="rounded-lg border border-line bg-surface-0 p-5">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
                 <h2 class="mb-4 text-sm font-semibold text-ink-900">Shipment details</h2>
                 <dl class="grid grid-cols-2 gap-y-3 text-sm">
                     <dt class="text-ink-500">Service type</dt>
@@ -49,7 +49,7 @@
                 </dl>
             </div>
 
-            <div class="rounded-lg border border-line bg-surface-0 p-5">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
                 <h2 class="mb-4 text-sm font-semibold text-ink-900">Billing</h2>
                 <dl class="space-y-2 text-sm">
                     <div class="flex justify-between"><dt class="text-ink-500">Base</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->base_amount, 2) }}</dd></div>
@@ -62,7 +62,7 @@
         </div>
 
         {{-- Right: scan timeline, styled as a waybill stamp trail --}}
-        <div class="rounded-lg border border-line bg-surface-0 p-5">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-5 text-sm font-semibold text-ink-900">Checkpoint trail</h2>
 
             @forelse ($shipment->scanEvents as $index => $event)

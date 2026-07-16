@@ -29,7 +29,7 @@
                 </div>
             </div>
 
-            <div class="rounded-lg border border-line bg-surface-0 p-6 shadow-sm">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-6 shadow-sm">
                 @if ($errors->any())
                     <div class="mb-4 rounded-md bg-status-exception/10 px-3 py-2 text-sm text-status-exception">
                         {{ $errors->first() }}
