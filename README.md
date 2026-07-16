@@ -1556,3 +1556,25 @@ routes/web.php   (zone-mappings.*, invoices.index routes)
 
 No migration needed — this increment is entirely nav/screens, no schema
 changes.
+
+## Increment 29 — Billing Moved Back Under Setups
+
+Reverses the "top-level module" part of Increment 28 — Billing is now a
+nested submenu **inside** Setups, right alongside Location, using the
+exact same collapsible pattern (its own `<details>`, same indent level,
+same auto-expand-when-active behavior). The screens themselves (Zones,
+Rate Cards, Onforwarding, Zone Mapping, Invoice, Client Billing) and
+their permissions are unchanged — only where the group sits in the
+sidebar.
+
+The topbar eyebrow label simplified back to just "Setups" for any page
+inside Billing or Location, rather than a separate "Billing" label — same
+as how Location pages already behaved.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php
+```
+
+No migration, no other file changes.
