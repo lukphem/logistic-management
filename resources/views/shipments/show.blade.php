@@ -3,6 +3,9 @@
     <div class="mb-6 flex items-start justify-between">
         <div>
             <p class="font-mono text-2xl font-semibold text-ink-900">{{ $shipment->tracking_number }}</p>
+            @if ($shipment->originHub)
+                <p class="text-xs text-ink-500">Originated at {{ $shipment->originHub->name }} ({{ $shipment->originHub->code }})</p>
+            @endif
             <p class="mt-1 text-sm text-ink-500">
                 {{ $shipment->originCity?->name ?? $shipment->originZone?->name ?? $shipment->origin_address }}
                 <span class="mx-1">→</span>

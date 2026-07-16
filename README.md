@@ -1235,3 +1235,66 @@ resources/views/users/form.blade.php, users/index.blade.php
 ```powershell
 php artisan migrate
 ```
+
+## Increment 22 — Hub Operational Coverage (States) + Hub-Coded Waybill Numbers
+
+### Hubs can now cover more than one state
+
+`hub_state` pivot table — a hub declares every state it actually picks up
+from and delivers to, separate from `city_id` (its single home location,
+Increment 17). A hub is very often broader than its home city's state —
+this is exactly that. Managed as a checklist (grouped by country) on the
+Hub form; shown as a count on the Hubs index.
+
+```php
+$hub->states;      // every state this hub operationally covers
+$state->hubs;       // reverse: every hub covering this state
+```
+
+### Waybill numbers are now coded with the originating hub
+
+`shipments.origin_hub_id` — distinct from `current_hub_id` (which tracks
+where the shipment *is right now* and moves as it travels the network).
+`origin_hub_id` is fixed at booking time: whichever hub picked up /
+originated the shipment, and the tracking number is generated from
+**that** hub's code — e.g. a shipment booked through hub `LOS-01` gets a
+tracking number starting `LOS01...` instead of the generic `LM...`
+prefix used before.
+
+**Resolution order**, handled automatically in `Shipment::booted()`:
+1. `origin_hub_id` explicitly provided (client or staff picked a specific
+   hub at booking)
+2. A hub whose home city (`city_id`) matches the shipment's
+   `origin_city_id`
+3. Any hub that operationally covers the origin city's **state** (the
+   new `hub_state` coverage from above)
+4. None found — falls back to the old generic `LM` prefix, so nothing
+   breaks for shipments with no city/hub information at all
+
+`origin_hub_id` can also be set explicitly by whoever's booking
+(`ClientShipmentController::store`, staff `ShipmentController::store`)
+if they already know which hub is handling pickup — the automatic
+resolution above only kicks in when it's left blank.
+
+The shipment detail page now shows "Originated at {hub name} ({hub
+code})" right under the tracking number.
+
+### Files
+
+```
+database/migrations/2026_01_15_000001_create_hub_state_table.php
+database/migrations/2026_01_15_000002_add_origin_hub_id_to_shipments_table.php
+app/Models/Hub.php   (states() relation)
+app/Models/State.php  (hubs() reverse relation)
+app/Models/Shipment.php   (origin_hub_id, resolveOriginHub(), hub-coded tracking number)
+app/Http/Controllers/Api/ClientShipmentController.php, ShipmentController.php   (origin_hub_id accepted)
+app/Http/Controllers/Web/HubController.php   (states checklist sync)
+resources/views/hubs/form.blade.php, hubs/index.blade.php   (operating-states checklist/count)
+resources/views/shipments/show.blade.php   (originating hub display)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

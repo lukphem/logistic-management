@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\City;
 use App\Models\Hub;
 use App\Models\Region;
+use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -15,7 +16,7 @@ class HubController extends Controller
 {
     public function index(): View
     {
-        $hubs = Hub::with(['region', 'city.state.country'])->withCount('zones')->orderBy('name')->paginate(15);
+        $hubs = Hub::with(['region', 'city.state.country'])->withCount(['zones', 'states'])->orderBy('name')->paginate(15);
 
         return view('hubs.index', compact('hubs'));
     }
@@ -26,14 +27,18 @@ class HubController extends Controller
             'hub' => new Hub(),
             'regions' => Region::orderBy('name')->get(),
             'cities' => City::with('state.country')->orderBy('name')->get(),
+            'states' => State::with('country')->orderBy('name')->get(),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
         $data = $this->validated($request);
+        $stateIds = $data['state_ids'] ?? [];
+        unset($data['state_ids']);
 
-        Hub::create($data);
+        $hub = Hub::create($data);
+        $hub->states()->sync($stateIds);
 
         return redirect()->route('hubs.index')->with('status', 'Hub added.');
     }
@@ -41,15 +46,21 @@ class HubController extends Controller
     public function edit(Hub $hub): View
     {
         return view('hubs.form', [
-            'hub' => $hub,
+            'hub' => $hub->load('states'),
             'regions' => Region::orderBy('name')->get(),
             'cities' => City::with('state.country')->orderBy('name')->get(),
+            'states' => State::with('country')->orderBy('name')->get(),
         ]);
     }
 
     public function update(Request $request, Hub $hub): RedirectResponse
     {
-        $hub->update($this->validated($request));
+        $data = $this->validated($request);
+        $stateIds = $data['state_ids'] ?? [];
+        unset($data['state_ids']);
+
+        $hub->update($data);
+        $hub->states()->sync($stateIds);
 
         return redirect()->route('hubs.index')->with('status', 'Hub updated.');
     }
@@ -72,6 +83,10 @@ class HubController extends Controller
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'is_active' => 'sometimes|boolean',
+            // The states this hub operationally picks up from/delivers
+            // to — separate from city_id, which is just its home location.
+            'state_ids' => 'nullable|array',
+            'state_ids.*' => 'exists:states,id',
         ]);
 
         $validator->validate();

@@ -21,6 +21,7 @@
                     <th class="px-5 py-3 font-medium">Code</th>
                     <th class="px-5 py-3 font-medium">Region</th>
                     <th class="px-5 py-3 font-medium">City</th>
+                    <th class="px-5 py-3 font-medium">Operating states</th>
                     <th class="px-5 py-3 font-medium">Address</th>
                     <th class="px-5 py-3 font-medium">Zones</th>
                     <th class="px-5 py-3 font-medium">Status</th>
@@ -34,6 +35,7 @@
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $hub->code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $hub->region?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $hub->city?->name ?? '—' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $hub->states_count }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $hub->address }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $hub->zones_count }}</td>
                         <td class="px-5 py-3">
@@ -50,7 +52,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-5 py-8 text-center text-sm text-ink-500">No hubs configured yet.</td></tr>
+                    <tr><td colspan="9" class="px-5 py-8 text-center text-sm text-ink-500">No hubs configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

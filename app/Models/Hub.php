@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Hub extends Model
@@ -20,6 +21,16 @@ class Hub extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    /**
+     * The states this hub actually picks up from and delivers to —
+     * usually broader than just its home city's state (city() above).
+     * Many-to-many: a state can be covered by more than one hub too.
+     */
+    public function states(): BelongsToMany
+    {
+        return $this->belongsToMany(State::class, 'hub_state');
     }
 
     public function zones(): HasMany
