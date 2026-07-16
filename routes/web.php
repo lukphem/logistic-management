@@ -98,7 +98,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:users:update')->group(function () {
         Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
         Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-        Route::patch('/users/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle-active');
+        Route::patch('/users/{user}/status/{status}', [UserController::class, 'changeStatus'])
+            ->whereIn('status', ['active', 'suspended', 'locked', 'terminated'])
+            ->name('users.change-status');
     });
     Route::middleware('can:users:delete')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');

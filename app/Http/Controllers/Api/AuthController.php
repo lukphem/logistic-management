@@ -33,8 +33,16 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        if (! $user->is_active) {
-            return response()->json(['message' => 'Account is disabled'], 403);
+        if (! $user->canSignIn()) {
+            $messages = [
+                'suspended' => 'This account has been suspended.',
+                'locked' => 'This account has been locked.',
+                'terminated' => 'This account has been terminated.',
+            ];
+            $message = $messages[$user->account_status] ?? 'Account is disabled';
+            $message .= $user->status_reason ? " Reason: {$user->status_reason}" : '';
+
+            return response()->json(['message' => $message], 403);
         }
 
         $token = $user->createToken(

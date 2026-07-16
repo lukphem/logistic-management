@@ -575,3 +575,87 @@ plus the access-control layer (roles, permissions, staff accounts) is
 built: Company Settings, Hubs, Zones, Rate Cards, Client Billing, Scan
 Statuses, Roles & Permissions, and Staff Users — all grouped under one
 Setups menu, ordered by dependency.
+
+## Increment 12 — Access Level (Global/Hub) + Account Lock/Suspend/Terminate + Audit Trail
+
+### Bug fix: missing `sanctum` guard
+
+While investigating the "Roles and permissions not accessible" report,
+found that `config/auth.php` never had a `sanctum` guard entry —
+`auth:sanctum` middleware (used across `routes/api.php` since Increment
+3) needs `config('auth.guards.sanctum')` to resolve, and Spatie's
+per-guard permission lookups for `sanctum`-guard roles need it too. This
+is now added. **If you're still seeing the roles/permissions problem
+after applying this and re-seeding, tell me the exact error text or
+screen you get** — I couldn't reproduce it directly (no PHP runtime in
+the environment this was built in), so I can't confirm this was the only
+cause.
+
+### Access level: Global vs. hub-restricted
+
+A single nullable `hub_id` on `users` — `null` means global access (every
+hub's shipments), set means restricted to that one hub. `User::hasGlobalAccess()`
+is the one place that logic lives. `ShipmentController` (staff) now
+filters both the list and the individual-shipment view by the signed-in
+user's hub when they're not global — a hub-restricted user gets a 403 on
+a shipment outside their hub, not just a filtered list that happens to
+exclude it.
+
+The staff user form presents this as two radio options (Global /
+Specific hub) rather than exposing the raw column — picking "Specific
+hub" reveals a hub dropdown.
+
+**Not yet extended to:** rider assignment, reports, or rate cards. Those
+still show everything regardless of the viewer's hub. Flag it if any of
+those need the same restriction next.
+
+### Account status: active / suspended / locked / terminated
+
+Replaces the old binary `is_active` toggle (still present and kept in
+sync, since a couple of other places read it) with four explicit states.
+All three restrictive states block login identically today; they're
+distinct because "why can't this person sign in" should show suspended
+vs. terminated vs. locked, not just "inactive" — for the exact audit and
+security-review reason you asked for.
+
+- **Suspended / Locked / Terminated** — require a reason, always
+- **Reactivate** — reason optional
+- A user can't change their own status (or delete their own account)
+- Checked on **every request**, not just at login — `UserType` middleware
+  (API/Sanctum) and `EnsureStaffUser` (dashboard session) both check
+  `canSignIn()` per-request, so suspending someone mid-session cuts them
+  off immediately rather than waiting for their token/session to expire.
+  The API side also explicitly deletes their current access token.
+
+### Audit trail
+
+`user_status_audits` — append-only, never updated or deleted. Every
+status change writes `from_status`, `to_status`, `reason`, and
+`changed_by`. `User::changeStatus()` is the only place that writes to it,
+so the audit log and the current status can never drift apart — they're
+one atomic operation. The user's edit page shows the full history.
+
+### Files
+
+```
+config/auth.php                                              (sanctum guard fix)
+database/migrations/2026_01_06_000001_add_access_scope_and_account_status_to_users_table.php
+database/migrations/2026_01_06_000002_create_user_status_audits_table.php
+app/Models/UserStatusAudit.php
+app/Models/User.php            (hub(), statusAudits(), hasGlobalAccess(), canSignIn(), changeStatus())
+app/Http/Controllers/Web/UserController.php   (rewritten)
+app/Http/Controllers/Web/ShipmentController.php  (hub-scoping added)
+app/Http/Controllers/Web/Auth/LoginController.php
+app/Http/Controllers/Api/AuthController.php
+app/Http/Middleware/EnsureStaffUser.php
+app/Http/Middleware/UserType.php
+resources/views/users/index.blade.php, users/form.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+(No reseed needed for this one — no new permission modules.)

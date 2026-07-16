@@ -26,33 +26,37 @@
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Email</th>
                     <th class="px-5 py-3 font-medium">Role</th>
+                    <th class="px-5 py-3 font-medium">Access</th>
                     <th class="px-5 py-3 font-medium">Status</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($users as $user)
+                    @php
+                        $statusStyles = [
+                            'active' => 'bg-status-delivered/10 text-status-delivered',
+                            'suspended' => 'bg-status-pending/10 text-status-pending',
+                            'locked' => 'bg-status-exception/10 text-status-exception',
+                            'terminated' => 'bg-ink-500/10 text-ink-500',
+                        ];
+                    @endphp
                     <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $user->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->email }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->roles->pluck('name')->unique()->join(', ') ?: '—' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $user->hasGlobalAccess() ? 'Global' : ($user->hub?->name ?? '—') }}</td>
                         <td class="px-5 py-3">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $user->is_active ? 'bg-status-delivered/10 text-status-delivered' : 'bg-ink-500/10 text-ink-500' }}">
-                                {{ $user->is_active ? 'Active' : 'Deactivated' }}
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $statusStyles[$user->account_status] ?? 'bg-ink-500/10 text-ink-500' }}">
+                                {{ ucfirst($user->account_status) }}
                             </span>
                         </td>
                         <td class="px-5 py-3 text-right">
-                            <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('users.toggle-active', $user) }}" class="inline">
-                                @csrf @method('PATCH')
-                                <button type="submit" class="ml-3 text-sm font-medium text-ink-500 hover:underline">
-                                    {{ $user->is_active ? 'Deactivate' : 'Reactivate' }}
-                                </button>
-                            </form>
+                            <a href="{{ route('users.edit', $user) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Manage</a>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No staff accounts yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No staff accounts yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

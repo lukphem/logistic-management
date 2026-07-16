@@ -27,10 +27,24 @@ class LoginController extends Controller
 
         $user = Auth::user();
 
-        if ($user->user_type !== 'staff' || ! $user->is_active) {
+        if ($user->user_type !== 'staff') {
             Auth::logout();
 
             return back()->withErrors(['email' => 'This account cannot access the admin dashboard.']);
+        }
+
+        if (! $user->canSignIn()) {
+            Auth::logout();
+
+            $messages = [
+                'suspended' => 'This account has been suspended.',
+                'locked' => 'This account has been locked.',
+                'terminated' => 'This account has been terminated.',
+            ];
+            $message = $messages[$user->account_status] ?? 'This account cannot access the admin dashboard.';
+            $message .= $user->status_reason ? " Reason: {$user->status_reason}" : '';
+
+            return back()->withErrors(['email' => $message]);
         }
 
         $request->session()->regenerate();

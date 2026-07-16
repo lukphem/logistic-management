@@ -17,12 +17,30 @@ class EnsureStaffUser
     {
         $user = $request->user();
 
-        if (! $user || $user->user_type !== 'staff' || ! $user->is_active) {
+        if (! $user || $user->user_type !== 'staff') {
             auth()->logout();
 
             return redirect()->route('login')->withErrors(['email' => 'This account cannot access the admin dashboard.']);
         }
 
+        if (! $user->canSignIn()) {
+            auth()->logout();
+
+            return redirect()->route('login')->withErrors(['email' => $this->messageFor($user->account_status, $user->status_reason)]);
+        }
+
         return $next($request);
+    }
+
+    private function messageFor(string $status, ?string $reason): string
+    {
+        $base = match ($status) {
+            'suspended' => 'This account has been suspended.',
+            'locked' => 'This account has been locked.',
+            'terminated' => 'This account has been terminated.',
+            default => 'This account cannot access the admin dashboard.',
+        };
+
+        return $reason ? "{$base} Reason: {$reason}" : $base;
     }
 }
