@@ -427,3 +427,82 @@ resources/views/components/layouts/app.blade.php   (nav restructure + visual pas
 ```
 
 No backend changes, no migration needed for this increment.
+
+## Increment 10 — Billing Setup (Rate Cards UI + Standard/Special Client Billing)
+
+### The Standard/Special model, exactly as specified
+
+Every client is **Standard** by default — no row needed in
+`client_billing_profiles` at all; "no profile" and "explicitly standard"
+are treated identically (zero discount). A client can be put on
+**Special**, which stores a `discount_percentage` — not a frozen price.
+
+`ShipmentPricingService::priceShipment()` now takes an optional
+`ClientBillingProfile` and applies the discount to **freight + surcharges
+only** (insurance is a pass-through cost, never discounted), then
+recalculates VAT on the discounted subtotal. Because the discount is
+applied fresh against whatever the standard `RateCard` resolves to at
+quote time — never against a number saved when the agreement was made —
+raising the standard rate automatically raises every special client's
+price too. Only touching `discount_percentage` itself changes their
+relative price.
+
+`ClientBillingProfile::resolveForRequest()` figures out who's asking
+(portal user via session/Sanctum, or external integrator via the
+`api_client` request attribute set by `CheckIpWhitelist`) and both
+`ClientController::quote()` and `ClientShipmentController::store()` now
+resolve and apply it automatically — no extra parameter for callers to
+pass.
+
+### Rate Card management (staff, the "standard rate" itself)
+
+`/rate-cards` — full CRUD. The form shows only the config fields relevant
+to whichever billing model is selected (flat/distance/weight/volumetric/
+hybrid/service_multiplier/time_surcharge/contract), toggled with a small
+vanilla-JS show/hide — no new frontend dependency. Zone-to-zone rate
+cards get a dedicated matrix editor on the edit page (add/remove one
+origin→destination price pair at a time), gated the same way as the rest
+of the form.
+
+### Client Billing (staff, per-client Standard/Special assignment)
+
+`/client-billing` lists every client — portal users and external API
+integrations side by side — with their current billing status and
+discount. Editing a client is two radio options (Standard / Special) with
+the discount field only appearing when Special is selected; switching
+back to Standard always zeroes the stored discount rather than leaving a
+stale value that could resurface later.
+
+### New permission module
+
+`billing` (create/read/update/delete) added alongside the existing
+modules. Finance's default role now includes full `rates` access and
+`billing` (they set rates and negotiate client discounts); Ops Manager
+gained `rates:read` (needs to see prices, not set them).
+
+### Files
+
+```
+database/migrations/2026_01_05_000001_create_client_billing_profiles_table.php
+database/migrations/2026_01_05_000002_add_discount_amount_to_shipments_table.php
+app/Models/ClientBillingProfile.php
+app/Http/Controllers/Web/RateCardController.php
+app/Http/Controllers/Web/ClientBillingController.php
+resources/views/rate-cards/index.blade.php, rate-cards/form.blade.php
+resources/views/client-billing/index.blade.php, client-billing/edit.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=RolePermissionSeeder
+```
+
+### Known gap
+
+Staff-initiated walk-in bookings (`ShipmentController::store` — the
+staff-facing, non-client-portal booking endpoint) still create a shipment
+without running it through `ShipmentPricingService`, so pricing and any
+special discount aren't applied there yet. Flag it if walk-in bookings
+need to go live before that's wired up.

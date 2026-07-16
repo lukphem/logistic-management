@@ -51,4 +51,9 @@ class User extends Authenticatable
             'is_active' => 'boolean',
         ];
     }
+
+    public function billingProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\ClientBillingProfile::class, 'client_user_id');
+    }
 }

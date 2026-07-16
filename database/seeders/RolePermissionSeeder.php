@@ -13,14 +13,14 @@ class RolePermissionSeeder extends Seeder
      * controllers/routes and the Blade admin. Extend this list as new
      * modules are added rather than hardcoding checks elsewhere.
      */
-    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations'];
+    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations', 'billing'];
     private array $actions = ['create', 'read', 'update', 'delete'];
 
     private array $defaultRoles = [
         'Super Admin' => '*', // gets every permission
-        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read'],
+        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read'],
         'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read'],
-        'Finance' => ['reports:read', 'settings:read'],
+        'Finance' => ['reports:read', 'settings:read', 'rates', 'billing'],
         'Support' => ['shipments:read'],
     ];
 

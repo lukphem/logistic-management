@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientBillingProfile;
 use App\Models\ClientWallet;
 use App\Models\RateCard;
 use App\Models\Shipment;
@@ -51,7 +52,11 @@ class ClientController extends Controller
             return response()->json(['message' => 'No active rate card configured for this service type'], 422);
         }
 
-        $breakdown = $this->pricingService->priceShipment($rateCard, $validator->validated());
+        $breakdown = $this->pricingService->priceShipment(
+            $rateCard,
+            $validator->validated(),
+            ClientBillingProfile::resolveForRequest($request)
+        );
 
         return response()->json([
             'service_type' => $request->service_type,

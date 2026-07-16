@@ -13,7 +13,7 @@ class Shipment extends Model
         'tracking_number', 'client_user_id', 'api_client_id', 'service_type', 'rate_card_id',
         'origin_address', 'origin_zone_id', 'destination_address', 'destination_zone_id', 'distance_km',
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg',
-        'base_amount', 'surcharge_amount', 'vat_amount', 'insurance_amount', 'total_amount',
+        'base_amount', 'surcharge_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id',
         'sla_breached', 'promised_delivery_at', 'delivered_at',
     ];

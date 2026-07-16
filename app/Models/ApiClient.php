@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ApiClient extends Model
 {
@@ -30,6 +31,11 @@ class ApiClient extends Model
     public function ipWhitelists(): HasMany
     {
         return $this->hasMany(IpWhitelist::class);
+    }
+
+    public function billingProfile(): HasOne
+    {
+        return $this->hasOne(ClientBillingProfile::class);
     }
 
     /**

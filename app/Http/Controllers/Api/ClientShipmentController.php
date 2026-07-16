@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClientBillingProfile;
 use App\Models\RateCard;
 use App\Models\Shipment;
 use App\Services\ShipmentPricingService;
@@ -64,7 +65,7 @@ class ClientShipmentController extends Controller
             return response()->json(['message' => 'No active rate card configured for this service type'], 422);
         }
 
-        $pricing = $this->pricingService->priceShipment($rateCard, $data);
+        $pricing = $this->pricingService->priceShipment($rateCard, $data, ClientBillingProfile::resolveForRequest($request));
 
         $shipment = Shipment::create([
             ...$data,
