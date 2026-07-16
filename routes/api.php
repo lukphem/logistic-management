@@ -14,6 +14,7 @@ Route::prefix('v1')->group(function () {
 
     // ── Auth (shared login endpoint, returns role/user_type-scoped token) ──
     Route::post('/auth/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
+    Route::post('/auth/logout', [\App\Http\Controllers\Api\AuthController::class, 'logout'])->middleware('auth:sanctum');
 
     // ── Core Staff — Sanctum + spatie permission checks ──
     Route::middleware(['auth:sanctum', 'user_type:staff'])->prefix('staff')->group(function () {
@@ -21,6 +22,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('permissions', \App\Http\Controllers\Api\PermissionController::class)->only(['index']);
         Route::apiResource('shipments', \App\Http\Controllers\Api\ShipmentController::class);
         Route::apiResource('rates', \App\Http\Controllers\Api\RateController::class);
+        Route::post('/rates/{rate}/zone-price', [\App\Http\Controllers\Api\RateController::class, 'setZonePrice']);
         Route::get('/reports/exceptions', [\App\Http\Controllers\Api\ReportController::class, 'exceptions']);
     });
 
@@ -39,6 +41,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/quote', [\App\Http\Controllers\Api\ClientController::class, 'quote']);
         Route::apiResource('shipments', \App\Http\Controllers\Api\ClientShipmentController::class);
         Route::get('/shipments/{id}/track', [\App\Http\Controllers\Api\ClientShipmentController::class, 'track']);
+        Route::post('/shipments/{id}/cancel', [\App\Http\Controllers\Api\ClientShipmentController::class, 'cancel']);
         Route::get('/invoices', [\App\Http\Controllers\Api\ClientController::class, 'invoices']);
         Route::get('/wallet', [\App\Http\Controllers\Api\ClientController::class, 'wallet']);
     });

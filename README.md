@@ -57,3 +57,52 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+## Increment 3 — Api Controllers
+
+Adds the actual controllers behind every route in `routes/api.php`, plus
+the supporting tables they need:
+
+- `AuthController` — single login endpoint issuing Sanctum tokens (ability
+  scoped to `user_type`); `Role`/`PermissionController` wrap
+  spatie/laravel-permission
+- `ShipmentController` (staff), `RateController` (staff — includes a
+  `zone-price` action to upsert one zone-to-zone matrix entry at a time),
+  `ReportController::exceptions`
+- `RiderController` — assigned orders, scan/status update (one action
+  handles both, since a scan IS the status update in practice), live
+  location ping (`rider_locations` — latest position only, not a history
+  log), COD remittance, basic earnings count
+- `ClientController` + `ClientShipmentController` — shared by the JWT
+  client-portal group and the API-key `/integration` group; requester
+  identity resolves to either `$request->user()` or the `api_client`
+  attribute set by `CheckIpWhitelist`, so the exact same code path serves
+  both audiences
+- `WebhookController::subscribe` — stores the callback URL, subscribed
+  events, and a signing secret; actual dispatch (queued HMAC-signed POST
+  on status change) is deferred to the notification-service increment
+- New tables: COD fields on `shipments`; `rider_locations`;
+  `client_wallets` + `wallet_transactions`; `webhook_subscriptions`
+- `RolePermissionSeeder` — seeds the module/action permission set
+  (shipments, rates, riders, reports, settings, roles × create/read/update/delete)
+  and five default roles (Super Admin, Ops Manager, Hub Staff, Finance,
+  Support); `DatabaseSeeder` now calls it and assigns the test user
+  Super Admin
+
+### Config note
+
+spatie/laravel-permission's published config defaults to the `web` guard.
+Since all API auth here goes through Sanctum, set
+`'default' => 'sanctum'` under the `guards` key considerations in
+`config/permission.php`, or explicitly pass `guard_name: 'sanctum'`
+wherever roles/permissions are created (already done in the seeder and
+controllers above) — the important part is that it's consistent
+everywhere, since a mismatch will make `hasRole()`/`can()` checks silently
+fail.
+
+### Still not built
+
+- Notification/webhook dispatch job (queued, HMAC-signed)
+- SLA breach detection scheduled job
+- Waybill generation (thermal ZPL + A4 PDF)
+- Formal invoice documents (currently just a shipment-list view)
