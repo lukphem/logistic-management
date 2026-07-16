@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Hub;
+use App\Models\Outlet;
 use App\Models\Region;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +19,7 @@ class UserController extends Controller
     public function index(): View
     {
         $users = User::where('user_type', 'staff')
-            ->with(['roles', 'hub', 'region'])
+            ->with(['roles', 'hub', 'region', 'outlet'])
             ->orderBy('name')
             ->paginate(15);
 
@@ -32,6 +33,7 @@ class UserController extends Controller
             'roles' => $this->webRoles(),
             'hubs' => Hub::orderBy('name')->get(),
             'regions' => Region::orderBy('name')->get(),
+            'outlets' => Outlet::orderBy('name')->get(),
         ]);
     }
 
@@ -46,6 +48,7 @@ class UserController extends Controller
             'user_type' => 'staff',
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
+            'outlet_id' => $data['outlet_id'],
         ]);
 
         $this->assignRoleAcrossGuards($user, $data['role']);
@@ -62,6 +65,7 @@ class UserController extends Controller
             'roles' => $this->webRoles(),
             'hubs' => Hub::orderBy('name')->get(),
             'regions' => Region::orderBy('name')->get(),
+            'outlets' => Outlet::orderBy('name')->get(),
         ]);
     }
 
@@ -76,6 +80,7 @@ class UserController extends Controller
             'email' => $data['email'],
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
+            'outlet_id' => $data['outlet_id'],
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
 
@@ -136,19 +141,21 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email' . ($ignoreUserId ? ",{$ignoreUserId}" : ''),
             'password' => $ignoreUserId ? 'nullable|string|min:8' : 'required|string|min:8',
             'role' => 'required|string|exists:roles,name',
-            'access_scope' => 'required|in:global,region,hub',
+            'access_scope' => 'required|in:global,region,hub,outlet',
             'region_id' => 'required_if:access_scope,region|nullable|exists:regions,id',
             'hub_id' => 'required_if:access_scope,hub|nullable|exists:hubs,id',
+            'outlet_id' => 'required_if:access_scope,outlet|nullable|exists:outlets,id',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // access_scope is a form-only concept — the three levels are
-        // mutually exclusive, so only ever one of region_id/hub_id is
-        // actually stored, regardless of what values were posted.
+        // access_scope is a form-only concept — the four levels are
+        // mutually exclusive, so only ever one of region_id/hub_id/
+        // outlet_id is actually stored, regardless of what was posted.
         $data['region_id'] = $data['access_scope'] === 'region' ? $data['region_id'] : null;
         $data['hub_id'] = $data['access_scope'] === 'hub' ? $data['hub_id'] : null;
+        $data['outlet_id'] = $data['access_scope'] === 'outlet' ? $data['outlet_id'] : null;
 
         return $data;
     }

@@ -30,6 +30,7 @@ class User extends Authenticatable
         'is_active',
         'hub_id',
         'region_id',
+        'outlet_id',
         'account_status',
         'status_reason',
         'status_changed_at',
@@ -76,38 +77,50 @@ class User extends Authenticatable
         return $this->belongsTo(Region::class);
     }
 
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
+    }
+
     public function statusAudits(): HasMany
     {
         return $this->hasMany(UserStatusAudit::class)->latest();
     }
 
     /**
-     * The access scale, broadest to narrowest: Global > Region > Hub.
-     * The three are mutually exclusive — a user has exactly one of them,
-     * never a combination — so region_id and hub_id are never both set
-     * at once (enforced in UserController::validateForm).
+     * The access scale, broadest to narrowest: Global > Region > Hub >
+     * Outlet. Exactly one of region_id/hub_id/outlet_id is ever set —
+     * never a combination — enforced in UserController::validateForm.
      */
     public function hasGlobalAccess(): bool
     {
-        return $this->hub_id === null && $this->region_id === null;
+        return $this->hub_id === null && $this->region_id === null && $this->outlet_id === null;
     }
 
     public function hasRegionAccess(): bool
     {
-        return $this->region_id !== null && $this->hub_id === null;
+        return $this->region_id !== null && $this->hub_id === null && $this->outlet_id === null;
     }
 
     public function hasHubAccess(): bool
     {
-        return $this->hub_id !== null;
+        return $this->hub_id !== null && $this->outlet_id === null;
+    }
+
+    public function hasOutletAccess(): bool
+    {
+        return $this->outlet_id !== null;
     }
 
     /**
      * Resolves the scale down to the one thing every consumer actually
      * needs: which hub IDs this user is allowed to see. Global returns
      * every hub; Region returns every hub under that region; Hub returns
-     * just the one. Callers (e.g. ShipmentController) never need to know
-     * which scope level produced the list.
+     * just the one; Outlet also resolves to just its parent hub, since
+     * shipments are tracked at hub granularity, not outlet — an
+     * outlet-scoped user sees the same shipment set as someone scoped to
+     * their parent hub. Callers (e.g. ShipmentController) never need to
+     * know which scope level produced the list.
      */
     public function accessibleHubIds(): array
     {
@@ -117,6 +130,10 @@ class User extends Authenticatable
 
         if ($this->hasRegionAccess()) {
             return Hub::where('region_id', $this->region_id)->pluck('id')->all();
+        }
+
+        if ($this->hasOutletAccess()) {
+            return [$this->outlet?->hub_id];
         }
 
         return [$this->hub_id];

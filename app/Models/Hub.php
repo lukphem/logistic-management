@@ -21,4 +21,9 @@ class Hub extends Model
     {
         return $this->hasMany(Zone::class);
     }
+
+    public function outlets(): HasMany
+    {
+        return $this->hasMany(Outlet::class);
+    }
 }

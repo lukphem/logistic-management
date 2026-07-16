@@ -730,3 +730,61 @@ resources/views/users/form.blade.php, users/index.blade.php  (region option/colu
 ```powershell
 php artisan migrate
 ```
+
+## Increment 14 — Outlets: A Fourth Level Under Hubs
+
+Adds Outlets — agent counters, franchise points, or pickup/drop-off spots
+that each report to exactly one hub. Completes the location hierarchy:
+**Region > Hub > Outlet**, and the access scale becomes four levels:
+**Global > Region > Hub > Outlet**.
+
+### Data model
+
+- `outlets` table: `hub_id` (required — unlike Hub's optional `region_id`,
+  an outlet doesn't exist independently of its hub), name, code, address,
+  lat/lng, active flag
+- `users.outlet_id` (nullable) — the fourth scope level, mutually
+  exclusive with `region_id`/`hub_id` the same way those already are with
+  each other
+
+### Important scoping detail
+
+Shipments are tracked at **hub** granularity (`current_hub_id`), not
+outlet — there's no `current_outlet_id` on shipments. So an
+outlet-scoped user's `accessibleHubIds()` resolves to their outlet's
+**parent hub** — they see the same shipment set as someone scoped
+directly to that hub. Outlet-level access exists for staff-account
+organization and future outlet-specific features (e.g. an outlet-specific
+report or a dedicated outlet counter view), not to further narrow
+shipment visibility below the hub level. If shipments ever need
+outlet-level granularity (e.g. an agent counter scanning its own
+handovers separately from the hub's), that's a schema change to
+`shipments`/`scan_events` worth discussing before building — flag it if
+that's actually needed.
+
+### New screen
+
+`/outlets` — CRUD (hub picker, name, code, address, lat/lng, active
+toggle), gated under the existing `locations:*` permission alongside
+Regions/Hubs/Zones. Added to the Setups menu right after Hubs & Branches,
+since an outlet's hub picker needs hubs to exist first.
+
+### Files
+
+```
+database/migrations/2026_01_08_000001_create_outlets_table.php
+database/migrations/2026_01_08_000002_add_outlet_id_to_users_table.php
+app/Models/Outlet.php
+app/Models/Hub.php     (outlets() relation)
+app/Models/User.php    (hasOutletAccess(), accessibleHubIds() updated)
+app/Http/Controllers/Web/OutletController.php
+app/Http/Controllers/Web/UserController.php   (four-way access_scope)
+resources/views/outlets/index.blade.php, outlets/form.blade.php
+resources/views/users/form.blade.php, users/index.blade.php  (outlet option/column)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

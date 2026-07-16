@@ -62,13 +62,13 @@
                     <p class="mb-4 text-xs text-ink-500">Controls which hub(s) this person can see and act on shipments for.</p>
 
                     @php
-                        $currentScope = old('access_scope', $user->region_id ? 'region' : ($user->hub_id ? 'hub' : 'global'));
+                        $currentScope = old('access_scope', $user->outlet_id ? 'outlet' : ($user->region_id ? 'region' : ($user->hub_id ? 'hub' : 'global')));
                     @endphp
                     <div class="space-y-3">
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="global" class="mt-1"
                                    @checked($currentScope === 'global')
-                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none';">
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none';">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Global</span>
                                 <span class="block text-xs text-ink-500">Sees and manages shipments across every hub.</span>
@@ -77,7 +77,7 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="region" class="mt-1"
                                    @checked($currentScope === 'region')
-                                   onchange="document.getElementById('region-field').style.display=''; document.getElementById('hub-field').style.display='none';">
+                                   onchange="document.getElementById('region-field').style.display=''; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none';">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Region</span>
                                 <span class="block text-xs text-ink-500">Sees every hub within one region.</span>
@@ -86,10 +86,19 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="hub" class="mt-1"
                                    @checked($currentScope === 'hub')
-                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='';">
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display=''; document.getElementById('outlet-field').style.display='none';">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Specific hub (station)</span>
                                 <span class="block text-xs text-ink-500">Restricted to one hub's shipments only.</span>
+                            </span>
+                        </label>
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <input type="radio" name="access_scope" value="outlet" class="mt-1"
+                                   @checked($currentScope === 'outlet')
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='';">
+                            <span>
+                                <span class="block text-sm font-medium text-ink-900">Specific outlet</span>
+                                <span class="block text-xs text-ink-500">Restricted to one outlet — shipment visibility follows its parent hub.</span>
                             </span>
                         </label>
                     </div>
@@ -108,6 +117,15 @@
                         <select name="hub_id" class="w-full max-w-xs rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             @foreach ($hubs as $hub)
                                 <option value="{{ $hub->id }}" @selected(old('hub_id', $user->hub_id) == $hub->id)>{{ $hub->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div id="outlet-field" class="mt-4" style="{{ $currentScope === 'outlet' ? '' : 'display:none' }}">
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Outlet</label>
+                        <select name="outlet_id" class="w-full max-w-xs rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($outlets as $outlet)
+                                <option value="{{ $outlet->id }}" @selected(old('outlet_id', $user->outlet_id) == $outlet->id)>{{ $outlet->name }}</option>
                             @endforeach
                         </select>
                     </div>

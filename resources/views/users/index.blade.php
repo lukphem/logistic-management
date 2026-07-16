@@ -50,6 +50,8 @@
                                 Global
                             @elseif ($user->hasRegionAccess())
                                 {{ $user->region?->name ?? '—' }} <span class="text-xs">(region)</span>
+                            @elseif ($user->hasOutletAccess())
+                                {{ $user->outlet?->name ?? '—' }} <span class="text-xs">(outlet)</span>
                             @else
                                 {{ $user->hub?->name ?? '—' }} <span class="text-xs">(hub)</span>
                             @endif
