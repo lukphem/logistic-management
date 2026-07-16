@@ -42,7 +42,21 @@
                         ];
                     @endphp
                     <tr class="border-b border-line last:border-0 hover:bg-surface-50 transition-colors">
-                        <td class="px-5 py-3 font-medium text-ink-900">{{ $user->name }}</td>
+                        <td class="px-5 py-3">
+                            <div class="flex items-center gap-3">
+                                <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-50 ring-1 ring-line">
+                                    @if ($user->photo_url)
+                                        <img src="{{ $user->photo_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
+                                    @else
+                                        <span class="text-xs font-semibold text-ink-500">{{ strtoupper(substr($user->first_name ?? $user->name, 0, 1)) }}</span>
+                                    @endif
+                                </span>
+                                <div>
+                                    <p class="font-medium text-ink-900">{{ $user->name }}</p>
+                                    <p class="font-mono text-xs text-ink-500">{{ $user->staff_id }}</p>
+                                </div>
+                            </div>
+                        </td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->email }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $user->roles->pluck('name')->unique()->join(', ') ?: '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">

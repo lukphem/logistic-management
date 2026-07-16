@@ -864,3 +864,61 @@ resources/views/users/form.blade.php, users/index.blade.php          (unit field
 ```powershell
 php artisan migrate
 ```
+
+## Increment 16 — Staff Profile Details + Logo Display Bugfix
+
+### Bugfix: logo image not visible
+
+`Setting::getLogoUrlAttribute()` was building an **absolute** URL via
+`Storage::disk('public')->url()`, which derives its host from `APP_URL`.
+`APP_URL` in a fresh `.env` typically has no port (`http://localhost`),
+while `php artisan serve` runs on `:8000` — so the generated `<img src>`
+silently pointed at the wrong port and 404'd. Fixed by returning a
+root-relative path (`/storage/...`) instead, which resolves against
+whatever host/port the page is actually being viewed on, regardless of
+`APP_URL`. Applied the same way to the new staff photo URL.
+
+**Still required** for either logo or staff photos to actually load:
+`php artisan storage:link` (creates the `public/storage` symlink) — this
+was already flagged in earlier increments' README notes but is worth
+repeating since it's the other half of what makes uploaded images work.
+
+### Staff profile additions
+
+- **Staff ID** — auto-generated (`STF-XXXXXX`) the moment a staff account
+  is created, never editable, never regenerated
+- **First name / Last name** — replace the single Name field on the form.
+  `name` itself is kept in the database and auto-synced from these two
+  (see `User::booted()`'s `saving` hook) specifically so the dozens of
+  existing places that read `$user->name` — `assignedRider->name`,
+  `handler->name`, dashboard greetings, etc. — needed zero changes.
+- **Phone number** — required
+- **Photo** — optional upload, shown as a circular avatar on both the
+  index list and the edit page, with initials as the fallback (matching
+  the pattern already used for the topbar avatar)
+
+### Optional staff details (all nullable, none required)
+
+Date of birth, gender, address, job title, date joined, employment type
+(full-time/part-time/contract/intern), emergency contact name and phone —
+tucked into a collapsed "Additional details (optional)" section on the
+form so the common case (create a staff account quickly) isn't cluttered
+by fields most people won't fill in immediately.
+
+### Files
+
+```
+database/migrations/2026_01_10_000001_add_staff_profile_fields_to_users_table.php
+app/Models/User.php      (staff_id generation, name sync, photo_url accessor)
+app/Models/Setting.php   (logo_url bugfix)
+app/Http/Controllers/Web/UserController.php   (photo upload, all new fields)
+resources/views/users/form.blade.php   (split name, phone, photo, optional-details <details>)
+resources/views/users/index.blade.php  (photo thumbnail + staff ID)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan storage:link
+```

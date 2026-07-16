@@ -42,6 +42,12 @@ class Setting extends Model
 
     public function getLogoUrlAttribute(): ?string
     {
-        return $this->logo_path ? \Illuminate\Support\Facades\Storage::disk('public')->url($this->logo_path) : null;
+        // Root-relative on purpose, not Storage::disk('public')->url(). That
+        // helper builds an ABSOLUTE URL from APP_URL, which typically has no
+        // port (e.g. http://localhost) while `php artisan serve` runs on
+        // :8000 — the browser then requests the wrong port and the image
+        // silently 404s. A root-relative path resolves against whatever
+        // host/port the page is actually being viewed on, always.
+        return $this->logo_path ? '/storage/' . ltrim($this->logo_path, '/') : null;
     }
 }

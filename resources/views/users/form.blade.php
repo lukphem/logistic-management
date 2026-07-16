@@ -18,22 +18,63 @@
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div class="lg:col-span-2">
-            <form method="POST" action="{{ $user->exists ? route('users.update', $user) : route('users.store') }}" class="space-y-6">
+            <form method="POST" action="{{ $user->exists ? route('users.update', $user) : route('users.store') }}" enctype="multipart/form-data" class="space-y-6">
                 @csrf
                 @if ($user->exists) @method('PUT') @endif
 
                 <div class="rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
                     <h2 class="mb-4 text-sm font-semibold text-ink-900">Account</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-ink-900">Full name</label>
-                            <input type="text" name="name" value="{{ old('name', $user->name) }}"
-                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+
+                    @if ($user->exists)
+                        <div class="mb-4 flex items-center gap-4">
+                            <span class="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-full bg-surface-50 ring-1 ring-line">
+                                @if ($user->photo_url)
+                                    <img src="{{ $user->photo_url }}" alt="{{ $user->name }}" class="h-full w-full object-cover">
+                                @else
+                                    <span class="text-lg font-semibold text-ink-500">{{ strtoupper(substr($user->first_name ?? $user->name, 0, 1)) }}</span>
+                                @endif
+                            </span>
+                            <div>
+                                <p class="font-mono text-xs text-ink-500">{{ $user->staff_id }}</p>
+                                <label class="mt-1 inline-block cursor-pointer text-sm font-medium text-[var(--brand-primary)] hover:underline">
+                                    Change photo
+                                    <input type="file" name="photo" accept="image/*" class="hidden">
+                                </label>
+                            </div>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-sm font-medium text-ink-900">Email</label>
-                            <input type="email" name="email" value="{{ old('email', $user->email) }}"
-                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    @else
+                        <div class="mb-4">
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Photo</label>
+                            <input type="file" name="photo" accept="image/*"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <p class="mt-1 text-xs text-ink-500">Optional. A staff ID is generated automatically once created.</p>
+                        </div>
+                    @endif
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">First name</label>
+                                <input type="text" name="first_name" value="{{ old('first_name', $user->first_name) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Last name</label>
+                                <input type="text" name="last_name" value="{{ old('last_name', $user->last_name) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Email</label>
+                                <input type="email" name="email" value="{{ old('email', $user->email) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Phone number</label>
+                                <input type="text" name="phone_number" value="{{ old('phone_number', $user->phone_number) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-ink-900">
@@ -145,6 +186,65 @@
                         <p class="mt-1 text-xs text-ink-500">Which team within the hub — never changes what shipments they can see.</p>
                     </div>
                 </div>
+
+                <details class="group rounded-xl border border-line bg-surface-0 shadow-sm">
+                    <summary class="flex cursor-pointer items-center justify-between p-5 text-sm font-semibold text-ink-900">
+                        Additional details <span class="text-xs font-normal text-ink-500">(optional)</span>
+                        <x-icon name="chevron" class="h-4 w-4 shrink-0 text-ink-500 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div class="space-y-4 border-t border-line p-5">
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Date of birth</label>
+                                <input type="date" name="date_of_birth" value="{{ old('date_of_birth', $user->date_of_birth?->format('Y-m-d')) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Gender</label>
+                                <input type="text" name="gender" value="{{ old('gender', $user->gender) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Address</label>
+                            <textarea name="address" rows="2"
+                                      class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">{{ old('address', $user->address) }}</textarea>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Job title</label>
+                                <input type="text" name="job_title" value="{{ old('job_title', $user->job_title) }}" placeholder="e.g. Dispatch Supervisor"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Employment type</label>
+                                <select name="employment_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">—</option>
+                                    @foreach (['full_time' => 'Full-time', 'part_time' => 'Part-time', 'contract' => 'Contract', 'intern' => 'Intern'] as $value => $label)
+                                        <option value="{{ $value }}" @selected(old('employment_type', $user->employment_type) === $value)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Date joined</label>
+                            <input type="date" name="date_joined" value="{{ old('date_joined', $user->date_joined?->format('Y-m-d')) }}"
+                                   class="w-full max-w-xs rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Emergency contact name</label>
+                                <input type="text" name="emergency_contact_name" value="{{ old('emergency_contact_name', $user->emergency_contact_name) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-ink-900">Emergency contact phone</label>
+                                <input type="text" name="emergency_contact_phone" value="{{ old('emergency_contact_phone', $user->emergency_contact_phone) }}"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                        </div>
+                    </div>
+                </details>
 
                 <div class="flex justify-end gap-3">
                     <a href="{{ route('users.index') }}" class="rounded-md px-4 py-2.5 text-sm font-medium text-ink-500 hover:text-ink-900">Cancel</a>

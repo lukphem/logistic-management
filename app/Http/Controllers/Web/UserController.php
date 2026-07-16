@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
@@ -44,15 +45,29 @@ class UserController extends Controller
         $data = $this->validateForm($request);
 
         $user = User::create([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
+            'phone_number' => $data['phone_number'],
             'password' => Hash::make($data['password']),
             'user_type' => 'staff',
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
             'outlet_id' => $data['outlet_id'],
             'unit_id' => $data['unit_id'],
+            'date_of_birth' => $data['date_of_birth'],
+            'gender' => $data['gender'],
+            'address' => $data['address'],
+            'job_title' => $data['job_title'],
+            'date_joined' => $data['date_joined'],
+            'employment_type' => $data['employment_type'],
+            'emergency_contact_name' => $data['emergency_contact_name'],
+            'emergency_contact_phone' => $data['emergency_contact_phone'],
         ]);
+
+        if ($request->hasFile('photo')) {
+            $user->update(['photo_path' => $request->file('photo')->store('staff-photos', 'public')]);
+        }
 
         $this->assignRoleAcrossGuards($user, $data['role']);
 
@@ -80,14 +95,31 @@ class UserController extends Controller
         $data = $this->validateForm($request, $user->id);
 
         $user->update([
-            'name' => $data['name'],
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
             'email' => $data['email'],
+            'phone_number' => $data['phone_number'],
             'hub_id' => $data['hub_id'],
             'region_id' => $data['region_id'],
             'outlet_id' => $data['outlet_id'],
             'unit_id' => $data['unit_id'],
+            'date_of_birth' => $data['date_of_birth'],
+            'gender' => $data['gender'],
+            'address' => $data['address'],
+            'job_title' => $data['job_title'],
+            'date_joined' => $data['date_joined'],
+            'employment_type' => $data['employment_type'],
+            'emergency_contact_name' => $data['emergency_contact_name'],
+            'emergency_contact_phone' => $data['emergency_contact_phone'],
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
+
+        if ($request->hasFile('photo')) {
+            if ($user->photo_path) {
+                Storage::disk('public')->delete($user->photo_path);
+            }
+            $user->update(['photo_path' => $request->file('photo')->store('staff-photos', 'public')]);
+        }
 
         $user->syncRoles([]); // clear existing (both guards) before reassigning
         $this->assignRoleAcrossGuards($user, $data['role']);
@@ -142,8 +174,11 @@ class UserController extends Controller
     private function validateForm(Request $request, ?int $ignoreUserId = null): array
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email' . ($ignoreUserId ? ",{$ignoreUserId}" : ''),
+            'phone_number' => 'required|string|max:30',
+            'photo' => 'nullable|image|max:2048',
             'password' => $ignoreUserId ? 'nullable|string|min:8' : 'required|string|min:8',
             'role' => 'required|string|exists:roles,name',
             'access_scope' => 'required|in:global,region,hub,outlet',
@@ -151,6 +186,15 @@ class UserController extends Controller
             'hub_id' => 'required_if:access_scope,hub|nullable|exists:hubs,id',
             'outlet_id' => 'required_if:access_scope,outlet|nullable|exists:outlets,id',
             'unit_id' => 'nullable|exists:units,id',
+            // Optional staff details — none required.
+            'date_of_birth' => 'nullable|date|before:today',
+            'gender' => 'nullable|string|max:50',
+            'address' => 'nullable|string|max:1000',
+            'job_title' => 'nullable|string|max:255',
+            'date_joined' => 'nullable|date',
+            'employment_type' => 'nullable|in:full_time,part_time,contract,intern',
+            'emergency_contact_name' => 'nullable|string|max:255',
+            'emergency_contact_phone' => 'nullable|string|max:30',
         ]);
 
         $validator->validate();
