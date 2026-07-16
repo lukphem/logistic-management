@@ -1578,3 +1578,53 @@ resources/views/components/layouts/app.blade.php
 ```
 
 No migration, no other file changes.
+
+## Increment 30 — Standard Courier Zone-Tier Model (A–F + International)
+
+Formalizes zones against the industry-standard tier structure:
+
+| Tier | Coverage | Billing Purpose |
+|---|---|---|
+| A | Same city / Local delivery | Lowest tariff |
+| B | Nearby towns within the same state | Short-distance tariff |
+| C | Neighboring states | Medium-distance tariff |
+| D | Regional destinations | Higher tariff |
+| E | Long-distance/interstate | Premium tariff |
+| F | Remote or hard-to-reach areas | Highest tariff, possible surcharge |
+| International | Countries grouped by region (West Africa, Europe, North America, Asia, etc.) | International tariffs |
+
+### Important distinction
+
+A zone's **tier** classifies *what kind* of coverage it represents —
+it's descriptive/organizational. The actual **price** between any two
+zones still lives entirely in `ZoneRateMatrix`, managed under
+**Billing → Zone Mapping** (Increment 28) — this increment doesn't
+change how pricing works, it adds a standard vocabulary on top of the
+zones that pricing already applies to.
+
+- `zones.tier` (nullable enum: A–F, international)
+- `zones.coverage_description` (nullable, free text) — auto-suggested
+  from the tier's standard description when left blank (both
+  server-side as a fallback, and client-side via a small script so
+  staff see it fill in immediately), always overridable
+- `Zone::TIERS` — the reference table (label, standard coverage
+  description, billing purpose) living on the model, used by the tier
+  picker and the index badge's tooltip
+- Zones index shows the tier as a badge; hovering shows its billing
+  purpose
+
+### Files
+
+```
+database/migrations/2026_01_20_000001_add_tier_to_zones_table.php
+app/Models/Zone.php   (TIERS constant, tierLabel()/tierPurpose())
+app/Http/Controllers/Web/ZoneController.php   (tier + coverage_description validation)
+resources/views/zones/form.blade.php   (tier picker, auto-suggested description)
+resources/views/zones/index.blade.php   (tier badge column)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

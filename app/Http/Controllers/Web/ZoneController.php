@@ -60,14 +60,24 @@ class ZoneController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:zones,code,' . $request->route('zone')?->id,
             'hub_id' => 'nullable|exists:hubs,id',
+            'tier' => 'nullable|in:' . implode(',', array_keys(\App\Models\Zone::TIERS)),
+            'coverage_description' => 'nullable|string|max:255',
         ]);
 
         $data = $validator->validate();
 
         // Blank "— None —" option submits as an empty string, not null —
         // see the fuller explanation in UserController's matching fix.
-        if (($data['hub_id'] ?? null) === '') {
-            $data['hub_id'] = null;
+        foreach (['hub_id', 'tier'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
+        }
+
+        // Suggest the tier's standard coverage description when none was
+        // typed — staff can always override it.
+        if (empty($data['coverage_description']) && $data['tier']) {
+            $data['coverage_description'] = \App\Models\Zone::TIERS[$data['tier']]['coverage'];
         }
 
         return $data;

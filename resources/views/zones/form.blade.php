@@ -27,6 +27,28 @@
         </div>
 
         <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Tier <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <select id="tier" name="tier" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">No tier set</option>
+                @foreach (\App\Models\Zone::TIERS as $key => $tier)
+                    <option value="{{ $key }}" @selected(old('tier', $zone->tier) === $key)>{{ $tier['label'] }} — {{ $tier['purpose'] }}</option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-500">
+                The standard courier zone-tier model — classifies what kind of coverage this is. The actual price
+                between zones is still set under Billing → Zone Mapping, not here.
+            </p>
+        </div>
+
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Coverage description <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <input id="coverage_description" type="text" name="coverage_description" value="{{ old('coverage_description', $zone->coverage_description) }}"
+                   placeholder="e.g. Nearby towns within the same state"
+                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            <p class="mt-1 text-xs text-ink-500">Filled in automatically from the tier's standard description if left blank — override it anytime.</p>
+        </div>
+
+        <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Hub</label>
             <select name="hub_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">— None —</option>
@@ -35,6 +57,20 @@
                 @endforeach
             </select>
         </div>
+
+        <script>
+            (function () {
+                const tierDescriptions = @json(collect(\App\Models\Zone::TIERS)->map(fn ($t) => $t['coverage']));
+                const tierSelect = document.getElementById('tier');
+                const descriptionInput = document.getElementById('coverage_description');
+
+                tierSelect.addEventListener('change', function () {
+                    if (!descriptionInput.value.trim() && tierDescriptions[tierSelect.value]) {
+                        descriptionInput.value = tierDescriptions[tierSelect.value];
+                    }
+                });
+            })();
+        </script>
 
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ route('zones.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
