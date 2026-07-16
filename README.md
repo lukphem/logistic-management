@@ -506,3 +506,72 @@ staff-facing, non-client-portal booking endpoint) still create a shipment
 without running it through `ShipmentPricingService`, so pricing and any
 special discount aren't applied there yet. Flag it if walk-in bookings
 need to go live before that's wired up.
+
+## Increment 11 — Staff User Management + Roles & Permissions
+
+### Staff users (`/users`)
+
+Manages dashboard accounts only — riders and clients authenticate
+differently and are out of scope here on purpose. Create/edit a staff
+user, assign them one role from a dropdown, set a password (optional on
+edit — blank leaves it unchanged), and toggle active/deactivated. A user
+can't deactivate or delete their own account (checked in the controller).
+
+### Roles & Permissions (`/roles`)
+
+Edit permissions on the five seeded default roles, or create a custom one
+(e.g. "Regional Supervisor" — the exact example from the original spec).
+Permissions render as checkboxes grouped by module with a "Select all"
+per group. The five defaults (Super Admin, Ops Manager, Hub Staff,
+Finance, Support) are protected from deletion — the delete action is
+simply hidden for those rows — since removing one would silently strip
+access from every staff account assigned to it.
+
+### The two-guard detail (important if you touch this code)
+
+Every role/permission name exists as **two** Spatie rows — one for the
+`web` guard (dashboard sessions), one for `sanctum` (API/mobile) — per
+the guard fix from Increment 6. Both controllers here treat that as
+exactly one decision from the user's point of view:
+
+- Creating/editing a role writes permissions to both guard rows together
+- Assigning a role to a staff user assigns both guard versions
+- The `web` row is the only one ever shown or bound to in a route —
+  `sanctum`'s copy is kept in sync automatically, never exposed in the UI
+
+If you add a new controller that touches roles or permissions, follow
+this same pattern rather than operating on a single guard — that's
+exactly the class of bug the Increment 6 guard fix corrected.
+
+### New permission module
+
+`users` (create/read/update/delete) — currently granted only to Super
+Admin (`*`). No other default role can create staff accounts or edit
+roles out of the box; that's deliberate.
+
+### Files
+
+```
+app/Http/Controllers/Web/UserController.php
+app/Http/Controllers/Web/RoleController.php
+resources/views/users/index.blade.php, users/form.blade.php
+resources/views/roles/index.blade.php, roles/form.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=RolePermissionSeeder
+```
+
+(No new tables — this uses spatie/laravel-permission's existing tables
+and the `users` table's existing columns.)
+
+### Settings module — status
+
+With this increment, every screen from the original setup-wizard spec
+plus the access-control layer (roles, permissions, staff accounts) is
+built: Company Settings, Hubs, Zones, Rate Cards, Client Billing, Scan
+Statuses, Roles & Permissions, and Staff Users — all grouped under one
+Setups menu, ordered by dependency.

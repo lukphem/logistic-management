@@ -5,9 +5,11 @@ use App\Http\Controllers\Web\ClientBillingController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\HubController;
 use App\Http\Controllers\Web\RateCardController;
+use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
+use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\ZoneController;
 use Illuminate\Support\Facades\Route;
 
@@ -83,5 +85,37 @@ Route::middleware(['auth', 'staff'])->group(function () {
     });
     Route::middleware('can:billing:update')->group(function () {
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
+    });
+
+    // Staff user management + roles/permissions.
+    Route::middleware('can:users:read')->group(function () {
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    });
+    Route::middleware('can:users:create')->group(function () {
+        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+    });
+    Route::middleware('can:users:update')->group(function () {
+        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::patch('/users/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('users.toggle-active');
+    });
+    Route::middleware('can:users:delete')->group(function () {
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
+
+    Route::middleware('can:roles:read')->group(function () {
+        Route::get('/roles', [RoleController::class, 'index'])->name('roles.index');
+    });
+    Route::middleware('can:roles:create')->group(function () {
+        Route::get('/roles/create', [RoleController::class, 'create'])->name('roles.create');
+        Route::post('/roles', [RoleController::class, 'store'])->name('roles.store');
+    });
+    Route::middleware('can:roles:update')->group(function () {
+        Route::get('/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+        Route::put('/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    });
+    Route::middleware('can:roles:delete')->group(function () {
+        Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     });
 });

@@ -54,6 +54,8 @@
                         ['label' => 'Rate Cards', 'route' => 'rate-cards.index', 'icon' => 'sliders', 'permission' => 'rates:read'],
                         ['label' => 'Client Billing', 'route' => 'client-billing.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Scan Statuses', 'route' => 'scan-statuses.index', 'icon' => 'list-check', 'permission' => 'settings:update'],
+                        ['label' => 'Roles & Permissions', 'route' => 'roles.index', 'icon' => 'setups', 'permission' => 'roles:read'],
+                        ['label' => 'Staff Users', 'route' => 'users.index', 'icon' => 'building', 'permission' => 'users:read'],
                     ];
 
                     $visibleSetupItems = collect($setupItems)->filter(
