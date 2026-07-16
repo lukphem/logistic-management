@@ -171,3 +171,46 @@ php artisan tinker
 - Reports/exceptions screen
 - Client self-service portal (separate Blade area, different layout shell)
 - Rider mobile app (separate stack entirely — not Blade)
+
+## Increment 5 — System Setup Page
+
+The onboarding/setup wizard from the original feature spec, implemented:
+a staff-only `/settings` page backed by a real `settings` table (single
+row — this is a single-tenant deployment, so there's exactly one company's
+configuration, not a per-tenant table).
+
+**How it wires in:** `BrandingServiceProvider` overlays the saved settings
+onto `config('branding.*')` at boot, so every existing call site (the
+layout's brand-color injection, `ShipmentPricingService`'s VAT lookup)
+keeps working unchanged — nothing had to be refactored to read from the
+database instead of the config file. `config/branding.php` still holds the
+fallback defaults for a fresh install before anyone has saved anything.
+
+### Files
+
+```
+database/migrations/2026_01_04_000001_create_settings_table.php
+app/Models/Setting.php
+app/Providers/BrandingServiceProvider.php   (registered in bootstrap/providers.php)
+app/Http/Controllers/Web/SettingsController.php
+resources/views/settings/edit.blade.php
+```
+
+### What it covers
+
+- Company name, operating regions
+- Service names (Express / Same-Day / Economy labels — these map to the
+  `service_type` field used when configuring rate cards)
+- Primary/secondary brand colors (color picker, takes effect immediately
+  on save — no rebuild needed)
+- VAT percentage, currency
+- Waybill thermal label size (2×1 / 4×6) and QR toggle
+
+### Not yet included
+
+- Logo upload (currently text-only company name; add a file input +
+  storage disk config when waybill/PDF generation needs an actual image)
+- Hub/zone setup screens (separate from this page — hubs/zones are
+  per-location, not single-value settings)
+- Permission-gating who can reach `/settings` beyond "any staff account" —
+  add a `settings:update` permission check once role assignment UI exists

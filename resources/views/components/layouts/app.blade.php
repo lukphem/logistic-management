@@ -35,6 +35,7 @@
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'grid'],
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box'],
+                        ['label' => 'Settings', 'route' => 'settings.edit', 'icon' => 'gear'],
                     ];
                 @endphp
 
