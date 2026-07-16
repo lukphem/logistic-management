@@ -52,7 +52,7 @@
                                     @endif
                                 </span>
                                 <div>
-                                    <p class="font-medium text-ink-900">{{ $user->name }}</p>
+                                    <p class="font-medium text-ink-900">{{ $user->title ? $user->title . ' ' : '' }}{{ $user->name }}</p>
                                     <p class="font-mono text-xs text-ink-500">{{ $user->staff_id }}</p>
                                 </div>
                             </div>

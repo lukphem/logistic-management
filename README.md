@@ -1213,3 +1213,25 @@ app/Http/Controllers/Web/ZoneController.php
 ```
 
 No migration needed — this is a validation-handling fix only.
+
+## Increment 21 — Title Field + Gender as a Controlled List
+
+- New `title` field (Mr/Mrs/Miss/Ms/Dr/Chief/Engr/Prof/Rev/Alhaji/Alhaja)
+  — a dropdown, shown before First/Last name, used for formal address
+- `gender` — converted from free text to a fixed list (Male/Female/
+  Prefer not to say), both in validation and the form
+- Users index now prefixes the title on the name when set (e.g. "Mrs
+  Adaeze Okoro")
+
+### Files
+
+```
+database/migrations/2026_01_14_000001_add_title_to_users_table.php
+app/Models/User.php
+app/Http/Controllers/Web/UserController.php
+resources/views/users/form.blade.php, users/index.blade.php
+```
+
+```powershell
+php artisan migrate
+```

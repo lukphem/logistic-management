@@ -27,6 +27,7 @@ class User extends Authenticatable
         'staff_id',
         'first_name',
         'last_name',
+        'title',
         'email',
         'phone_number',
         'photo_path',

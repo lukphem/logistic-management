@@ -52,6 +52,15 @@
                     @endif
 
                     <div class="space-y-4">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Title</label>
+                            <select name="title" class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">—</option>
+                                @foreach (['Mr', 'Mrs', 'Miss', 'Ms', 'Dr', 'Chief', 'Engr', 'Prof', 'Rev', 'Alhaji', 'Alhaja'] as $titleOption)
+                                    <option value="{{ $titleOption }}" @selected(old('title', $user->title) === $titleOption)>{{ $titleOption }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-ink-900">First name <x-required /></label>
@@ -216,8 +225,12 @@
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-ink-900">Gender</label>
-                                <input type="text" name="gender" value="{{ old('gender', $user->gender) }}"
-                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <select name="gender" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">—</option>
+                                    @foreach (['Male', 'Female', 'Prefer not to say'] as $genderOption)
+                                        <option value="{{ $genderOption }}" @selected(old('gender', $user->gender) === $genderOption)>{{ $genderOption }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
                         <div>

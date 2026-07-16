@@ -47,6 +47,7 @@ class UserController extends Controller
         $user = User::create([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
+            'title' => $data['title'],
             'email' => $data['email'],
             'phone_number' => $data['phone_number'],
             'password' => Hash::make($data['password']),
@@ -97,6 +98,7 @@ class UserController extends Controller
         $user->update([
             'first_name' => $data['first_name'],
             'last_name' => $data['last_name'],
+            'title' => $data['title'],
             'email' => $data['email'],
             'phone_number' => $data['phone_number'],
             'hub_id' => $data['hub_id'],
@@ -186,9 +188,10 @@ class UserController extends Controller
             'hub_id' => 'required_if:access_scope,hub|nullable|exists:hubs,id',
             'outlet_id' => 'required_if:access_scope,outlet|nullable|exists:outlets,id',
             'unit_id' => 'nullable|exists:units,id',
+            'title' => 'nullable|in:Mr,Mrs,Miss,Ms,Dr,Chief,Engr,Prof,Rev,Alhaji,Alhaja',
             // Optional staff details — none required.
             'date_of_birth' => 'nullable|date|before:today',
-            'gender' => 'nullable|string|max:50',
+            'gender' => 'nullable|in:Male,Female,Prefer not to say',
             'address' => 'nullable|string|max:1000',
             'job_title' => 'nullable|string|max:255',
             'date_joined' => 'nullable|date',
@@ -208,7 +211,7 @@ class UserController extends Controller
         // one field — this is what was blocking every staff form
         // submission where "No unit" was selected. Normalize every
         // nullable FK to true null before it goes anywhere near a query.
-        foreach (['region_id', 'hub_id', 'outlet_id', 'unit_id', 'employment_type'] as $field) {
+        foreach (['region_id', 'hub_id', 'outlet_id', 'unit_id', 'employment_type', 'title', 'gender'] as $field) {
             if (($data[$field] ?? null) === '') {
                 $data[$field] = null;
             }
