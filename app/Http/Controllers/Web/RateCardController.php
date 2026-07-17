@@ -61,7 +61,7 @@ class RateCardController extends Controller
             : collect();
 
         $weightRates = $rateCard->billing_model === 'origin_destination_weight'
-            ? ZoneWeightRate::where('rate_card_id', $rateCard->id)->with(['fromZone', 'toZone'])->orderBy('from_zone_id')->orderBy('min_weight')->get()
+            ? ZoneWeightRate::where('rate_card_id', $rateCard->id)->with('zone')->orderBy('zone_id')->orderBy('min_weight')->get()
             : collect();
 
         return view('rate-cards.form', [
@@ -124,14 +124,16 @@ class RateCardController extends Controller
 
     /**
      * Adds one row to the origin_destination_weight rate table: a
-     * (From Zone, To Zone, weight band, service type) combination with
-     * its price, transit days, and per-extra-kg overage rate.
+     * (zone, weight band, service type) combination with its price,
+     * transit days, and per-extra-kg overage rate. The zone itself
+     * covers both directions of travel between whichever two states are
+     * mapped to it (see ZoneMapping) — there's no separate "from"/"to"
+     * dimension to set here.
      */
     public function addWeightRate(Request $request, RateCard $rateCard): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
-            'from_zone_id' => 'required|exists:zones,id',
-            'to_zone_id' => 'required|exists:zones,id',
+            'zone_id' => 'required|exists:zones,id',
             'min_weight' => 'required|numeric|min:0',
             'max_weight' => 'required|numeric|gt:min_weight',
             'service_type' => 'required|string|max:100',

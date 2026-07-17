@@ -1761,3 +1761,59 @@ routes/web.php   (weight-rates routes)
 composer require doctrine/dbal
 php artisan migrate
 ```
+
+## Increment 33 — Correction: Zone Mapping Is a State-Pair → Zone Lookup
+
+Corrects Increment 32's Zone Mapping design after clarification: a route
+between two **states** — regardless of direction — equates to **one**
+zone. "Abuja to Lagos = Zone 2" and "Lagos to Abuja" are the same
+mapping, not two, and not a per-city assignment.
+
+### What changed
+
+- `zone_mappings`: dropped and recreated as `state_a_id` / `state_b_id` /
+  `zone_id` (unique on the pair), replacing the previous single-city
+  `city_id → zone_id` design
+- `ZoneMapping::booted()` normalizes `state_a_id`/`state_b_id` to always
+  store the lower ID first, so one row covers the route both ways —
+  `ZoneMapping::resolveZone($stateOneId, $stateTwoId)` normalizes the
+  same way on lookup, regardless of which order the two IDs are passed in
+- `zone_weight_rates`: `from_zone_id`/`to_zone_id` replaced with a single
+  `zone_id` — since a route now resolves to exactly one zone, pricing
+  only needs one zone dimension too, not a matrix
+- `RateEngine::resolveZoneIdForRoute()` (renamed from `resolveZoneId`)
+  now resolves each city to its **state** first, then calls
+  `ZoneMapping::resolveZone()` — zone mapping operates at the state
+  level, not the city level
+- Rate Card's weight-rate table, the Zone Mapping screen, and every
+  related controller updated to match — "From Zone"/"To Zone" columns
+  are gone everywhere, replaced with a single "Zone" column
+
+No production data depended on the old structure (it was one increment
+old), so this drops and recreates the affected tables rather than
+carrying forward a design that didn't match the actual requirement.
+
+### Files
+
+```
+database/migrations/2026_01_23_000001_recreate_zone_mappings_as_state_pairs.php
+database/migrations/2026_01_23_000002_convert_zone_weight_rates_to_single_zone.php
+app/Models/ZoneMapping.php   (state_a_id/state_b_id, normalization, resolveZone())
+app/Models/ZoneWeightRate.php   (single zone() relation)
+app/Models/Zone.php, City.php   (stale references cleaned up)
+app/Services/RateEngine.php   (resolveZoneIdForRoute via state, not city)
+app/Http/Controllers/Web/ZoneMappingController.php   (state_a/state_b form handling)
+app/Http/Controllers/Web/RateCardController.php   (single zone_id validation)
+resources/views/zone-mappings/index.blade.php   (State A / State B pickers)
+resources/views/rate-cards/form.blade.php   (single Zone column throughout)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Since this drops and recreates `zone_mappings`, any test data you
+already entered under the old (incorrect) city-based design will be
+lost — re-enter it as state pairs after migrating.

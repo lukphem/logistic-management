@@ -41,7 +41,7 @@ class Zone extends Model
     }
 
     /**
-     * Every city assigned to this zone — see ZoneMapping.
+     * Every state-pair route assigned to this zone — see ZoneMapping.
      */
     public function zoneMappings(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

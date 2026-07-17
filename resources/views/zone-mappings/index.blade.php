@@ -13,9 +13,10 @@
     @endif
 
     <p class="mb-4 text-sm text-ink-500">
-        Assigns every city to a Zone — e.g. "Port Harcourt = Zone 2." A shipment's origin and destination zones
-        resolve from these assignments automatically, so origin-destination + weight rate cards (Billing → Rate Cards)
-        only need one rate row per <em>zone pair</em>, not one per city pair.
+        Assigns a route between two states to a Zone — e.g. "Abuja to Lagos = Zone 2." One assignment covers the
+        route both ways; "Lagos to Abuja" is the same mapping, not a separate one. Origin-destination + weight
+        rate cards (Billing → Rate Cards) then resolve pricing automatically for any shipment between two mapped
+        states.
     </p>
 
     <div class="mb-5">
@@ -34,8 +35,8 @@
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
-                    <th class="px-5 py-3 font-medium">City</th>
-                    <th class="px-5 py-3 font-medium">State/Country</th>
+                    <th class="px-5 py-3 font-medium">State A</th>
+                    <th class="px-5 py-3 font-medium">State B</th>
                     <th class="px-5 py-3 font-medium">Zone</th>
                     <th class="px-5 py-3"></th>
                 </tr>
@@ -43,8 +44,8 @@
             <tbody>
                 @forelse ($mappings as $mapping)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
-                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->city->name }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ $mapping->city->state->name }}, {{ $mapping->city->state->country->name }}</td>
+                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateA->name }}</td>
+                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateB->name }}</td>
                         <td class="px-5 py-3 text-ink-900">{{ $mapping->zone->name }}</td>
                         <td class="px-5 py-3 text-right">
                             <form method="POST" action="{{ route('zone-mappings.destroy', $mapping) }}" onsubmit="return confirm('Remove this zone assignment?')">
@@ -54,7 +55,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No cities assigned to a zone yet.</td></tr>
+                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No routes assigned to a zone yet.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -63,21 +64,33 @@
     <div class="mt-5">{{ $mappings->links() }}</div>
 
     <div class="mt-6 rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-ink-900">Assign a city to a zone</h2>
+        <h2 class="mb-1 text-sm font-semibold text-ink-900">Assign a route to a zone</h2>
+        <p class="mb-4 text-xs text-ink-500">Order doesn't matter — State A/B are just the two ends of the route, not a direction.</p>
         <form method="POST" action="{{ route('zone-mappings.store') }}" class="flex flex-wrap items-end gap-4">
             @csrf
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">City <x-required /></label>
-                <select name="city_id" class="w-56 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    @foreach ($cities->groupBy(fn ($city) => $city->state->name . ', ' . $city->state->country->name) as $groupLabel => $groupCities)
-                        <optgroup label="{{ $groupLabel }}">
-                            @foreach ($groupCities as $city)
-                                <option value="{{ $city->id }}">{{ $city->name }}</option>
+                <label class="mb-1 block text-sm font-medium text-ink-900">State A <x-required /></label>
+                <select name="state_a_id" class="w-52 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($states->groupBy(fn ($state) => $state->country->name) as $countryName => $countryStates)
+                        <optgroup label="{{ $countryName }}">
+                            @foreach ($countryStates as $state)
+                                <option value="{{ $state->id }}">{{ $state->name }}</option>
                             @endforeach
                         </optgroup>
                     @endforeach
                 </select>
-                <p class="mt-1 text-xs text-ink-500">Re-assigning a city updates its existing mapping rather than creating a duplicate.</p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">State B <x-required /></label>
+                <select name="state_b_id" class="w-52 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($states->groupBy(fn ($state) => $state->country->name) as $countryName => $countryStates)
+                        <optgroup label="{{ $countryName }}">
+                            @foreach ($countryStates as $state)
+                                <option value="{{ $state->id }}">{{ $state->name }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endforeach
+                </select>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Zone <x-required /></label>

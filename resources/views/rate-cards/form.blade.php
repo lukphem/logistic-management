@@ -262,15 +262,15 @@
         <div class="mt-8 rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
             <h2 class="mb-1 text-sm font-semibold text-ink-900">Rate table</h2>
             <p class="mb-4 text-xs text-ink-500">
-                From Zone / To Zone are resolved automatically from each shipment's origin/destination city via
-                Setups → Billing → Zone Mapping — no need for a row per city pair, only per zone pair.
+                The Zone is resolved automatically from each shipment's origin/destination state via Setups → Billing
+                → Zone Mapping — a route between two states equates to one zone regardless of direction, so only one
+                row is needed per zone, not per state pair.
             </p>
 
             <table class="mb-5 w-full text-left text-sm">
                 <thead>
                     <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
-                        <th class="py-2 font-medium">From Zone</th>
-                        <th class="py-2 font-medium">To Zone</th>
+                        <th class="py-2 font-medium">Zone</th>
                         <th class="py-2 font-medium">Weight (kg)</th>
                         <th class="py-2 font-medium">Service</th>
                         <th class="py-2 font-medium">Price</th>
@@ -282,8 +282,7 @@
                 <tbody>
                     @forelse ($weightRates as $rate)
                         <tr class="border-b border-line last:border-0">
-                            <td class="py-2 text-ink-900">{{ $rate->fromZone->name }}</td>
-                            <td class="py-2 text-ink-900">{{ $rate->toZone->name }}</td>
+                            <td class="py-2 text-ink-900">{{ $rate->zone->name }}</td>
                             <td class="py-2 text-ink-500">{{ rtrim(rtrim(number_format($rate->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($rate->max_weight, 2), '0'), '.') }}</td>
                             <td class="py-2 text-ink-900">{{ ucfirst($rate->service_type) }}</td>
                             <td class="py-2 font-mono text-ink-900">{{ number_format($rate->price, 2) }}</td>
@@ -297,7 +296,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="py-6 text-center text-sm text-ink-500">No rate rows set yet.</td></tr>
+                        <tr><td colspan="7" class="py-6 text-center text-sm text-ink-500">No rate rows set yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -305,16 +304,8 @@
             <form method="POST" action="{{ route('rate-cards.weight-rates.store', $rateCard) }}" class="flex flex-wrap items-end gap-3">
                 @csrf
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">From Zone</label>
-                    <select name="from_zone_id" class="w-36 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        @foreach ($zones as $zone)
-                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">To Zone</label>
-                    <select name="to_zone_id" class="w-36 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
+                    <select name="zone_id" class="w-36 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         @foreach ($zones as $zone)
                             <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                         @endforeach

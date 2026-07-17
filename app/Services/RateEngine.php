@@ -139,47 +139,48 @@ class RateEngine
     }
 
     /**
-     * Looks up origin/destination city → Zone (ZoneMapping), then finds
-     * the matching zone_weight_rates row for that (from_zone, to_zone,
-     * service_type) combination whose weight band contains the
-     * shipment's chargeable weight. Weight beyond the matched band's
-     * max_weight is charged at that row's extra_amount_per_extra_kg.
+     * Resolves origin/destination city → state → the ONE zone that
+     * route maps to (ZoneMapping, bidirectional), then finds the
+     * matching zone_weight_rates row for that (zone, service_type)
+     * combination whose weight band contains the shipment's chargeable
+     * weight. Weight beyond the matched band's max_weight is charged at
+     * that row's extra_amount_per_extra_kg.
      */
     private function originDestinationWeight(RateCard $rateCard, array $context): float
     {
-        $fromZoneId = $this->resolveZoneId($context['origin_city_id'] ?? null);
-        $toZoneId = $this->resolveZoneId($context['destination_city_id'] ?? null);
+        $zoneId = $this->resolveZoneIdForRoute(
+            $context['origin_city_id'] ?? null,
+            $context['destination_city_id'] ?? null
+        );
 
-        if (! $fromZoneId || ! $toZoneId) {
-            throw new InvalidArgumentException('Both origin and destination cities must be mapped to a zone (see Zone Mapping) to use origin_destination_weight pricing.');
+        if (! $zoneId) {
+            throw new InvalidArgumentException('This origin/destination state pair has no zone mapping yet (see Setups → Billing → Zone Mapping).');
         }
 
         $weight = (float) ($context['chargeable_weight_kg'] ?? $context['weight_kg'] ?? 0);
         $serviceType = $context['service_type'] ?? $rateCard->service_type;
 
         $rate = \App\Models\ZoneWeightRate::where('rate_card_id', $rateCard->id)
-            ->where('from_zone_id', $fromZoneId)
-            ->where('to_zone_id', $toZoneId)
+            ->where('zone_id', $zoneId)
             ->where('service_type', $serviceType)
             ->where('min_weight', '<=', $weight)
             ->where('max_weight', '>=', $weight)
             ->first();
 
-        // Falls back to the highest-weight band for this zone pair/service
-        // if nothing matched (i.e. the shipment is heavier than every
+        // Falls back to the highest-weight band for this zone/service if
+        // nothing matched (i.e. the shipment is heavier than every
         // defined band) — that band's extra-per-kg rate then covers the
         // overage rather than the shipment having no price at all.
         if (! $rate) {
             $rate = \App\Models\ZoneWeightRate::where('rate_card_id', $rateCard->id)
-                ->where('from_zone_id', $fromZoneId)
-                ->where('to_zone_id', $toZoneId)
+                ->where('zone_id', $zoneId)
                 ->where('service_type', $serviceType)
                 ->orderByDesc('max_weight')
                 ->first();
         }
 
         if (! $rate) {
-            throw new InvalidArgumentException('No rate configured for this zone pair and service type.');
+            throw new InvalidArgumentException('No rate configured for this zone and service type.');
         }
 
         $overage = max(0, $weight - (float) $rate->max_weight);
@@ -187,13 +188,26 @@ class RateEngine
         return (float) $rate->price + ($overage * (float) $rate->extra_amount_per_extra_kg);
     }
 
-    private function resolveZoneId(?int $cityId): ?int
+    /**
+     * A route between two states equates to exactly one zone, regardless
+     * of direction (see ZoneMapping::resolveZone). Resolves each city to
+     * its state first, since that's the level zone mapping actually
+     * operates at — not the city itself.
+     */
+    private function resolveZoneIdForRoute(?int $originCityId, ?int $destinationCityId): ?int
     {
-        if (! $cityId) {
+        if (! $originCityId || ! $destinationCityId) {
             return null;
         }
 
-        return \App\Models\ZoneMapping::where('city_id', $cityId)->value('zone_id');
+        $originStateId = \App\Models\City::find($originCityId)?->state_id;
+        $destinationStateId = \App\Models\City::find($destinationCityId)?->state_id;
+
+        if (! $originStateId || ! $destinationStateId) {
+            return null;
+        }
+
+        return \App\Models\ZoneMapping::resolveZone($originStateId, $destinationStateId)?->id;
     }
 
     /**
