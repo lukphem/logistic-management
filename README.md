@@ -1876,3 +1876,19 @@ resources/views/auth/login.blade.php   (full redesign)
 
 No migration, no controller changes — this increment is entirely
 front-end.
+
+## Increment 35 — Zone Mapping Screen Trimmed to Just the Essentials
+
+Removed the explanatory paragraphs from the Zone Mapping screen — the
+"how this works" description at the top, and the "order doesn't matter"
+note above the assignment form. The screen now shows only what's
+functional: the zone filter, the State A / State B / Zone table, and the
+assignment form itself. No behavior changed, purely a leaner page.
+
+### Files
+
+```
+resources/views/zone-mappings/index.blade.php
+```
+
+No migration, no controller changes.

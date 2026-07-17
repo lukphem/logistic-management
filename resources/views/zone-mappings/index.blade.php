@@ -12,13 +12,6 @@
         </div>
     @endif
 
-    <p class="mb-4 text-sm text-ink-500">
-        Assigns a route between two states to a Zone — e.g. "Abuja to Lagos = Zone 2." One assignment covers the
-        route both ways; "Lagos to Abuja" is the same mapping, not a separate one. Origin-destination + weight
-        rate cards (Billing → Rate Cards) then resolve pricing automatically for any shipment between two mapped
-        states.
-    </p>
-
     <div class="mb-5">
         <form method="GET" class="flex items-center gap-3">
             <select name="zone_id" onchange="this.form.submit()"
@@ -64,8 +57,7 @@
     <div class="mt-5">{{ $mappings->links() }}</div>
 
     <div class="mt-6 rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-        <h2 class="mb-1 text-sm font-semibold text-ink-900">Assign a route to a zone</h2>
-        <p class="mb-4 text-xs text-ink-500">Order doesn't matter — State A/B are just the two ends of the route, not a direction.</p>
+        <h2 class="mb-4 text-sm font-semibold text-ink-900">Assign a route to a zone</h2>
         <form method="POST" action="{{ route('zone-mappings.store') }}" class="flex flex-wrap items-end gap-4">
             @csrf
             <div>
