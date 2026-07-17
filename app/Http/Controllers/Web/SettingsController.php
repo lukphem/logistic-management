@@ -27,6 +27,7 @@ class SettingsController extends Controller
             'service_names.*' => 'required|string|max:100',
             'color_primary' => 'required|string|max:20',
             'color_secondary' => 'required|string|max:20',
+            'login_design' => 'required|in:' . implode(',', array_keys(Setting::LOGIN_DESIGNS)),
             'vat_percentage' => 'required|numeric|min:0|max:100',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',

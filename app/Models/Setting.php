@@ -8,7 +8,7 @@ class Setting extends Model
 {
     protected $fillable = [
         'company_name', 'logo_path', 'service_names',
-        'color_primary', 'color_secondary',
+        'color_primary', 'color_secondary', 'login_design',
         'vat_percentage', 'currency',
         'waybill_thermal_size', 'waybill_show_qr',
         'operating_regions', 'invoice_header', 'invoice_footer',
@@ -19,6 +19,17 @@ class Setting extends Model
         'operating_regions' => 'array',
         'waybill_show_qr' => 'boolean',
         'vat_percentage' => 'float',
+    ];
+
+    /**
+     * Each key has a matching resources/views/auth/designs/{key}.blade.php
+     * partial for the login page's left illustration panel.
+     */
+    public const LOGIN_DESIGNS = [
+        'route' => ['label' => 'Route', 'description' => 'A truck driving a dashed route between two map pins.'],
+        'warehouse' => ['label' => 'Warehouse', 'description' => 'A warm, warehouse-toned grid of package icons.'],
+        'map' => ['label' => 'Map', 'description' => 'A dotted world map with scattered delivery pins.'],
+        'gradient' => ['label' => 'Vibrant', 'description' => 'A colorful multi-tone gradient with floating icons.'],
     ];
 
     /**

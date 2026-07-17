@@ -92,6 +92,25 @@
             <p class="mt-3 text-xs text-ink-500">Applied across the dashboard, client portal, and waybill templates as soon as saved.</p>
         </div>
 
+        {{-- Login Design --}}
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Login page design</h2>
+            <p class="mb-4 text-xs text-ink-500">Changes the illustration panel shown on the staff sign-in page. Your brand colors above still apply to whichever one is selected.</p>
+
+            @php $currentDesign = old('login_design', $settings->login_design ?? 'route'); @endphp
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                @foreach (\App\Models\Setting::LOGIN_DESIGNS as $key => $design)
+                    <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="login_design" value="{{ $key }}" class="mt-1" @checked($currentDesign === $key)>
+                        <span>
+                            <span class="block text-sm font-medium text-ink-900">{{ $design['label'] }}</span>
+                            <span class="block text-xs text-ink-500">{{ $design['description'] }}</span>
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+        </div>
+
         {{-- Billing Defaults --}}
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Billing defaults</h2>

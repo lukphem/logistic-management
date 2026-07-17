@@ -40,6 +40,7 @@ class BrandingServiceProvider extends ServiceProvider
             'branding.waybill.show_qr' => $settings->waybill_show_qr ?? config('branding.waybill.show_qr'),
             'branding.invoice.header' => $settings->invoice_header,
             'branding.invoice.footer' => $settings->invoice_footer,
+            'branding.login_design' => $settings->login_design ?? 'route',
         ]);
     }
 }

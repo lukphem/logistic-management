@@ -1946,3 +1946,54 @@ Note: this requires `doctrine/dbal` to modify the `zone_id` column
 ```powershell
 composer require doctrine/dbal
 ```
+
+## Increment 37 — Selectable Login Page Designs + More Color
+
+Four distinct login page illustrations, selectable from **Setups →
+Company Settings → Login page design**:
+
+- **Route** — the original design (truck driving a dashed path between
+  two map pins)
+- **Warehouse** — a warm grid of package icons behind a large highlighted
+  package, leaning on the brand secondary color
+- **Map** — a dotted map field with several colorful pins (using the
+  status-delivered green and status-transit blue for variety, not just
+  brand colors) and crossing dashed routes
+- **Vibrant** — a genuinely multi-tone gradient (brand primary → purple →
+  brand secondary → orange) rather than a flat brand-color background,
+  with floating truck/package/pin/route icons — directly answering "more
+  colours," since every other design still centers on the brand palette
+
+### How it's wired
+
+- `settings.login_design` (string, default `'route'`) — overlaid onto
+  `config('branding.login_design')` the same way every other branding
+  setting already works (Increment 5's `BrandingServiceProvider` pattern)
+- `Setting::LOGIN_DESIGNS` is the single source of truth for what
+  exists — both the settings-page picker and the `@include` on the login
+  page read from it, so adding a fifth design later means one new
+  `resources/views/auth/designs/{key}.blade.php` partial and one new
+  array entry, nothing else
+- The login page itself just does
+  `@include('auth.designs.' . config('branding.login_design'))` — the
+  surrounding layout, right-panel sign-in form, and responsive mobile
+  fallback (Increment 34) are shared across all four designs unchanged
+
+### Files
+
+```
+database/migrations/2026_01_25_000001_add_login_design_to_settings_table.php
+app/Models/Setting.php   (login_design fillable, LOGIN_DESIGNS constant)
+app/Providers/BrandingServiceProvider.php   (login_design overlay)
+app/Http/Controllers/Web/SettingsController.php   (login_design validation)
+resources/views/settings/edit.blade.php   (design picker section)
+resources/views/auth/login.blade.php   (dynamic @include)
+resources/views/auth/designs/route.blade.php, warehouse.blade.php, map.blade.php, gradient.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+npm run build
+```
