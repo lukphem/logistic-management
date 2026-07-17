@@ -8,6 +8,7 @@ use App\Models\District;
 use App\Models\OnforwardingClassification;
 use App\Models\Route;
 use App\Models\State;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,6 +17,10 @@ use Illuminate\View\View;
 
 class DistrictController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     public function index(Request $request): View
     {
         $query = District::with(['city.state.country', 'onforwardingClassification']);
@@ -74,6 +79,44 @@ class DistrictController extends Controller
         $district->delete();
 
         return redirect()->route('districts.index')->with('status', 'District/area removed.');
+    }
+
+    public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = District::with('city')->orderBy('name')->get()->map(fn ($d) => [
+            $d->city->code,
+            $d->name,
+            $d->short_code,
+            $d->postal_code,
+        ]);
+
+        return $this->csv->download('districts.csv', ['city_code', 'name', 'short_code', 'postal_code'], $rows);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $city = City::where('code', strtoupper(trim($row['city_code'] ?? '')))->first();
+
+            if (! $city || empty($row['name']) || empty($row['short_code'])) {
+                $skipped++;
+                continue;
+            }
+
+            District::updateOrCreate(
+                ['city_id' => $city->id, 'short_code' => strtoupper(trim($row['short_code']))],
+                ['name' => trim($row['name']), 'postal_code' => $row['postal_code'] ?? null]
+            );
+            $count++;
+        }
+
+        return back()->with('status', "Imported {$count} districts" . ($skipped ? ", skipped {$skipped} (unknown city code or missing name/short code)." : '.'));
     }
 
     private function validated(Request $request, ?int $ignoreId = null): array

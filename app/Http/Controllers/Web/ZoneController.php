@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Hub;
 use App\Models\Zone;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -12,6 +13,10 @@ use Illuminate\View\View;
 
 class ZoneController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     public function index(): View
     {
         $zones = Zone::with('hub')->orderBy('name')->paginate(15);
@@ -52,6 +57,47 @@ class ZoneController extends Controller
         $zone->delete();
 
         return redirect()->route('zones.index')->with('status', 'Zone removed.');
+    }
+
+    public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = Zone::orderBy('name')->get()->map(fn ($z) => [
+            $z->name, $z->code, $z->type, $z->tier, $z->coverage_description,
+        ]);
+
+        return $this->csv->download('zones.csv', ['name', 'code', 'type', 'tier', 'coverage_description'], $rows);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $type = strtolower(trim($row['type'] ?? 'domestic'));
+            $tier = strtoupper(trim($row['tier'] ?? ''));
+
+            if (empty($row['code']) || empty($row['name']) || ! array_key_exists($type, Zone::TYPES)) {
+                $skipped++;
+                continue;
+            }
+
+            Zone::updateOrCreate(
+                ['code' => strtoupper(trim($row['code']))],
+                [
+                    'name' => trim($row['name']),
+                    'type' => $type,
+                    'tier' => ($type === 'domestic' && array_key_exists($tier, Zone::TIERS)) ? $tier : null,
+                    'coverage_description' => $row['coverage_description'] ?? '',
+                ]
+            );
+            $count++;
+        }
+
+        return back()->with('status', "Imported {$count} zones" . ($skipped ? ", skipped {$skipped} (missing name/code or invalid type)." : '.'));
     }
 
     private function validated(Request $request): array

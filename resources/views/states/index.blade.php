@@ -6,6 +6,8 @@
         </div>
     @endif
 
+    <x-csv-actions :export-route="route('states.export')" :import-route="route('states.import')" label="States" />
+
     <div class="mb-5 flex items-center justify-between gap-4">
         <form method="GET" class="flex items-center gap-3">
             <select name="country_id" onchange="this.form.submit()"

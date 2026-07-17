@@ -6,6 +6,8 @@
         </div>
     @endif
 
+    <x-csv-actions :export-route="route('zones.export')" :import-route="route('zones.import')" label="Zones" />
+
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">Zones drive zone-to-zone rate matrices and rider geofencing.</p>
         <a href="{{ route('zones.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

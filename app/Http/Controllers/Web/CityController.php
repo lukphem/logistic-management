@@ -9,6 +9,7 @@ use App\Models\Hub;
 use App\Models\OnforwardingClassification;
 use App\Models\Route;
 use App\Models\State;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,10 @@ use Illuminate\View\View;
 
 class CityController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     public function index(Request $request): View
     {
         $query = City::with(['state.country', 'operationalHub', 'onforwardingClassification']);
@@ -77,6 +82,49 @@ class CityController extends Controller
         $city->delete();
 
         return redirect()->route('cities.index')->with('status', 'City removed.');
+    }
+
+    /**
+     * state_code is the full composed code (e.g. "NG-LA"), not the raw
+     * short_code — unambiguous across countries without needing a
+     * separate country column.
+     */
+    public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = City::with('state')->orderBy('name')->get()->map(fn ($c) => [
+            $c->state->code,
+            $c->name,
+            $c->short_code,
+            $c->postal_code,
+        ]);
+
+        return $this->csv->download('cities.csv', ['state_code', 'name', 'short_code', 'postal_code'], $rows);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $state = State::where('code', strtoupper(trim($row['state_code'] ?? '')))->first();
+
+            if (! $state || empty($row['name']) || empty($row['short_code'])) {
+                $skipped++;
+                continue;
+            }
+
+            City::updateOrCreate(
+                ['state_id' => $state->id, 'short_code' => strtoupper(trim($row['short_code']))],
+                ['name' => trim($row['name']), 'postal_code' => $row['postal_code'] ?? null]
+            );
+            $count++;
+        }
+
+        return back()->with('status', "Imported {$count} cities" . ($skipped ? ", skipped {$skipped} (unknown state code or missing name/short code)." : '.'));
     }
 
     private function validated(Request $request, ?int $ignoreId = null): array

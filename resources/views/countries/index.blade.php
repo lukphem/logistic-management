@@ -6,6 +6,8 @@
         </div>
     @endif
 
+    <x-csv-actions :export-route="route('countries.export')" :import-route="route('countries.import')" label="Countries" />
+
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-ink-500">Top of the operating-location hierarchy: Country → State/Province → City.</p>
         <a href="{{ route('countries.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

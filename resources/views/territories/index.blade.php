@@ -11,6 +11,8 @@
         territory automatically default to Zone 2 with each other.
     </p>
 
+    <x-csv-actions :export-route="route('territories.export')" :import-route="route('territories.import')" label="Territories" />
+
     <div class="mb-5 flex items-center justify-between">
         <span></span>
         <a href="{{ route('territories.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

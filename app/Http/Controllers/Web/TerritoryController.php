@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Territory;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -11,6 +12,10 @@ use Illuminate\View\View;
 
 class TerritoryController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     public function index(): View
     {
         $territories = Territory::withCount('states')->orderBy('name')->paginate(15);
@@ -47,6 +52,35 @@ class TerritoryController extends Controller
         $territory->delete();
 
         return redirect()->route('territories.index')->with('status', 'Territory removed.');
+    }
+
+    public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = Territory::orderBy('name')->get()->map(fn ($t) => [$t->name, $t->code]);
+
+        return $this->csv->download('territories.csv', ['name', 'code'], $rows);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+
+        foreach ($rows as $row) {
+            if (empty($row['code']) || empty($row['name'])) {
+                continue;
+            }
+
+            Territory::updateOrCreate(
+                ['code' => strtoupper(trim($row['code']))],
+                ['name' => trim($row['name'])]
+            );
+            $count++;
+        }
+
+        return back()->with('status', "Imported {$count} territories.");
     }
 
     private function validated(Request $request): array

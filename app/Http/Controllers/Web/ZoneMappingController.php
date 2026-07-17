@@ -8,6 +8,7 @@ use App\Models\State;
 use App\Models\Zone;
 use App\Models\ZoneCountryMapping;
 use App\Models\ZoneMapping;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -15,6 +16,10 @@ use Illuminate\View\View;
 
 class ZoneMappingController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     /**
      * Two independent sections on one screen:
      *
@@ -49,12 +54,6 @@ class ZoneMappingController extends Controller
         ]);
     }
 
-    /**
-     * Idempotent — safe to run again later (e.g. after a new state is
-     * added under Setups → Location) since it only creates pairs that
-     * don't already exist, never touching zones already assigned to an
-     * existing pair.
-     */
     /**
      * Every newly generated pair is pre-assigned a zone using
      * ZoneMapping::determineDefaultZoneTier() (same state / same
@@ -137,5 +136,97 @@ class ZoneMappingController extends Controller
         $zoneCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
         return back()->with('status', 'Zone updated.');
+    }
+
+    /**
+     * Exports every domestic pair, assigned or not — the whole ~666-row
+     * set is exactly what makes hand-editing this screen slow, so this
+     * is the highest-value CSV round trip in the whole app: download,
+     * fill in the zone column in a spreadsheet, re-upload.
+     */
+    public function exportDomestic(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = ZoneMapping::with(['stateA', 'stateB', 'zone'])
+            ->orderBy('state_a_id')->orderBy('state_b_id')
+            ->get()
+            ->map(fn ($m) => [$m->stateA->code, $m->stateB->code, $m->zone?->code]);
+
+        return $this->csv->download('domestic-zone-mapping.csv', ['state_a_code', 'state_b_code', 'zone_code'], $rows);
+    }
+
+    public function importDomestic(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $stateA = State::where('code', strtoupper(trim($row['state_a_code'] ?? '')))->first();
+            $stateB = State::where('code', strtoupper(trim($row['state_b_code'] ?? '')))->first();
+
+            if (! $stateA || ! $stateB) {
+                $skipped++;
+                continue;
+            }
+
+            // Blank zone_code leaves the pair unassigned rather than
+            // skipping the row entirely — useful for a CSV that's
+            // pre-populating pairs before anyone's decided their zones.
+            $zone = ! empty($row['zone_code'])
+                ? Zone::where('code', strtoupper(trim($row['zone_code'])))->first()
+                : null;
+
+            [$a, $b] = $stateA->id < $stateB->id ? [$stateA->id, $stateB->id] : [$stateB->id, $stateA->id];
+
+            ZoneMapping::updateOrCreate(
+                ['state_a_id' => $a, 'state_b_id' => $b],
+                ['zone_id' => $zone?->id]
+            );
+            $count++;
+        }
+
+        return redirect()->route('zone-mappings.index')->with('status', "Imported {$count} domestic mappings" . ($skipped ? ", skipped {$skipped} (unknown state code)." : '.'));
+    }
+
+    public function exportInternational(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = ZoneCountryMapping::with(['country', 'zone'])
+            ->orderBy('country_id')
+            ->get()
+            ->map(fn ($m) => [$m->country->code, $m->zone?->code]);
+
+        return $this->csv->download('international-zone-mapping.csv', ['country_code', 'zone_code'], $rows);
+    }
+
+    public function importInternational(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $country = Country::where('code', strtoupper(trim($row['country_code'] ?? '')))->first();
+
+            if (! $country) {
+                $skipped++;
+                continue;
+            }
+
+            $zone = ! empty($row['zone_code'])
+                ? Zone::where('code', strtoupper(trim($row['zone_code'])))->first()
+                : null;
+
+            ZoneCountryMapping::updateOrCreate(
+                ['country_id' => $country->id],
+                ['zone_id' => $zone?->id]
+            );
+            $count++;
+        }
+
+        return redirect()->route('zone-mappings.index')->with('status', "Imported {$count} international mappings" . ($skipped ? ", skipped {$skipped} (unknown country code)." : '.'));
     }
 }

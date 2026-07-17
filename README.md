@@ -2086,3 +2086,67 @@ imported inside `RouteController.php`, and `routes/web.php` never needs
 to import the model), but if you ever add code that needs both in the
 same file, you'll need an import alias (`use App\Models\Route as
 DeliveryRoute;` or similar).
+
+## Increment 39 — CSV Export/Import for the Location & Zone Setup Screens
+
+Added a download-amend-reupload workflow to the screens where it matters
+most — the location hierarchy and both zone mapping tables, where the
+domestic mapping alone is ~666 rows.
+
+### Covered in this increment
+
+- **Countries** — name, code
+- **States** — country_code, name, short_code, territory_code, has_airport, postal_code
+- **Cities** — state_code, name, short_code, postal_code
+- **Districts** — city_code, name, short_code, postal_code
+- **Territories** — name, code
+- **Zones** — name, code, type, tier, coverage_description
+- **Zone Mapping — Domestic** — state_a_code, state_b_code, zone_code (the highest-value one: ~666 rows, previously only editable one row at a time)
+- **Zone Mapping — International** — country_code, zone_code
+
+### Not covered in this increment
+
+Regions, Hubs, Outlets, Units, Routes, Onforwarding Classifications, Rate
+Cards, and Client Billing don't have CSV support yet — smaller datasets
+where the one-at-a-time forms are less painful, and I wanted to ship the
+highest-value screens rather than a thin layer spread across everything.
+Flag it if any of these should be added next; the shared `CsvService`
+below makes each one a small, consistent addition.
+
+### How it works
+
+- **`app/Services/CsvService.php`** — shared by every screen.
+  `download()` streams a CSV; `parse()` reads an uploaded CSV into
+  associative rows keyed by its own header row, so column order in the
+  uploaded file doesn't matter.
+- **Natural keys, not database IDs** — every CSV references rows by
+  their human-readable **code** (country code, the composed state/city
+  code, territory code, zone code), never a raw ID. This is exactly why
+  the auto-composed `code` system (Increment 19) exists: a file is
+  portable across environments and safe to hand-edit, since IDs would
+  mean nothing to a person and wouldn't survive a re-import into a
+  different database.
+- **Import always upserts, never blind-inserts** — every import uses
+  `updateOrCreate` keyed on the same natural fields the form itself
+  treats as unique (e.g. country by code, state by
+  country+short_code), so re-uploading an amended export updates
+  existing rows in place rather than duplicating them. Rows referencing
+  something that doesn't exist (an unknown state/city/country code) are
+  skipped and counted, not silently dropped — the status message
+  reports both how many imported and how many were skipped.
+- **`<x-csv-actions>`** — one shared Blade component (file input +
+  Import button, Export link) used identically on every screen.
+
+### Files
+
+```
+app/Services/CsvService.php
+app/Http/Controllers/Web/CountryController.php, StateController.php, CityController.php, DistrictController.php, TerritoryController.php, ZoneController.php   (export()/import())
+app/Http/Controllers/Web/ZoneMappingController.php   (exportDomestic()/importDomestic()/exportInternational()/importInternational())
+resources/views/components/csv-actions.blade.php
+resources/views/countries/, states/, cities/, districts/, territories/, zones/, zone-mappings/   (index views, CSV bar added)
+routes/web.php   (export routes under *:read, import routes under *:update)
+```
+
+No migration needed — this increment only adds controller methods,
+routes, and view markup.

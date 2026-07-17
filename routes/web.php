@@ -64,6 +64,13 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/outlets', [OutletController::class, 'index'])->name('outlets.index');
         Route::get('/units', [UnitController::class, 'index'])->name('units.index');
         Route::get('/zones', [ZoneController::class, 'index'])->name('zones.index');
+
+        Route::get('/countries/export', [CountryController::class, 'export'])->name('countries.export');
+        Route::get('/states/export', [StateController::class, 'export'])->name('states.export');
+        Route::get('/territories/export', [TerritoryController::class, 'export'])->name('territories.export');
+        Route::get('/cities/export', [CityController::class, 'export'])->name('cities.export');
+        Route::get('/districts/export', [DistrictController::class, 'export'])->name('districts.export');
+        Route::get('/zones/export', [ZoneController::class, 'export'])->name('zones.export');
     });
     Route::middleware('can:locations:create')->group(function () {
         Route::get('/countries/create', [CountryController::class, 'create'])->name('countries.create');
@@ -112,6 +119,13 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/units/{unit}', [UnitController::class, 'update'])->name('units.update');
         Route::get('/zones/{zone}/edit', [ZoneController::class, 'edit'])->name('zones.edit');
         Route::put('/zones/{zone}', [ZoneController::class, 'update'])->name('zones.update');
+
+        Route::post('/countries/import', [CountryController::class, 'import'])->name('countries.import');
+        Route::post('/states/import', [StateController::class, 'import'])->name('states.import');
+        Route::post('/territories/import', [TerritoryController::class, 'import'])->name('territories.import');
+        Route::post('/cities/import', [CityController::class, 'import'])->name('cities.import');
+        Route::post('/districts/import', [DistrictController::class, 'import'])->name('districts.import');
+        Route::post('/zones/import', [ZoneController::class, 'import'])->name('zones.import');
     });
     Route::middleware('can:locations:delete')->group(function () {
         Route::delete('/countries/{country}', [CountryController::class, 'destroy'])->name('countries.destroy');
@@ -131,6 +145,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:rates:read')->group(function () {
         Route::get('/rate-cards', [RateCardController::class, 'index'])->name('rate-cards.index');
         Route::get('/zone-mappings', [ZoneMappingController::class, 'index'])->name('zone-mappings.index');
+        Route::get('/zone-mappings/export-domestic', [ZoneMappingController::class, 'exportDomestic'])->name('zone-mappings.export-domestic');
+        Route::get('/zone-mappings/export-international', [ZoneMappingController::class, 'exportInternational'])->name('zone-mappings.export-international');
     });
     Route::middleware('can:rates:create')->group(function () {
         Route::get('/rate-cards/create', [RateCardController::class, 'create'])->name('rate-cards.create');
@@ -147,6 +163,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/zone-mappings/generate-international', [ZoneMappingController::class, 'generateInternational'])->name('zone-mappings.generate-international');
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
         Route::patch('/zone-country-mappings/{zoneCountryMapping}/zone', [ZoneMappingController::class, 'updateCountryZone'])->name('zone-mappings.update-country-zone');
+        Route::post('/zone-mappings/import-domestic', [ZoneMappingController::class, 'importDomestic'])->name('zone-mappings.import-domestic');
+        Route::post('/zone-mappings/import-international', [ZoneMappingController::class, 'importInternational'])->name('zone-mappings.import-international');
     });
     Route::middleware('can:rates:delete')->group(function () {
         Route::delete('/rate-cards/{rateCard}', [RateCardController::class, 'destroy'])->name('rate-cards.destroy');

@@ -8,6 +8,8 @@
 
     <p class="mb-4 text-sm text-ink-500">The most granular operating-location level — a neighborhood or area within a city.</p>
 
+    <x-csv-actions :export-route="route('districts.export')" :import-route="route('districts.import')" label="Districts" />
+
     <div class="mb-5 flex items-center justify-between gap-4">
         <form method="GET" class="flex items-center gap-3">
             <select name="state_id" onchange="this.form.submit()"

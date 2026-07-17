@@ -23,6 +23,8 @@
         </form>
     </div>
 
+    <x-csv-actions :export-route="route('zone-mappings.export-domestic')" :import-route="route('zone-mappings.import-domestic')" label="Domestic Mapping" />
+
     <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
@@ -69,6 +71,8 @@
             </button>
         </form>
     </div>
+
+    <x-csv-actions :export-route="route('zone-mappings.export-international')" :import-route="route('zone-mappings.import-international')" label="International Mapping" />
 
     <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">

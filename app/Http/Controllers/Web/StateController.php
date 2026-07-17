@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Country;
 use App\Models\State;
 use App\Models\Territory;
+use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -14,6 +15,10 @@ use Illuminate\View\View;
 
 class StateController extends Controller
 {
+    public function __construct(private CsvService $csv)
+    {
+    }
+
     public function index(Request $request): View
     {
         $query = State::with('country')->withCount('cities');
@@ -67,6 +72,61 @@ class StateController extends Controller
         $state->delete();
 
         return redirect()->route('states.index')->with('status', 'State/province removed.');
+    }
+
+    /**
+     * country_code/territory_code (not IDs) are used so the file is
+     * portable across environments — importing it back resolves each by
+     * code, the same natural key used throughout this whole location
+     * hierarchy.
+     */
+    public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = State::with(['country', 'territory'])->orderBy('name')->get()->map(fn ($s) => [
+            $s->country->code,
+            $s->name,
+            $s->short_code,
+            $s->territory?->code,
+            $s->has_airport ? 'yes' : 'no',
+            $s->postal_code,
+        ]);
+
+        return $this->csv->download('states.csv', ['country_code', 'name', 'short_code', 'territory_code', 'has_airport', 'postal_code'], $rows);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $country = Country::where('code', strtoupper(trim($row['country_code'] ?? '')))->first();
+
+            if (! $country || empty($row['name']) || empty($row['short_code'])) {
+                $skipped++;
+                continue;
+            }
+
+            $territory = ! empty($row['territory_code'])
+                ? Territory::where('code', strtoupper(trim($row['territory_code'])))->first()
+                : null;
+
+            State::updateOrCreate(
+                ['country_id' => $country->id, 'short_code' => strtoupper(trim($row['short_code']))],
+                [
+                    'name' => trim($row['name']),
+                    'territory_id' => $territory?->id,
+                    'has_airport' => strtolower(trim($row['has_airport'] ?? '')) === 'yes',
+                    'postal_code' => $row['postal_code'] ?? null,
+                ]
+            );
+            $count++;
+        }
+
+        return back()->with('status', "Imported {$count} states" . ($skipped ? ", skipped {$skipped} (missing country/name/short code)." : '.'));
     }
 
     private function validated(Request $request, ?int $ignoreId = null): array

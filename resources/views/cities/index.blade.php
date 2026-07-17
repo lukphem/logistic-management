@@ -8,6 +8,8 @@
 
     <p class="mb-4 text-sm text-ink-500">The city a hub actually operates in — this is what ties a hub (and through it, units and staff) to a real place.</p>
 
+    <x-csv-actions :export-route="route('cities.export')" :import-route="route('cities.import')" label="Cities" />
+
     <div class="mb-5 flex items-center justify-between gap-4">
         <form method="GET" class="flex items-center gap-3">
             <select name="country_id" onchange="this.form.submit()"
