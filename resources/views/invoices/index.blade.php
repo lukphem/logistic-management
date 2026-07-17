@@ -26,7 +26,7 @@
                class="rounded-md border border-line bg-surface-0 px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
     </form>
 
-    <div class="overflow-hidden rounded-xl border border-line bg-surface-0 shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">

@@ -12,7 +12,7 @@
         still moves their price, since the discount is applied fresh at every quote, not frozen at the rate on the day it was agreed.
     </p>
 
-    <div class="overflow-hidden rounded-xl border border-line bg-surface-0 shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">

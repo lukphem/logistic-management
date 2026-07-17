@@ -12,6 +12,12 @@
         'chevron' => '<path d="m6 9 6 6 6-6"/>',
         'logout' => '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
         'search' => '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+        'truck' => '<path d="M3 6h10v9H3z"/><path d="M13 10h4l4 3.5V15h-8z"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+        'map-pin' => '<path d="M12 21s-7-6.5-7-11.5a7 7 0 1 1 14 0C19 14.5 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.3"/>',
+        'route' => '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8v3a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4" stroke-dasharray="2.5 3"/>',
+        'package' => '<path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/><path d="m7 5.5 9 5"/>',
+        'menu' => '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        'close' => '<path d="M6 6l12 12M18 6 6 18"/>',
     ];
 @endphp
 

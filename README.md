@@ -1817,3 +1817,62 @@ php artisan migrate
 Since this drops and recreates `zone_mappings`, any test data you
 already entered under the old (incorrect) city-based design will be
 lost — re-enter it as state pairs after migrating.
+
+## Increment 34 — Responsive Layout Across Every Page + Logistics-Themed Login
+
+### Responsive sidebar (benefits every page at once)
+
+The sidebar was a fixed-width static column with no mobile behavior at
+all — unusable on a phone. Since every screen in the app shares
+`components/layouts/app.blade.php`, fixing it there fixes it everywhere:
+
+- Sidebar is now an off-canvas drawer below the `md` breakpoint (hidden
+  by `-translate-x-full`, slides in via a hamburger button in the
+  topbar), and the same static column as before at `md` and up
+- A semi-transparent backdrop appears behind the open drawer on mobile;
+  tapping it (or the new close button in the drawer itself) closes it
+- Topbar padding/spacing tightens on mobile (`px-4` vs `px-8`,
+  `p-4` vs `p-8` on the main content area), and the signed-in user's name
+  hides on the smallest screens (the avatar initial alone is enough
+  there)
+- No new dependency — a dozen lines of plain JS toggling classes
+
+### Every table now scrolls horizontally on small screens
+
+Every list page's table wrapper (18 files) changed from `overflow-hidden`
+to `overflow-x-auto` — on mobile, wide tables (Shipments, Users, Rate
+Cards, etc.) now scroll sideways within their card instead of squashing
+illegibly or breaking the page layout. Rounded corners are unaffected —
+`overflow-x-auto` still clips to the border-radius the same way
+`overflow-hidden` did.
+
+### Login page — properly logistics-themed
+
+Replaced the plain centered card with a split-panel design:
+
+- **Left panel** (desktop only — no room for it on mobile): brand-primary
+  background with an actual illustration — two map pins joined by a
+  dashed route, a truck icon animating gently back and forth along it,
+  and a few translucent floating package icons for texture. A short
+  tagline underneath.
+- **Right panel**: the sign-in form itself, unchanged in function, with a
+  slightly refined button (shadow lift on hover, matching the rest of the
+  app's button style from Increment 17)
+- On mobile, the left panel disappears entirely and the form takes the
+  full width with a small centered logo header instead — the same
+  fallback behavior as before
+
+New icons added to the shared icon component: `truck`, `map-pin`,
+`route`, `package`, `menu` (hamburger), `close`.
+
+### Files
+
+```
+resources/views/components/icon.blade.php   (6 new icons)
+resources/views/components/layouts/app.blade.php   (responsive drawer, hamburger toggle)
+resources/views/auth/login.blade.php   (full redesign)
++ overflow-x-auto swapped in on every table wrapper across 18 list-view files
+```
+
+No migration, no controller changes — this increment is entirely
+front-end.

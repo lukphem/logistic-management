@@ -17,7 +17,7 @@
         Reordering here changes display order only; the underlying <code class="font-mono">key</code> on past shipments is never touched.
     </p>
 
-    <div class="overflow-hidden rounded-xl border border-line bg-surface-0 shadow-sm">
+    <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">

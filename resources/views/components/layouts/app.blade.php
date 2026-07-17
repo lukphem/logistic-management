@@ -23,9 +23,13 @@
 <body class="h-full bg-surface-50 text-ink-900 antialiased">
     <div class="flex h-full">
 
-        {{-- Sidebar --}}
-        <aside class="flex w-64 shrink-0 flex-col bg-[var(--brand-primary)] bg-gradient-to-b from-white/0 to-black/10 text-white">
-            <div class="flex h-16 items-center gap-2.5 px-5 border-b border-white/10">
+        {{-- Backdrop — mobile only, closes the drawer on tap --}}
+        <div id="sidebar-backdrop" class="fixed inset-0 z-30 hidden bg-black/40 md:hidden"></div>
+
+        {{-- Sidebar — off-canvas drawer on mobile, static column on md+ --}}
+        <aside id="sidebar"
+               class="fixed inset-y-0 left-0 z-40 flex w-64 -translate-x-full shrink-0 flex-col bg-[var(--brand-primary)] bg-gradient-to-b from-white/0 to-black/10 text-white transition-transform duration-200 md:relative md:inset-auto md:translate-x-0">
+            <div class="flex h-16 items-center gap-2.5 border-b border-white/10 px-5">
                 @if (config('branding.logo_url'))
                     <img src="{{ config('branding.logo_url') }}" alt="{{ config('branding.company_name') }}" class="h-8 w-8 rounded-md object-cover ring-1 ring-white/20">
                 @else
@@ -34,6 +38,9 @@
                     </span>
                 @endif
                 <span class="truncate text-sm font-semibold tracking-wide">{{ config('branding.company_name') }}</span>
+                <button id="sidebar-close" type="button" class="ml-auto text-white/70 hover:text-white md:hidden">
+                    <x-icon name="close" class="h-5 w-5" />
+                </button>
             </div>
 
             <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
@@ -201,25 +208,53 @@
 
         {{-- Main --}}
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface-0/80 px-8 backdrop-blur">
-                <div>
-                    @if ($setupsActive)
-                        <p class="text-xs font-medium text-ink-500">Setups</p>
-                    @endif
-                    <h1 class="text-lg font-semibold text-ink-900">{{ $title ?? 'Dashboard' }}</h1>
+            <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface-0/80 px-4 backdrop-blur md:px-8">
+                <div class="flex items-center gap-3">
+                    <button id="sidebar-open" type="button" class="text-ink-500 hover:text-ink-900 md:hidden">
+                        <x-icon name="menu" class="h-5 w-5" />
+                    </button>
+                    <div>
+                        @if ($setupsActive)
+                            <p class="text-xs font-medium text-ink-500">Setups</p>
+                        @endif
+                        <h1 class="text-lg font-semibold text-ink-900">{{ $title ?? 'Dashboard' }}</h1>
+                    </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="text-sm text-ink-500">{{ auth()->user()?->name }}</span>
-                    <span class="grid h-9 w-9 place-items-center rounded-full bg-[var(--brand-primary)]/10 text-xs font-semibold text-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]/20">
+                    <span class="hidden text-sm text-ink-500 sm:inline">{{ auth()->user()?->name }}</span>
+                    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--brand-primary)]/10 text-xs font-semibold text-[var(--brand-primary)] ring-1 ring-[var(--brand-primary)]/20">
                         {{ strtoupper(substr(auth()->user()?->name ?? '?', 0, 1)) }}
                     </span>
                 </div>
             </header>
 
-            <main class="flex-1 overflow-y-auto p-8">
+            <main class="flex-1 overflow-y-auto p-4 md:p-8">
                 {{ $slot }}
             </main>
         </div>
     </div>
+
+    <script>
+        (function () {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            const openBtn = document.getElementById('sidebar-open');
+            const closeBtn = document.getElementById('sidebar-close');
+
+            function openSidebar() {
+                sidebar.classList.remove('-translate-x-full');
+                backdrop.classList.remove('hidden');
+            }
+
+            function closeSidebar() {
+                sidebar.classList.add('-translate-x-full');
+                backdrop.classList.add('hidden');
+            }
+
+            openBtn?.addEventListener('click', openSidebar);
+            closeBtn?.addEventListener('click', closeSidebar);
+            backdrop?.addEventListener('click', closeSidebar);
+        })();
+    </script>
 </body>
 </html>
