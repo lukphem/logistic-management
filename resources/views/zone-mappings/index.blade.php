@@ -12,15 +12,14 @@
         </div>
     @endif
 
-    <div class="mb-5">
-        <form method="GET" class="flex items-center gap-3">
-            <select name="zone_id" onchange="this.form.submit()"
-                    class="rounded-md border border-line bg-surface-0 px-3 py-2 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                <option value="">All zones</option>
-                @foreach ($zones as $zone)
-                    <option value="{{ $zone->id }}" @selected(request('zone_id') == $zone->id)>{{ $zone->name }}</option>
-                @endforeach
-            </select>
+    {{-- Domestic Mapping --}}
+    <div class="mb-5 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-ink-900">Domestic Mapping</h2>
+        <form method="POST" action="{{ route('zone-mappings.generate-domestic') }}">
+            @csrf
+            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                Generate Nigeria combinations
+            </button>
         </form>
     </div>
 
@@ -31,74 +30,78 @@
                     <th class="px-5 py-3 font-medium">State A</th>
                     <th class="px-5 py-3 font-medium">State B</th>
                     <th class="px-5 py-3 font-medium">Zone</th>
-                    <th class="px-5 py-3"></th>
                 </tr>
             </thead>
             <tbody>
-                @forelse ($mappings as $mapping)
+                @forelse ($domesticMappings as $mapping)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateA->name }}</td>
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateB->name }}</td>
-                        <td class="px-5 py-3 text-ink-900">{{ $mapping->zone->name }}</td>
-                        <td class="px-5 py-3 text-right">
-                            <form method="POST" action="{{ route('zone-mappings.destroy', $mapping) }}" onsubmit="return confirm('Remove this zone assignment?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
+                        <td class="px-5 py-3">
+                            <form method="POST" action="{{ route('zone-mappings.update-zone', $mapping) }}">
+                                @csrf @method('PATCH')
+                                <select name="zone_id" onchange="this.form.submit()"
+                                        class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">Unassigned</option>
+                                    @foreach ($zones as $zone)
+                                        <option value="{{ $zone->id }}" @selected($mapping->zone_id === $zone->id)>{{ $zone->name }}</option>
+                                    @endforeach
+                                </select>
                             </form>
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No routes assigned to a zone yet.</td></tr>
+                    <tr><td colspan="3" class="px-5 py-8 text-center text-sm text-ink-500">No combinations generated yet — click "Generate Nigeria combinations" above.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="mt-5">{{ $mappings->links() }}</div>
+    <div class="mt-5">{{ $domesticMappings->links() }}</div>
 
-    <div class="mt-6 rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-        <h2 class="mb-4 text-sm font-semibold text-ink-900">Assign a route to a zone</h2>
-        <form method="POST" action="{{ route('zone-mappings.store') }}" class="flex flex-wrap items-end gap-4">
+    {{-- International Mapping --}}
+    <div class="mb-5 mt-10 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-ink-900">International Mapping</h2>
+        <form method="POST" action="{{ route('zone-mappings.generate-international') }}">
             @csrf
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">State A <x-required /></label>
-                <select name="state_a_id" class="w-52 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    @foreach ($states->groupBy(fn ($state) => $state->country->name) as $countryName => $countryStates)
-                        <optgroup label="{{ $countryName }}">
-                            @foreach ($countryStates as $state)
-                                <option value="{{ $state->id }}">{{ $state->name }}</option>
-                            @endforeach
-                        </optgroup>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">State B <x-required /></label>
-                <select name="state_b_id" class="w-52 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    @foreach ($states->groupBy(fn ($state) => $state->country->name) as $countryName => $countryStates)
-                        <optgroup label="{{ $countryName }}">
-                            @foreach ($countryStates as $state)
-                                <option value="{{ $state->id }}">{{ $state->name }}</option>
-                            @endforeach
-                        </optgroup>
-                    @endforeach
-                </select>
-            </div>
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Zone <x-required /></label>
-                <select name="zone_id" class="w-44 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    @foreach ($zones as $zone)
-                        <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                    @endforeach
-                </select>
-                @if ($zones->isEmpty())
-                    <p class="mt-1 text-xs text-status-exception">No zones exist yet — create one under Billing → Zones first.</p>
-                @endif
-            </div>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
-                Save assignment
+                Generate international countries
             </button>
         </form>
     </div>
+
+    <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
+        <table class="w-full text-left text-sm">
+            <thead>
+                <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                    <th class="px-5 py-3 font-medium">Country</th>
+                    <th class="px-5 py-3 font-medium">Zone</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($internationalMappings as $mapping)
+                    <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
+                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->country->name }}</td>
+                        <td class="px-5 py-3">
+                            <form method="POST" action="{{ route('zone-mappings.update-country-zone', $mapping) }}">
+                                @csrf @method('PATCH')
+                                <select name="zone_id" onchange="this.form.submit()"
+                                        class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">Unassigned</option>
+                                    @foreach ($zones as $zone)
+                                        <option value="{{ $zone->id }}" @selected($mapping->zone_id === $zone->id)>{{ $zone->name }}</option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr><td colspan="2" class="px-5 py-8 text-center text-sm text-ink-500">No countries generated yet — click "Generate international countries" above.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-5">{{ $internationalMappings->links() }}</div>
 
 </x-layouts.app>

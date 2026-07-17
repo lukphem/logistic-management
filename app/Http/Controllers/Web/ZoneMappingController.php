@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Country;
 use App\Models\State;
 use App\Models\Zone;
+use App\Models\ZoneCountryMapping;
 use App\Models\ZoneMapping;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,71 +16,109 @@ use Illuminate\View\View;
 class ZoneMappingController extends Controller
 {
     /**
-     * Assigns a route between two STATES to a Zone — e.g. "Abuja to
-     * Lagos = Zone 2." One row covers the route both ways (see
-     * ZoneMapping::resolveZone / its saving hook, which always stores
-     * the lower state ID first) — "Lagos to Abuja" is the same mapping,
-     * not a second row.
+     * Two independent sections on one screen:
      *
-     * That single per-pair assignment is what lets the
-     * origin_destination_weight rate table (managed on each rate card's
-     * own edit page) resolve pricing for any shipment between two mapped
-     * states.
+     * Domestic — every combination of Nigeria's states (~666 pairs),
+     * auto-generated rather than entered one at a time, since the
+     * business is Nigeria-based and the full set is known and fixed.
+     * One row covers a route both ways (see ZoneMapping::resolveZone).
      *
-     * The older zone-to-zone price matrix (ZoneRateMatrix, for the
-     * 'zone_to_zone' billing model) is unaffected by this — it's managed
-     * from each zone_to_zone rate card's own edit page, same as before
-     * this screen existed.
+     * International — one row per (non-Nigeria) country, since an
+     * international shipment only ever needs to know which zone the
+     * OTHER country belongs to; Nigeria is always the fixed origin side,
+     * so there's no pair to resolve the way there is domestically.
+     *
+     * Both start with no zone assigned when generated — staff fill them
+     * in via the inline picker on each row.
      */
     public function index(Request $request): View
     {
-        $query = ZoneMapping::with(['stateA.country', 'stateB.country', 'zone']);
+        $domesticMappings = ZoneMapping::with(['stateA', 'stateB', 'zone'])
+            ->orderBy('state_a_id')
+            ->orderBy('state_b_id')
+            ->paginate(20, ['*'], 'domestic_page');
 
-        if ($request->filled('zone_id')) {
-            $query->where('zone_id', $request->zone_id);
-        }
-
-        $mappings = $query->orderBy('zone_id')->paginate(20)->withQueryString();
+        $internationalMappings = ZoneCountryMapping::with(['country', 'zone'])
+            ->orderBy('country_id')
+            ->paginate(20, ['*'], 'international_page');
 
         return view('zone-mappings.index', [
-            'mappings' => $mappings,
+            'domesticMappings' => $domesticMappings,
+            'internationalMappings' => $internationalMappings,
             'zones' => Zone::orderBy('name')->get(),
-            'states' => State::with('country')->orderBy('name')->get(),
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    /**
+     * Idempotent — safe to run again later (e.g. after a new state is
+     * added under Setups → Location) since it only creates pairs that
+     * don't already exist, never touching zones already assigned to an
+     * existing pair.
+     */
+    public function generateDomestic(): RedirectResponse
+    {
+        $nigeria = Country::where('code', 'NG')->first();
+
+        if (! $nigeria) {
+            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+        }
+
+        $stateIds = State::where('country_id', $nigeria->id)->pluck('id')->values()->all();
+        $created = 0;
+
+        for ($i = 0; $i < count($stateIds); $i++) {
+            for ($j = $i + 1; $j < count($stateIds); $j++) {
+                [$a, $b] = $stateIds[$i] < $stateIds[$j] ? [$stateIds[$i], $stateIds[$j]] : [$stateIds[$j], $stateIds[$i]];
+
+                $mapping = ZoneMapping::firstOrCreate(['state_a_id' => $a, 'state_b_id' => $b]);
+                $created += $mapping->wasRecentlyCreated ? 1 : 0;
+            }
+        }
+
+        return redirect()->route('zone-mappings.index')->with('status', "Domestic combinations generated ({$created} new).");
+    }
+
+    /**
+     * Same idempotency guarantee as generateDomestic — safe to re-run
+     * after adding a new country.
+     */
+    public function generateInternational(): RedirectResponse
+    {
+        $created = 0;
+
+        foreach (Country::where('code', '!=', 'NG')->get() as $country) {
+            $mapping = ZoneCountryMapping::firstOrCreate(['country_id' => $country->id]);
+            $created += $mapping->wasRecentlyCreated ? 1 : 0;
+        }
+
+        return redirect()->route('zone-mappings.index')->with('status', "International countries generated ({$created} new).");
+    }
+
+    public function updateZone(Request $request, ZoneMapping $zoneMapping): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
-            'state_a_id' => 'required|exists:states,id|different:state_b_id',
-            'state_b_id' => 'required|exists:states,id',
-            'zone_id' => 'required|exists:zones,id',
+            'zone_id' => 'nullable|exists:zones,id',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // Normalize order before the upsert lookup too — otherwise
-        // saving "Lagos, Abuja" when "Abuja, Lagos" already exists would
-        // create a second row instead of updating the first, since the
-        // model's saving-hook normalization only reorders the values
-        // being saved, not the WHERE clause used to find an existing row.
-        [$a, $b] = $data['state_a_id'] <= $data['state_b_id']
-            ? [$data['state_a_id'], $data['state_b_id']]
-            : [$data['state_b_id'], $data['state_a_id']];
+        $zoneMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
-        ZoneMapping::updateOrCreate(
-            ['state_a_id' => $a, 'state_b_id' => $b],
-            ['zone_id' => $data['zone_id']]
-        );
-
-        return redirect()->route('zone-mappings.index')->with('status', 'Route assigned to zone.');
+        return back()->with('status', 'Zone updated.');
     }
 
-    public function destroy(ZoneMapping $zoneMapping): RedirectResponse
+    public function updateCountryZone(Request $request, ZoneCountryMapping $zoneCountryMapping): RedirectResponse
     {
-        $zoneMapping->delete();
+        $validator = Validator::make($request->all(), [
+            'zone_id' => 'nullable|exists:zones,id',
+        ]);
 
-        return redirect()->route('zone-mappings.index')->with('status', 'Zone assignment removed.');
+        $validator->validate();
+        $data = $validator->validated();
+
+        $zoneCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
+
+        return back()->with('status', 'Zone updated.');
     }
 }

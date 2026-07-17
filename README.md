@@ -1892,3 +1892,57 @@ resources/views/zone-mappings/index.blade.php
 ```
 
 No migration, no controller changes.
+
+## Increment 36 — Auto-Generated Domestic Mapping + Country-Based International Mapping
+
+Removed the zone filter dropdown ("the top part") and replaced manual
+one-at-a-time entry with two auto-generated, inline-editable sections.
+
+### Domestic Mapping
+
+"Generate Nigeria combinations" creates every possible state-pair
+combination for Nigeria (36 states + FCT → ~666 pairs) in one click,
+each starting **unassigned**. Staff then work through the list and pick
+a zone per row from an inline dropdown that saves immediately on
+change — no separate add/edit form needed anymore, since the full set
+of pairs already exists.
+
+Idempotent: safe to click again later (e.g. after adding a new state
+under Setups → Location) — it only creates pairs that don't already
+exist and never touches a zone already assigned to an existing pair.
+`zone_mappings.zone_id` is now nullable to support this (previously
+required).
+
+### International Mapping — new, country-based (not a pair)
+
+International works differently on purpose: since the business always
+ships **from** Nigeria, an international shipment only needs to know
+which zone the *other* country belongs to (e.g. "France = Europe zone")
+— Nigeria is always the fixed side, so there's no pair to resolve the
+way domestic needs one. New `zone_country_mappings` table: one row per
+country (excluding Nigeria itself), same "Generate" + inline-assign
+pattern as domestic.
+
+### Files
+
+```
+database/migrations/2026_01_24_000001_make_zone_mappings_zone_id_nullable.php
+database/migrations/2026_01_24_000002_create_zone_country_mappings_table.php
+app/Models/ZoneCountryMapping.php
+app/Http/Controllers/Web/ZoneMappingController.php   (rewritten: generate + inline update actions)
+resources/views/zone-mappings/index.blade.php   (rewritten: two sections, no filter, inline zone selects)
+routes/web.php   (generate-domestic, generate-international, update-zone, update-country-zone)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Note: this requires `doctrine/dbal` to modify the `zone_id` column
+(same requirement already introduced in Increment 32 for the
+`billing_model` column change) — if you haven't added it yet:
+```powershell
+composer require doctrine/dbal
+```
