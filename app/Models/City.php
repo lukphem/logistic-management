@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class City extends Model
 {
-    protected $fillable = ['state_id', 'name', 'short_code', 'code', 'postal_code', 'operational_hub_id', 'onforwarding_classification_id'];
+    protected $fillable = ['state_id', 'name', 'short_code', 'code', 'postal_code', 'operational_hub_id', 'onforwarding_classification_id', 'route_id'];
 
     public function state(): BelongsTo
     {
@@ -28,6 +28,16 @@ class City extends Model
     public function onforwardingClassification(): BelongsTo
     {
         return $this->belongsTo(OnforwardingClassification::class);
+    }
+
+    /**
+     * Groups this city into a delivery route — foundation for a FUTURE
+     * feature (automatic shipment sorting / driver allocation, not built
+     * yet). See Route.
+     */
+    public function route(): BelongsTo
+    {
+        return $this->belongsTo(Route::class);
     }
 
     /**

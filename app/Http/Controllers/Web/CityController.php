@@ -7,6 +7,7 @@ use App\Models\City;
 use App\Models\Country;
 use App\Models\Hub;
 use App\Models\OnforwardingClassification;
+use App\Models\Route;
 use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,7 @@ class CityController extends Controller
             'states' => State::with('country')->orderBy('name')->get(),
             'hubs' => Hub::with('city.state')->orderBy('name')->get(),
             'classifications' => OnforwardingClassification::orderBy('name')->get(),
+            'routes' => Route::orderBy('name')->get(),
         ]);
     }
 
@@ -59,6 +61,7 @@ class CityController extends Controller
             'states' => State::with('country')->orderBy('name')->get(),
             'hubs' => Hub::with('city.state')->orderBy('name')->get(),
             'classifications' => OnforwardingClassification::orderBy('name')->get(),
+            'routes' => Route::orderBy('name')->get(),
         ]);
     }
 
@@ -91,16 +94,17 @@ class CityController extends Controller
             // state is covered by more than one hub. See City::operationalHub().
             'operational_hub_id' => 'nullable|exists:hubs,id',
             'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
+            'route_id' => 'nullable|exists:routes,id',
             'postal_code' => 'nullable|string|max:20',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // Blank "No specific hub"/"No classification" options submit as
-        // an empty string, not null — normalize immediately, the same
-        // class of bug fixed in Increment 20.
-        foreach (['operational_hub_id', 'onforwarding_classification_id'] as $field) {
+        // Blank "No specific hub"/"No classification"/"No route" options
+        // submit as an empty string, not null — normalize immediately,
+        // the same class of bug fixed in Increment 20.
+        foreach (['operational_hub_id', 'onforwarding_classification_id', 'route_id'] as $field) {
             if (($data[$field] ?? null) === '') {
                 $data[$field] = null;
             }

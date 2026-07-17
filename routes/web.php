@@ -13,10 +13,12 @@ use App\Http\Controllers\Web\OutletController;
 use App\Http\Controllers\Web\RateCardController;
 use App\Http\Controllers\Web\RegionController;
 use App\Http\Controllers\Web\RoleController;
+use App\Http\Controllers\Web\RouteController;
 use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StateController;
+use App\Http\Controllers\Web\TerritoryController;
 use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\ZoneController;
@@ -53,6 +55,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:locations:read')->group(function () {
         Route::get('/countries', [CountryController::class, 'index'])->name('countries.index');
         Route::get('/states', [StateController::class, 'index'])->name('states.index');
+        Route::get('/territories', [TerritoryController::class, 'index'])->name('territories.index');
+        Route::get('/routes', [RouteController::class, 'index'])->name('routes.index');
         Route::get('/cities', [CityController::class, 'index'])->name('cities.index');
         Route::get('/districts', [DistrictController::class, 'index'])->name('districts.index');
         Route::get('/regions', [RegionController::class, 'index'])->name('regions.index');
@@ -66,6 +70,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/countries', [CountryController::class, 'store'])->name('countries.store');
         Route::get('/states/create', [StateController::class, 'create'])->name('states.create');
         Route::post('/states', [StateController::class, 'store'])->name('states.store');
+        Route::get('/territories/create', [TerritoryController::class, 'create'])->name('territories.create');
+        Route::post('/territories', [TerritoryController::class, 'store'])->name('territories.store');
+        Route::get('/routes/create', [RouteController::class, 'create'])->name('routes.create');
+        Route::post('/routes', [RouteController::class, 'store'])->name('routes.store');
         Route::get('/cities/create', [CityController::class, 'create'])->name('cities.create');
         Route::post('/cities', [CityController::class, 'store'])->name('cities.store');
         Route::get('/districts/create', [DistrictController::class, 'create'])->name('districts.create');
@@ -86,6 +94,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/countries/{country}', [CountryController::class, 'update'])->name('countries.update');
         Route::get('/states/{state}/edit', [StateController::class, 'edit'])->name('states.edit');
         Route::put('/states/{state}', [StateController::class, 'update'])->name('states.update');
+        Route::get('/territories/{territory}/edit', [TerritoryController::class, 'edit'])->name('territories.edit');
+        Route::put('/territories/{territory}', [TerritoryController::class, 'update'])->name('territories.update');
+        Route::get('/routes/{route}/edit', [RouteController::class, 'edit'])->name('routes.edit');
+        Route::put('/routes/{route}', [RouteController::class, 'update'])->name('routes.update');
         Route::get('/cities/{city}/edit', [CityController::class, 'edit'])->name('cities.edit');
         Route::put('/cities/{city}', [CityController::class, 'update'])->name('cities.update');
         Route::get('/districts/{district}/edit', [DistrictController::class, 'edit'])->name('districts.edit');
@@ -104,6 +116,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:locations:delete')->group(function () {
         Route::delete('/countries/{country}', [CountryController::class, 'destroy'])->name('countries.destroy');
         Route::delete('/states/{state}', [StateController::class, 'destroy'])->name('states.destroy');
+        Route::delete('/territories/{territory}', [TerritoryController::class, 'destroy'])->name('territories.destroy');
+        Route::delete('/routes/{route}', [RouteController::class, 'destroy'])->name('routes.destroy');
         Route::delete('/cities/{city}', [CityController::class, 'destroy'])->name('cities.destroy');
         Route::delete('/districts/{district}', [DistrictController::class, 'destroy'])->name('districts.destroy');
         Route::delete('/regions/{region}', [RegionController::class, 'destroy'])->name('regions.destroy');

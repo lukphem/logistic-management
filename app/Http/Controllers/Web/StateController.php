@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Country;
 use App\Models\State;
+use App\Models\Territory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -31,7 +32,11 @@ class StateController extends Controller
 
     public function create(): View
     {
-        return view('states.form', ['state' => new State(), 'countries' => Country::orderBy('name')->get()]);
+        return view('states.form', [
+            'state' => new State(),
+            'countries' => Country::orderBy('name')->get(),
+            'territories' => Territory::orderBy('name')->get(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -43,7 +48,11 @@ class StateController extends Controller
 
     public function edit(State $state): View
     {
-        return view('states.form', ['state' => $state, 'countries' => Country::orderBy('name')->get()]);
+        return view('states.form', [
+            'state' => $state,
+            'countries' => Country::orderBy('name')->get(),
+            'territories' => Territory::orderBy('name')->get(),
+        ]);
     }
 
     public function update(Request $request, State $state): RedirectResponse
@@ -76,10 +85,21 @@ class StateController extends Controller
                     ->ignore($ignoreId),
             ],
             'postal_code' => 'nullable|string|max:20',
+            'territory_id' => 'nullable|exists:territories,id',
+            'has_airport' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
+        $data = $validator->validated();
 
-        return $validator->validated();
+        $data['has_airport'] = $request->boolean('has_airport');
+
+        // Blank "No territory" option submits as an empty string, not
+        // null — same class of bug fixed in Increment 20.
+        if (($data['territory_id'] ?? null) === '') {
+            $data['territory_id'] = null;
+        }
+
+        return $data;
     }
 }

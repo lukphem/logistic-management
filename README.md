@@ -1997,3 +1997,92 @@ resources/views/auth/designs/route.blade.php, warehouse.blade.php, map.blade.php
 php artisan migrate
 npm run build
 ```
+
+## Increment 38 — Territories: Auto-Determined Domestic Zone Tiers + Routes Foundation
+
+### Territories: the rule that auto-fills domestic zone mapping
+
+New `territories` table groups states together purely for the domestic
+zone-tier rule — e.g. a "South West" territory containing Lagos, Ogun,
+Oyo, Osun, Ondo, Ekiti. Distinct from Region (Increment 13, an
+access-scope grouping) — Territory exists only for this rule.
+
+`states` gained `territory_id` (optional — which territory this state
+belongs to) and `has_airport` (boolean).
+
+`ZoneMapping::determineDefaultZoneTier(State $a, State $b)` — the rule,
+checked in order:
+
+1. **Same state** → Zone 1
+2. **Different states, same territory** → Zone 2
+3. **Different territories, both states have an airport** → Zone 3
+4. **Different territories, at least one state has no airport** → Zone 4
+
+`Zone::ensureDefaultZones()` creates (once, idempotently) the four
+standard "Zone 1"–"Zone 4" records this rule assigns into.
+`ZoneMappingController::generateDomestic()` (Increment 36) now calls
+both when generating Nigeria's state combinations — every newly
+generated pair is pre-filled with its rule-determined zone instead of
+starting unassigned. **This is only ever a starting point** — any
+individual pair can still be reassigned to a different zone afterward
+via the existing inline picker, exactly as before; the rule never
+touches a pair that's already been assigned, including on repeated runs.
+
+International mapping (Increment 36) is **not** given an equivalent
+auto-rule in this increment — there's no clear equivalent to
+"territory"/"airport" for countries without more specific direction, so
+country → zone assignment stays fully manual via the existing inline
+picker. Flag it if a country-grouping concept (e.g. "region") and a
+matching auto-rule should exist too.
+
+### Routes: foundation for a future feature, not built yet
+
+New `routes` table (name, code, optional hub) + optional `route_id` on
+both `City` and `District`. This is explicitly **only the data model** —
+grouping cities/districts into a route for **future** automatic shipment
+sorting and driver/rider allocation. No sorting or allocation logic
+exists in this increment; that's deferred to whichever future module
+actually implements it.
+
+### New screens
+
+- **Territories** (Setups → Location) — simple name/code CRUD
+- **Routes** (Setups → Location) — name/code/optional-hub CRUD
+- State form gained a Territory picker and a "Has an airport" checkbox
+- City and District forms each gained an optional Route picker
+
+### Files
+
+```
+database/migrations/2026_01_26_000001_create_territories_table.php
+database/migrations/2026_01_26_000002_add_territory_and_airport_to_states_table.php
+database/migrations/2026_01_26_000003_create_routes_table.php
+app/Models/Territory.php, Route.php
+app/Models/State.php   (territory(), has_airport)
+app/Models/City.php, District.php   (route())
+app/Models/ZoneMapping.php   (determineDefaultZoneTier())
+app/Models/Zone.php   (ensureDefaultZones())
+app/Http/Controllers/Web/TerritoryController.php, RouteController.php
+app/Http/Controllers/Web/StateController.php   (territory_id, has_airport)
+app/Http/Controllers/Web/CityController.php, DistrictController.php   (route_id)
+app/Http/Controllers/Web/ZoneMappingController.php   (generateDomestic() applies the rule)
+resources/views/territories/, routes/   (index + form each)
+resources/views/states/form.blade.php, cities/form.blade.php, districts/form.blade.php
+resources/views/components/layouts/app.blade.php   (Territories, Routes added to Location submenu)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+### A naming note, if you extend this yourself later
+
+The new `Route` model (`App\Models\Route`) sits right next to Laravel's
+own `Illuminate\Support\Facades\Route` facade used throughout
+`routes/web.php` — they don't actually collide (the facade is never
+imported inside `RouteController.php`, and `routes/web.php` never needs
+to import the model), but if you ever add code that needs both in the
+same file, you'll need an import alias (`use App\Models\Route as
+DeliveryRoute;` or similar).

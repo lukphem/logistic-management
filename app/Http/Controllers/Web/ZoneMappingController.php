@@ -55,6 +55,15 @@ class ZoneMappingController extends Controller
      * don't already exist, never touching zones already assigned to an
      * existing pair.
      */
+    /**
+     * Every newly generated pair is pre-assigned a zone using
+     * ZoneMapping::determineDefaultZoneTier() (same state / same
+     * territory / territory-to-territory with or without an airport on
+     * both sides) — staff can still reassign any individual pair
+     * afterward via the inline picker. Pairs that already exist (already
+     * manually assigned or from a previous generation) are never
+     * touched, regardless of what the rule would now compute for them.
+     */
     public function generateDomestic(): RedirectResponse
     {
         $nigeria = Country::where('code', 'NG')->first();
@@ -63,14 +72,22 @@ class ZoneMappingController extends Controller
             return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
         }
 
-        $stateIds = State::where('country_id', $nigeria->id)->pluck('id')->values()->all();
+        $states = State::where('country_id', $nigeria->id)->get()->values();
+        $defaultZones = Zone::ensureDefaultZones();
         $created = 0;
 
-        for ($i = 0; $i < count($stateIds); $i++) {
-            for ($j = $i + 1; $j < count($stateIds); $j++) {
-                [$a, $b] = $stateIds[$i] < $stateIds[$j] ? [$stateIds[$i], $stateIds[$j]] : [$stateIds[$j], $stateIds[$i]];
+        for ($i = 0; $i < $states->count(); $i++) {
+            for ($j = $i + 1; $j < $states->count(); $j++) {
+                $stateA = $states[$i];
+                $stateB = $states[$j];
+                [$a, $b] = $stateA->id < $stateB->id ? [$stateA->id, $stateB->id] : [$stateB->id, $stateA->id];
 
-                $mapping = ZoneMapping::firstOrCreate(['state_a_id' => $a, 'state_b_id' => $b]);
+                $tier = ZoneMapping::determineDefaultZoneTier($stateA, $stateB);
+
+                $mapping = ZoneMapping::firstOrCreate(
+                    ['state_a_id' => $a, 'state_b_id' => $b],
+                    ['zone_id' => $defaultZones[$tier]->id]
+                );
                 $created += $mapping->wasRecentlyCreated ? 1 : 0;
             }
         }

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\City;
 use App\Models\District;
 use App\Models\OnforwardingClassification;
+use App\Models\Route;
 use App\Models\State;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ class DistrictController extends Controller
             'district' => new District(),
             'cities' => City::with('state.country')->orderBy('name')->get(),
             'classifications' => OnforwardingClassification::orderBy('name')->get(),
+            'routes' => Route::orderBy('name')->get(),
         ]);
     }
 
@@ -56,6 +58,7 @@ class DistrictController extends Controller
             'district' => $district,
             'cities' => City::with('state.country')->orderBy('name')->get(),
             'classifications' => OnforwardingClassification::orderBy('name')->get(),
+            'routes' => Route::orderBy('name')->get(),
         ]);
     }
 
@@ -85,17 +88,20 @@ class DistrictController extends Controller
                     ->ignore($ignoreId),
             ],
             'onforwarding_classification_id' => 'nullable|exists:onforwarding_classifications,id',
+            'route_id' => 'nullable|exists:routes,id',
             'postal_code' => 'nullable|string|max:20',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
 
-        // Blank "No classification" option submits as an empty string,
-        // not null — normalize immediately, the same class of bug fixed
-        // in Increment 20.
-        if (($data['onforwarding_classification_id'] ?? null) === '') {
-            $data['onforwarding_classification_id'] = null;
+        // Blank "No classification"/"No route" options submit as an
+        // empty string, not null — normalize immediately, the same
+        // class of bug fixed in Increment 20.
+        foreach (['onforwarding_classification_id', 'route_id'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
         }
 
         return $data;

@@ -9,11 +9,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class State extends Model
 {
-    protected $fillable = ['country_id', 'name', 'short_code', 'code', 'postal_code'];
+    protected $fillable = ['country_id', 'territory_id', 'has_airport', 'name', 'short_code', 'code', 'postal_code'];
+
+    protected $casts = ['has_airport' => 'boolean'];
 
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
+    }
+
+    public function territory(): BelongsTo
+    {
+        return $this->belongsTo(Territory::class);
     }
 
     public function cities(): HasMany

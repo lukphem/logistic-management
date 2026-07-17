@@ -46,4 +46,36 @@ class ZoneMapping extends Model
 
         return static::where('state_a_id', $a)->where('state_b_id', $b)->first()?->zone;
     }
+
+    /**
+     * The default domestic zone tier for a state pair, before any manual
+     * override. Checked in this order:
+     *
+     *  1 — same state
+     *  2 — different states, same territory
+     *  3 — different territories, both states have an airport
+     *  4 — different territories, at least one state has no airport
+     *
+     * This is only ever a STARTING POINT — ZoneMappingController::generateDomestic()
+     * uses it to pre-fill newly generated pairs, and any individual pair
+     * can still be reassigned to a different zone afterward via the
+     * normal inline picker on the Zone Mapping screen. Recomputing this
+     * never touches a pair that's already been assigned.
+     */
+    public static function determineDefaultZoneTier(State $stateA, State $stateB): int
+    {
+        if ($stateA->id === $stateB->id) {
+            return 1;
+        }
+
+        if ($stateA->territory_id && $stateA->territory_id === $stateB->territory_id) {
+            return 2;
+        }
+
+        if ($stateA->has_airport && $stateB->has_airport) {
+            return 3;
+        }
+
+        return 4;
+    }
 }

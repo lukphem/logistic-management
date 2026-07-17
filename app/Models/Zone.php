@@ -62,4 +62,38 @@ class Zone extends Model
     {
         return self::TYPES[$this->type] ?? ucfirst($this->type);
     }
+
+    /**
+     * The 4 standard domestic zones the tier rule
+     * (ZoneMapping::determineDefaultZoneTier) assigns generated state
+     * pairs into — created once, reused every time
+     * ZoneMappingController::generateDomestic() runs. Returns them keyed
+     * by tier (1–4) for easy lookup.
+     *
+     * @return array<int, Zone>
+     */
+    public static function ensureDefaultZones(): array
+    {
+        $definitions = [
+            1 => ['name' => 'Zone 1', 'code' => 'Z1', 'coverage' => 'Same state'],
+            2 => ['name' => 'Zone 2', 'code' => 'Z2', 'coverage' => 'Same territory, different state'],
+            3 => ['name' => 'Zone 3', 'code' => 'Z3', 'coverage' => 'Territory to territory, both states have an airport'],
+            4 => ['name' => 'Zone 4', 'code' => 'Z4', 'coverage' => 'Territory to territory, at least one state without an airport'],
+        ];
+
+        $zones = [];
+
+        foreach ($definitions as $tier => $definition) {
+            $zones[$tier] = self::firstOrCreate(
+                ['name' => $definition['name']],
+                [
+                    'code' => $definition['code'],
+                    'type' => 'domestic',
+                    'coverage_description' => $definition['coverage'],
+                ]
+            );
+        }
+
+        return $zones;
+    }
 }
