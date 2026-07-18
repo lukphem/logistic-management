@@ -25,6 +25,7 @@
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Code</th>
                     <th class="px-5 py-3 font-medium">Billing model</th>
+                    <th class="px-5 py-3 font-medium">Route type</th>
                     <th class="px-5 py-3 font-medium">Status</th>
                     <th class="px-5 py-3"></th>
                 </tr>
@@ -35,6 +36,7 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $serviceType->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $serviceType->code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ \App\Models\Setting::BILLING_MODELS[$serviceType->billing_model] ?? '—' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $serviceType->route_type ? ucfirst($serviceType->route_type) . ' only' : 'Both' }}</td>
                         <td class="px-5 py-3">
                             @if ($serviceType->is_active)
                                 <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-2.5 py-0.5 text-xs font-medium text-status-delivered">Active</span>
@@ -51,7 +53,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No service types configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No service types configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

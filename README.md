@@ -2606,3 +2606,42 @@ resources/views/rate-checker/index.blade.php   (rebuilt: Billing Model/Route Typ
 ```
 
 No migration needed.
+
+## Increment 47 — Route Type Now Actually Restricts Service Type
+
+Closes the gap flagged at the end of Increment 46: Route Type controlled
+which *fields* showed on the Rate Checker, but didn't actually filter
+which *service types* were selectable — only Billing Model did.
+
+`service_types.route_type` (nullable enum: `domestic`, `international`)
+— a deliberate restriction on the service type's own definition (e.g.
+an "International Express" service that shouldn't appear for domestic
+bookings). Nullable means "offered for both," the default, so every
+existing service type keeps working exactly as before until someone
+deliberately restricts one.
+
+This is a different kind of field from `shipments.shipping_type`
+(Increment 44) — that one is never manually picked, auto-derived per
+shipment from the resolved zone. This one is a one-time configuration
+choice on the service type itself, made by whoever manages Service
+Types, same as any other setup field.
+
+Rate Checker's filter now checks both conditions together — a service
+type only shows when it matches the selected Billing Model **and** the
+selected Route Type. Switching either one re-filters live.
+
+### Files
+
+```
+database/migrations/2026_01_31_000001_add_route_type_to_service_types_table.php
+app/Models/ServiceType.php   (route_type)
+app/Http/Controllers/Web/ServiceTypeController.php   (route_type validation)
+resources/views/service-types/form.blade.php, index.blade.php   (field + column)
+resources/views/rate-checker/index.blade.php   (filterServiceTypes() checks both billing model and route type)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

@@ -55,6 +55,7 @@ class ServiceTypeController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:service_types,code,' . $ignoreId,
             'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
+            'route_type' => 'nullable|in:domestic,international',
             'is_active' => 'sometimes|boolean',
         ]);
 
@@ -64,6 +65,9 @@ class ServiceTypeController extends Controller
 
         if (($data['billing_model'] ?? null) === '') {
             $data['billing_model'] = null;
+        }
+        if (($data['route_type'] ?? null) === '') {
+            $data['route_type'] = null;
         }
 
         return $data;

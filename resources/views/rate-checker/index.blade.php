@@ -23,13 +23,13 @@
                 <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                     <input type="radio" name="route_type" value="domestic" id="route-domestic"
                            @checked(request('route_type', 'domestic') === 'domestic')
-                           onchange="document.getElementById('domestic-fields').style.display=''; document.getElementById('international-fields').style.display='none';">
+                           onchange="document.getElementById('domestic-fields').style.display=''; document.getElementById('international-fields').style.display='none'; filterServiceTypes();">
                     Domestic
                 </label>
                 <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                     <input type="radio" name="route_type" value="international" id="route-international"
                            @checked(request('route_type') === 'international')
-                           onchange="document.getElementById('domestic-fields').style.display='none'; document.getElementById('international-fields').style.display='';">
+                           onchange="document.getElementById('domestic-fields').style.display='none'; document.getElementById('international-fields').style.display=''; filterServiceTypes();">
                     International
                 </label>
             </div>
@@ -40,7 +40,7 @@
             <select id="service-type" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">Select a service type</option>
                 @foreach ($serviceTypes as $serviceType)
-                    <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
+                    <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
                 @endforeach
             </select>
         </div>
@@ -161,21 +161,29 @@
     @endif
 
     <script>
-        (function () {
-            const billingModelSelect = document.getElementById('billing-model');
-            const serviceTypeSelect = document.getElementById('service-type');
-            const serviceTypeOptions = Array.from(serviceTypeSelect.options).slice(1);
+        const billingModelSelect = document.getElementById('billing-model');
+        const serviceTypeSelect = document.getElementById('service-type');
+        const serviceTypeOptions = Array.from(serviceTypeSelect.options).slice(1);
 
-            billingModelSelect.addEventListener('change', function () {
-                const chosen = billingModelSelect.value;
-                serviceTypeOptions.forEach(function (option) {
-                    option.hidden = chosen !== '' && option.dataset.billingModel !== chosen;
-                });
-                if (serviceTypeSelect.selectedOptions[0]?.hidden) {
-                    serviceTypeSelect.value = '';
-                }
+        function filterServiceTypes() {
+            const chosenModel = billingModelSelect.value;
+            const chosenRoute = document.querySelector('input[name="route_type"]:checked')?.value || 'domestic';
+
+            serviceTypeOptions.forEach(function (option) {
+                const modelMatches = chosenModel === '' || option.dataset.billingModel === chosenModel;
+                const routeMatches = option.dataset.routeType === '' || option.dataset.routeType === chosenRoute;
+                option.hidden = !(modelMatches && routeMatches);
             });
 
+            if (serviceTypeSelect.selectedOptions[0]?.hidden) {
+                serviceTypeSelect.value = '';
+            }
+        }
+
+        billingModelSelect.addEventListener('change', filterServiceTypes);
+        filterServiceTypes();
+
+        (function () {
             const citiesByState = @json($cities->groupBy('state_id')->map->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]));
             const districtsByCity = @json($districts->groupBy('city_id')->map->map(fn ($d) => ['id' => $d->id, 'name' => $d->name]));
 
