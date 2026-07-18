@@ -24,27 +24,16 @@ class Setting extends Model
     ];
 
     /**
-     * The fixed catalog of known billing-model TYPES — a reference list
-     * only. No calculation logic exists behind any of these right now;
-     * the whole billing-model layer (RateCard, RateEngine, and every
-     * per-model rate table) was cleared to be rebuilt one model at a
-     * time, each discussed and configured deliberately. This list is
-     * step one of that: pick which of these the business actually uses
-     * (supported_billing_models below) before any of them get built.
+     * The catalog of billing-model TYPES the system actually supports —
+     * starts EMPTY on purpose. Nothing goes in here until it's been
+     * built: its configuration screen, its rate table (if it needs one),
+     * and its real calculation logic, one model at a time. Add an entry
+     * here only as the last step of actually building that model — never
+     * ahead of it, since a name sitting in this list implies it's usable
+     * when it isn't yet.
      */
     public const BILLING_MODELS = [
-        'flat' => 'Flat Rate',
-        'distance' => 'Distance-Based',
-        'weight' => 'Weight-Based',
-        'zone_to_zone' => 'Zone-to-Zone — fixed price per zone pair',
-        'origin_destination_weight' => 'Origin-Destination — weight bands + service type',
-        'volumetric' => 'Volumetric/Dimensional',
-        'hybrid' => 'Hybrid (Base + Distance + Weight)',
-        'service_multiplier' => 'Service-Type Multiplier',
-        'time_surcharge' => 'Time-Based Surcharge',
-        'contract' => 'Client-Specific Contract Rate',
-        'truckload' => 'Truckload (Flat Rate per Truck)',
-        'carton_rate' => 'Carton Rate — by zone + carton size',
+        // e.g. 'flat' => 'Flat Rate', — added here once actually built.
     ];
 
     /**

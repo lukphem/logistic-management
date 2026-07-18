@@ -2330,3 +2330,30 @@ resources/views/rate-cards/
 ```powershell
 php artisan migrate
 ```
+
+## Increment 42 — Billing Model Catalog Starts Empty
+
+Corrects Increment 41's reference list: `Setting::BILLING_MODELS` had all
+12 known model names pre-listed (unchecked, but still visibly present)
+even though none of them had been built yet — misleading, since a name
+sitting in that list implies it's usable.
+
+`Setting::BILLING_MODELS` is now genuinely empty. It gains an entry only
+as the **last step** of actually building that model — its config
+screen, its rate table if it needs one, and its real calculation logic —
+never ahead of that work. The Company Settings checklist now shows "No
+billing models have been built yet" instead of a blank grid when the
+catalog is empty, and will show real checkboxes only for models that
+have actually been completed.
+
+Next model discussed and picked gets added here as part of building it —
+not before.
+
+### Files
+
+```
+app/Models/Setting.php   (BILLING_MODELS emptied)
+resources/views/settings/edit.blade.php   (empty-state message)
+```
+
+No migration needed.
