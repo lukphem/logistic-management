@@ -21,7 +21,7 @@ class StandardBillingController extends Controller
 
     public function index(): View
     {
-        $tariffs = StandardBillingTariff::with('serviceType')->withCount('zonePrices')
+        $tariffs = StandardBillingTariff::with(['serviceType', 'zonePrices.zone'])
             ->orderBy('service_type_id')->orderBy('min_weight')->paginate(15);
 
         return view('standard-billing.index', compact('tariffs'));

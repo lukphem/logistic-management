@@ -2942,3 +2942,28 @@ resources/views/standard-billing/index.blade.php  (combined CSV note + link to a
 ```
 
 No migration, no controller changes.
+
+## Increment 56 — Standard Billing List Shows Full Zone Price Detail
+
+Previously the list showed one row per tariff with just a "Zones
+priced" count — seeing the actual charges meant clicking into Edit for
+every single one. Now it shows one row per zone price, with the
+tariff's own columns (Service Type, Weight Band, Additional Weight,
+Status, Actions) spanning across all of that tariff's rows via
+`rowspan`, so the shared context isn't repeated but every individual
+zone's Charge/Additional Charge/Transit Days is visible directly —
+matching the same shape as the combined CSV export, just rendered as a
+table instead of a file.
+
+A tariff with no zone prices yet still gets its own row (with
+"No zone prices set yet" where the zone columns would be), so it isn't
+dropped from the list just for being incomplete.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (index() eager-loads zonePrices.zone instead of just a count)
+resources/views/standard-billing/index.blade.php   (one row per zone price, tariff columns spanned via rowspan)
+```
+
+No migration needed.
