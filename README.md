@@ -3032,3 +3032,71 @@ resources/views/rate-checker/index.blade.php   (wireCascade() rebuilt to restore
 ```
 
 No migration, no controller changes.
+
+## Increment 59 — Rate Checker Promoted, Gated by Billing Model, Additional Services
+
+Four related changes requested together.
+
+### Rate Checker moved to the main nav
+
+Now sits at the top level alongside Dashboard and Shipments, not nested
+inside Setups → Billing — it's a tool staff reach for directly, not a
+setup screen.
+
+### The form is gated behind Billing Model
+
+Previously Route Type, Service Type, and every location/weight field
+showed immediately. Now **nothing else appears until a Billing Model is
+picked** — different models will need entirely different fields
+(Standard Billing needs origin/destination/weight; a future flat-rate
+or contract model might need none of that), so showing form fields
+before that choice is made doesn't make sense. Picking a model that
+isn't built yet (anything other than `standard_billing`, currently the
+only one) shows a plain "hasn't been built yet" message instead of a
+form that can't work. This scales automatically — a future model just
+needs adding to the `implementedModels` list once it's actually built.
+
+Also fixed while rebuilding this: Service Type is now filtered by
+**both** Billing Model and Route Type together (previously only Route
+Type), so it can't show a service type that doesn't actually belong to
+the model just selected.
+
+### The quote now states what was actually asked
+
+The result panel leads with `{service type} · {origin} → {destination}
+· {weight} kg` above the numbers — echoing back Origin, Destination,
+Weight, and Service Type, so the quote is self-contained instead of
+requiring a scroll back up to the form to see what was checked.
+
+### Additional Services — foundation for packaging, etc.
+
+New `additional_services` table (name, price, active) with CRUD at
+**Setups → Billing → Additional Services** — deliberately simple for
+now, a flat price per optional service. Selectable as checkboxes on the
+Rate Checker (and available to real bookings via
+`ShipmentPricingService`, since `additional_service_ids` is just
+another context key), summed and added to the taxable amount the same
+way onforwarding and insurance are — not discounted, but subject to
+VAT. This is explicitly a foundation for later feature work (packaging,
+fragile handling, gift wrapping, etc.), not a complete services
+catalog — start with what's needed and add more as they come up.
+
+### Files
+
+```
+database/migrations/2026_02_01_000001_create_additional_services_table.php
+app/Models/AdditionalService.php
+app/Http/Controllers/Web/AdditionalServiceController.php
+app/Services/ShipmentPricingService.php   (calculateAdditionalServices())
+app/Http/Controllers/Web/RateCheckerController.php   (additional services, echoed quote inputs, billing models list)
+resources/views/additional-services/   (index + form)
+resources/views/rate-checker/index.blade.php   (gated by billing model, additional services checkboxes, quote header)
+resources/views/components/layouts/app.blade.php   (Rate Checker to top-level nav, Additional Services to Billing submenu)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

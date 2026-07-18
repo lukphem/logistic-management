@@ -38,9 +38,10 @@ class ShipmentPricingService
         $discountedFreight = ($baseAmount + $surchargeAmount) - $discountAmount;
         $insuranceAmount = $this->calculateInsurance($context);
         $onforwardingAmount = $this->calculateOnforwarding($context);
+        $additionalServicesAmount = $this->calculateAdditionalServices($context);
 
         $vatPercentage = (float) ($context['vat_percentage'] ?? config('branding.vat_percentage', 0));
-        $taxableAmount = $discountedFreight + $insuranceAmount + $onforwardingAmount;
+        $taxableAmount = $discountedFreight + $insuranceAmount + $onforwardingAmount + $additionalServicesAmount;
         $vatAmount = round($taxableAmount * ($vatPercentage / 100), 2);
 
         $total = round($taxableAmount + $vatAmount, 2);
@@ -49,6 +50,7 @@ class ShipmentPricingService
             'base_amount' => round($baseAmount, 2),
             'surcharge_amount' => round($surchargeAmount, 2),
             'onforwarding_amount' => round($onforwardingAmount, 2),
+            'additional_services_amount' => round($additionalServicesAmount, 2),
             'discount_amount' => $discountAmount,
             'insurance_amount' => round($insuranceAmount, 2),
             'vat_amount' => $vatAmount,
@@ -66,6 +68,24 @@ class ShipmentPricingService
         }
 
         return $total;
+    }
+
+    /**
+     * Optional add-ons (packaging, fragile handling, etc.) — pass
+     * whichever AdditionalService IDs were selected via
+     * $context['additional_service_ids']. Same treatment as insurance
+     * and onforwarding: a real extra service, not part of the
+     * negotiated freight rate, so never discounted but still taxable.
+     */
+    private function calculateAdditionalServices(array $context): float
+    {
+        $ids = $context['additional_service_ids'] ?? [];
+
+        if (empty($ids)) {
+            return 0.0;
+        }
+
+        return (float) \App\Models\AdditionalService::whereIn('id', $ids)->where('is_active', true)->sum('price');
     }
 
     private function calculateInsurance(array $context): float

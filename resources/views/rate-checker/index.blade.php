@@ -7,115 +7,139 @@
 
     <form method="GET" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Billing model</label>
-            <select id="billing-model" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <option value="">All</option>
-                @foreach (\App\Models\Setting::BILLING_MODELS as $key => $label)
-                    <option value="{{ $key }}">{{ $label }}</option>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <x-required /></label>
+            <select id="billing-model" name="billing_model" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">Select a billing model</option>
+                @foreach ($billingModels as $key => $label)
+                    <option value="{{ $key }}" @selected(request('billing_model') === $key)>{{ $label }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-xs text-ink-500">Narrows the service types below to ones using this model.</p>
+            <p class="mt-1 text-xs text-ink-500">The rest of this form depends on which model is picked — different models need different fields.</p>
         </div>
 
-        <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Route type</label>
-            <div class="flex gap-3">
-                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                    <input type="radio" name="route_type" value="domestic" id="route-domestic"
-                           @checked(request('route_type', 'domestic') === 'domestic')
-                           onchange="document.getElementById('domestic-fields').style.display=''; document.getElementById('international-fields').style.display='none'; filterServiceTypes();">
-                    Domestic
-                </label>
-                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                    <input type="radio" name="route_type" value="international" id="route-international"
-                           @checked(request('route_type') === 'international')
-                           onchange="document.getElementById('domestic-fields').style.display='none'; document.getElementById('international-fields').style.display=''; filterServiceTypes();">
-                    International
-                </label>
+        <div id="model-not-implemented" class="hidden rounded-md border border-dashed border-line p-4 text-sm text-ink-500">
+            This billing model hasn't been built yet — nothing to check a rate against.
+        </div>
+
+        <div id="model-fields" class="hidden space-y-4">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Route type</label>
+                <div class="flex gap-3">
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="route_type" value="domestic" id="route-domestic"
+                               @checked(request('route_type', 'domestic') === 'domestic')
+                               onchange="document.getElementById('domestic-fields').style.display=''; document.getElementById('international-fields').style.display='none'; filterServiceTypes();">
+                        Domestic
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="route_type" value="international" id="route-international"
+                               @checked(request('route_type') === 'international')
+                               onchange="document.getElementById('domestic-fields').style.display='none'; document.getElementById('international-fields').style.display=''; filterServiceTypes();">
+                        International
+                    </label>
+                </div>
             </div>
-        </div>
 
-        <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
-            <select id="service-type" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <option value="">Select a service type</option>
-                @foreach ($serviceTypes as $serviceType)
-                    <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
-                @endforeach
-            </select>
-        </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
+                <select id="service-type" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    <option value="">Select a service type</option>
+                    @foreach ($serviceTypes as $serviceType)
+                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
+                    @endforeach
+                </select>
+            </div>
 
-        <div id="domestic-fields" class="space-y-4" style="{{ request('route_type') === 'international' ? 'display:none' : '' }}">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div id="domestic-fields" class="space-y-4" style="{{ request('route_type') === 'international' ? 'display:none' : '' }}">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin state</label>
+                        <select id="origin-state" name="origin_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a state</option>
+                            @foreach ($states as $state)
+                                <option value="{{ $state->id }}" @selected(request('origin_state_id') == $state->id)>{{ $state->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin city</label>
+                        <select id="origin-city" name="origin_city_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a city</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin district <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                        <select id="origin-district" name="origin_district_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a district</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination state</label>
+                        <select id="destination-state" name="destination_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a state</option>
+                            @foreach ($states as $state)
+                                <option value="{{ $state->id }}" @selected(request('destination_state_id') == $state->id)>{{ $state->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination city</label>
+                        <select id="destination-city" name="destination_city_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a city</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination district <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                        <select id="destination-district" name="destination_district_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a district</option>
+                        </select>
+                    </div>
+                </div>
+                <p class="text-xs text-ink-500">District is only needed to preview an onforwarding surcharge tied to a specific district rather than the whole city.</p>
+            </div>
+
+            <div id="international-fields" style="{{ request('route_type') !== 'international' ? 'display:none' : '' }}">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
+                <select name="destination_country_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    <option value="">Select a country</option>
+                    @foreach ($countries as $country)
+                        <option value="{{ $country->id }}" @selected(request('destination_country_id') == $country->id)>{{ $country->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Weight (kg) <x-required /></label>
+                <input type="number" step="0.01" min="0" name="weight_kg" value="{{ request('weight_kg') }}"
+                       class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            </div>
+
+            @if ($additionalServices->isNotEmpty())
                 <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin state</label>
-                    <select id="origin-state" name="origin_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a state</option>
-                        @foreach ($states as $state)
-                            <option value="{{ $state->id }}" @selected(request('origin_state_id') == $state->id)>{{ $state->name }}</option>
+                    <label class="mb-2 block text-sm font-medium text-ink-900">Additional services <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        @php $selectedServices = (array) request('additional_service_ids', []); @endphp
+                        @foreach ($additionalServices as $service)
+                            <label class="flex items-center justify-between gap-2 rounded-lg border border-line p-2.5 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                <span class="flex items-center gap-2">
+                                    <input type="checkbox" name="additional_service_ids[]" value="{{ $service->id }}" @checked(in_array((string) $service->id, $selectedServices)) class="rounded border-line">
+                                    {{ $service->name }}
+                                </span>
+                                <span class="font-mono text-xs text-ink-500">+{{ number_format($service->price, 2) }}</span>
+                            </label>
                         @endforeach
-                    </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin city</label>
-                    <select id="origin-city" name="origin_city_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a city</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin district <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <select id="origin-district" name="origin_district_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a district</option>
-                    </select>
-                </div>
+            @endif
+
+            <div class="flex justify-end pt-2">
+                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                    Check rate
+                </button>
             </div>
-
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Destination state</label>
-                    <select id="destination-state" name="destination_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a state</option>
-                        @foreach ($states as $state)
-                            <option value="{{ $state->id }}" @selected(request('destination_state_id') == $state->id)>{{ $state->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Destination city</label>
-                    <select id="destination-city" name="destination_city_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a city</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Destination district <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <select id="destination-district" name="destination_district_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select a district</option>
-                    </select>
-                </div>
-            </div>
-            <p class="text-xs text-ink-500">District is only needed to preview an onforwarding surcharge tied to a specific district rather than the whole city.</p>
-        </div>
-
-        <div id="international-fields" style="{{ request('route_type') !== 'international' ? 'display:none' : '' }}">
-            <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
-            <select name="destination_country_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <option value="">Select a country</option>
-                @foreach ($countries as $country)
-                    <option value="{{ $country->id }}" @selected(request('destination_country_id') == $country->id)>{{ $country->name }}</option>
-                @endforeach
-            </select>
-        </div>
-
-        <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Weight (kg) <x-required /></label>
-            <input type="number" step="0.01" min="0" name="weight_kg" value="{{ request('weight_kg') }}"
-                   class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-        </div>
-
-        <div class="flex justify-end pt-2">
-            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
-                Check rate
-            </button>
         </div>
     </form>
 
@@ -126,7 +150,10 @@
         </div>
     @elseif ($result)
         <div class="mt-6 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-            <p class="mb-4 text-sm font-semibold text-ink-900">Quote</p>
+            <p class="mb-1 text-sm font-semibold text-ink-900">Quote</p>
+            <p class="mb-4 text-sm text-ink-500">
+                {{ $result['service_type_name'] }} · {{ $result['origin_label'] ?? '—' }} → {{ $result['destination_label'] ?? '—' }} · {{ rtrim(rtrim(number_format($result['weight_kg'], 2), '0'), '.') }} kg
+            </p>
             <dl class="mb-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                 <div>
                     <dt class="text-ink-500">Zone</dt>
@@ -147,6 +174,9 @@
                 @if ($result['onforwarding_amount'] > 0)
                     <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($result['onforwarding_amount'], 2) }}</dd></div>
                 @endif
+                @if ($result['additional_services_amount'] > 0)
+                    <div class="flex justify-between"><dt class="text-ink-500">Additional services</dt><dd class="font-mono text-ink-900">{{ number_format($result['additional_services_amount'], 2) }}</dd></div>
+                @endif
                 @if ($result['discount_amount'] > 0)
                     <div class="flex justify-between"><dt class="text-ink-500">Discount</dt><dd class="font-mono text-status-delivered">−{{ number_format($result['discount_amount'], 2) }}</dd></div>
                 @endif
@@ -162,6 +192,32 @@
 
     <script>
         const billingModelSelect = document.getElementById('billing-model');
+        const modelFields = document.getElementById('model-fields');
+        const modelNotImplemented = document.getElementById('model-not-implemented');
+        // Only 'standard_billing' has a real form right now — every other
+        // billing model shows the "not built yet" message instead, since
+        // the fields a future model needs could be completely different.
+        const implementedModels = ['standard_billing'];
+
+        function syncModelSection() {
+            const chosen = billingModelSelect.value;
+
+            if (!chosen) {
+                modelFields.classList.add('hidden');
+                modelNotImplemented.classList.add('hidden');
+            } else if (implementedModels.includes(chosen)) {
+                modelFields.classList.remove('hidden');
+                modelNotImplemented.classList.add('hidden');
+            } else {
+                modelFields.classList.add('hidden');
+                modelNotImplemented.classList.remove('hidden');
+            }
+
+            filterServiceTypes();
+        }
+
+        billingModelSelect.addEventListener('change', syncModelSection);
+
         const serviceTypeSelect = document.getElementById('service-type');
         const serviceTypeOptions = Array.from(serviceTypeSelect.options).slice(1);
 
@@ -180,8 +236,7 @@
             }
         }
 
-        billingModelSelect.addEventListener('change', filterServiceTypes);
-        filterServiceTypes();
+        syncModelSection(); // restores the right section on reload, e.g. after "Check rate"
 
         (function () {
             const citiesByState = @json($cities->groupBy('state_id')->map->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]));

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\Auth\LoginController;
+use App\Http\Controllers\Web\AdditionalServiceController;
 use App\Http\Controllers\Web\CityController;
 use App\Http\Controllers\Web\ClientBillingController;
 use App\Http\Controllers\Web\CountryController;
@@ -164,6 +165,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/standard-billing/export', [StandardBillingController::class, 'exportAll'])->name('standard-billing.export');
         Route::get('/standard-billing/{tariff}/zone-prices/export', [StandardBillingController::class, 'exportZonePrices'])->name('standard-billing.zone-prices.export');
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
+        Route::get('/additional-services', [AdditionalServiceController::class, 'index'])->name('additional-services.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
         Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
@@ -175,6 +177,11 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/service-types/{serviceType}/edit', [ServiceTypeController::class, 'edit'])->name('service-types.edit');
         Route::put('/service-types/{serviceType}', [ServiceTypeController::class, 'update'])->name('service-types.update');
         Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy'])->name('service-types.destroy');
+        Route::get('/additional-services/create', [AdditionalServiceController::class, 'create'])->name('additional-services.create');
+        Route::post('/additional-services', [AdditionalServiceController::class, 'store'])->name('additional-services.store');
+        Route::get('/additional-services/{additionalService}/edit', [AdditionalServiceController::class, 'edit'])->name('additional-services.edit');
+        Route::put('/additional-services/{additionalService}', [AdditionalServiceController::class, 'update'])->name('additional-services.update');
+        Route::delete('/additional-services/{additionalService}', [AdditionalServiceController::class, 'destroy'])->name('additional-services.destroy');
         Route::get('/standard-billing/create', [StandardBillingController::class, 'create'])->name('standard-billing.create');
         Route::post('/standard-billing', [StandardBillingController::class, 'store'])->name('standard-billing.store');
         Route::post('/standard-billing/import', [StandardBillingController::class, 'importAll'])->name('standard-billing.import');
