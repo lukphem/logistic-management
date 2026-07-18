@@ -72,20 +72,22 @@ class ShipmentPricingService
 
     /**
      * Optional add-ons (packaging, fragile handling, etc.) — pass
-     * whichever AdditionalService IDs were selected via
-     * $context['additional_service_ids']. Same treatment as insurance
+     * whichever AdditionalServiceOption IDs were selected via
+     * $context['additional_service_option_ids']. Each service can have
+     * multiple priced variants (Packaging: Small/Medium/Large Box), so
+     * this sums by OPTION, not by service. Same treatment as insurance
      * and onforwarding: a real extra service, not part of the
      * negotiated freight rate, so never discounted but still taxable.
      */
     private function calculateAdditionalServices(array $context): float
     {
-        $ids = $context['additional_service_ids'] ?? [];
+        $ids = $context['additional_service_option_ids'] ?? [];
 
         if (empty($ids)) {
             return 0.0;
         }
 
-        return (float) \App\Models\AdditionalService::whereIn('id', $ids)->where('is_active', true)->sum('price');
+        return (float) \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)->sum('price');
     }
 
     private function calculateInsurance(array $context): float

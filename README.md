@@ -3100,3 +3100,57 @@ routes/web.php
 ```powershell
 php artisan migrate
 ```
+
+## Increment 60 — Additional Services Restructured: Service → Priced Options
+
+Corrects Increment 59: "Packaging" isn't one flat price — it has
+different types (Small Box, Medium Box, Large Box, Envelope), each
+priced differently. `additional_services` is now the category/name
+only; price moved to a new child table, `additional_service_options`,
+one row per variant.
+
+A service with just one real variant still just needs one option — this
+doesn't force every service to have multiple types, "Fragile Handling"
+can be a single "Standard" option, while "Packaging" has several.
+
+### Building it right this time
+
+The Service + Options form applies the `old()`-preservation lesson from
+Increment 57 **from the start**, rather than needing a follow-up fix —
+one unified form (name, active, repeatable option rows), same
+id-based create/update/delete pattern as Standard Billing's zone
+prices: a row with its id present + Price filled updates it, id present
++ blank Price deletes it, no id + filled creates a new one, and an
+option removed client-side never reaches the request at all.
+
+### Selecting on the Rate Checker
+
+Each service now shows as its own row with a dropdown of its options
+(including "None"), rather than a flat list of checkboxes — you pick
+which *type* of Packaging, not just whether Packaging applies.
+`ShipmentPricingService::calculateAdditionalServices()` now sums by
+`additional_service_option_ids`, not service IDs directly.
+
+### Files
+
+```
+database/migrations/2026_02_02_000001_restructure_additional_services_with_options.php
+app/Models/AdditionalService.php   (options() relation, price removed)
+app/Models/AdditionalServiceOption.php   (new)
+app/Http/Controllers/Web/AdditionalServiceController.php   (rewritten: unified Service+Options form)
+app/Services/ShipmentPricingService.php   (sums by option IDs)
+app/Http/Controllers/Web/RateCheckerController.php   (loads services with their active options)
+resources/views/additional-services/form.blade.php, index.blade.php
+resources/views/rate-checker/index.blade.php   (per-service option dropdown instead of flat checkboxes)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Note: any Additional Service created under the old flat-price design
+(Increment 59) had its price column dropped by this migration — if you
+created any test data there, re-enter it as a named option (e.g. a
+"Standard" option) under the same service after migrating.

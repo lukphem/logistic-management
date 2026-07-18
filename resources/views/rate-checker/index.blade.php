@@ -120,16 +120,21 @@
             @if ($additionalServices->isNotEmpty())
                 <div>
                     <label class="mb-2 block text-sm font-medium text-ink-900">Additional services <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        @php $selectedServices = (array) request('additional_service_ids', []); @endphp
+                    <div class="space-y-2">
+                        @php $selectedOptions = (array) request('additional_service_option_ids', []); @endphp
                         @foreach ($additionalServices as $service)
-                            <label class="flex items-center justify-between gap-2 rounded-lg border border-line p-2.5 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                                <span class="flex items-center gap-2">
-                                    <input type="checkbox" name="additional_service_ids[]" value="{{ $service->id }}" @checked(in_array((string) $service->id, $selectedServices)) class="rounded border-line">
-                                    {{ $service->name }}
-                                </span>
-                                <span class="font-mono text-xs text-ink-500">+{{ number_format($service->price, 2) }}</span>
-                            </label>
+                            @php
+                                $selectedForThisService = collect($service->options)->first(fn ($o) => in_array((string) $o->id, $selectedOptions));
+                            @endphp
+                            <div class="grid grid-cols-[1fr_1fr] items-center gap-2 rounded-lg border border-line p-2.5">
+                                <span class="text-sm text-ink-900">{{ $service->name }}</span>
+                                <select name="additional_service_option_ids[]" class="rounded-md border border-line px-2 py-1.5 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">None</option>
+                                    @foreach ($service->options as $option)
+                                        <option value="{{ $option->id }}" @selected($selectedForThisService?->id === $option->id)>{{ $option->name }} (+{{ number_format($option->price, 2) }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         @endforeach
                     </div>
                 </div>

@@ -59,7 +59,7 @@ class RateCheckerController extends Controller
                     'origin_district_id' => $request->filled('origin_district_id') ? $request->integer('origin_district_id') : null,
                     'destination_district_id' => $request->filled('destination_district_id') ? $request->integer('destination_district_id') : null,
                     'destination_country_id' => $request->filled('destination_country_id') ? $request->integer('destination_country_id') : null,
-                    'additional_service_ids' => $request->input('additional_service_ids', []),
+                    'additional_service_option_ids' => $request->input('additional_service_option_ids', []),
                 ];
 
                 $quote = $this->pricingEngine->quote($context);
@@ -96,7 +96,9 @@ class RateCheckerController extends Controller
             'cities' => City::with('state')->orderBy('name')->get(),
             'districts' => District::with('city')->orderBy('name')->get(),
             'countries' => Country::where('code', '!=', 'NG')->orderBy('name')->get(),
-            'additionalServices' => AdditionalService::where('is_active', true)->orderBy('name')->get(),
+            'additionalServices' => AdditionalService::where('is_active', true)
+                ->with(['options' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
+                ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),
         ]);
     }
 

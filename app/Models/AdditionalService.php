@@ -3,13 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AdditionalService extends Model
 {
-    protected $fillable = ['name', 'price', 'is_active'];
+    protected $fillable = ['name', 'is_active'];
 
-    protected $casts = [
-        'price' => 'float',
-        'is_active' => 'boolean',
-    ];
+    protected $casts = ['is_active' => 'boolean'];
+
+    public function options(): HasMany
+    {
+        return $this->hasMany(AdditionalServiceOption::class);
+    }
 }
