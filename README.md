@@ -3154,3 +3154,42 @@ Note: any Additional Service created under the old flat-price design
 (Increment 59) had its price column dropped by this migration — if you
 created any test data there, re-enter it as a named option (e.g. a
 "Standard" option) under the same service after migrating.
+
+## Increment 61 — Same-State Zone Mapping + Territory/Airport Visibility
+
+### Same-state shipments can now be priced at all
+
+Real gap: the domestic generation loop only ever paired two *different*
+states (`for ($j = $i + 1; ...)` structurally can't produce `$i == $j`),
+so a shipment where origin and destination are the same state had no
+zone mapping to resolve against — `PricingEngine` would have thrown
+"can't be rated" for something as basic as a delivery within Lagos.
+
+`generateDomestic()` now also creates one self-pair row per state
+(`state_a_id = state_b_id`) before the cross-state loop runs.
+`ZoneMapping::determineDefaultZoneTier()` already always returned tier 1
+for a state paired with itself (that logic existed since Increment 38)
+— this was purely about the row never getting *created* in the first
+place. `ZoneMapping::resolveZone()`'s normalization already handled
+`stateOneId === stateTwoId` correctly too — nothing needed changing
+there. CSV export/import (Increment 39) needed no changes either — a
+self-pair round-trips through them exactly like any other pair.
+
+### Domestic Mapping table now shows the rule's own inputs
+
+Two new columns: **Same territory** (Yes/No, or "Same state" for a
+self-pair) and **Airport** (Both / neither state / which one
+specifically). These are exactly the two inputs
+`determineDefaultZoneTier()` uses to suggest a default zone — showing
+them lets staff see *why* a pair defaulted to whatever tier it did,
+rather than needing to check each state's own settings separately.
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php   (generateDomestic() also creates self-pairs; index() eager-loads territory)
+resources/views/zone-mappings/index.blade.php   (Same territory + Airport columns)
+```
+
+No migration needed — this increment only changes what gets generated
+and displayed, not the schema.

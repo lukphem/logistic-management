@@ -38,7 +38,7 @@ class ZoneMappingController extends Controller
      */
     public function index(Request $request): View
     {
-        $domesticMappings = ZoneMapping::with(['stateA', 'stateB', 'zone'])
+        $domesticMappings = ZoneMapping::with(['stateA.territory', 'stateB.territory', 'zone'])
             ->orderBy('state_a_id')
             ->orderBy('state_b_id')
             ->paginate(20, ['*'], 'domestic_page');
@@ -62,6 +62,14 @@ class ZoneMappingController extends Controller
      * afterward via the inline picker. Pairs that already exist (already
      * manually assigned or from a previous generation) are never
      * touched, regardless of what the rule would now compute for them.
+     *
+     * Also generates one self-pair per state (state_a_id = state_b_id),
+     * representing a shipment that stays within the same state —
+     * previously impossible to price at all, since the cross-state loop
+     * below only ever pairs two DIFFERENT states and nothing filled the
+     * gap. determineDefaultZoneTier() already always returns tier 1 for
+     * a state paired with itself; this just makes sure that row actually
+     * gets created so it's settable (and resolvable by PricingEngine).
      */
     public function generateDomestic(): RedirectResponse
     {
@@ -74,6 +82,14 @@ class ZoneMappingController extends Controller
         $states = State::where('country_id', $nigeria->id)->get()->values();
         $defaultZones = Zone::ensureDefaultZones();
         $created = 0;
+
+        foreach ($states as $state) {
+            $mapping = ZoneMapping::firstOrCreate(
+                ['state_a_id' => $state->id, 'state_b_id' => $state->id],
+                ['zone_id' => $defaultZones[ZoneMapping::determineDefaultZoneTier($state, $state)]->id]
+            );
+            $created += $mapping->wasRecentlyCreated ? 1 : 0;
+        }
 
         for ($i = 0; $i < $states->count(); $i++) {
             for ($j = $i + 1; $j < $states->count(); $j++) {

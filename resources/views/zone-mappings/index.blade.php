@@ -31,14 +31,44 @@
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">State A</th>
                     <th class="px-5 py-3 font-medium">State B</th>
+                    <th class="px-5 py-3 font-medium">Same territory</th>
+                    <th class="px-5 py-3 font-medium">Airport</th>
                     <th class="px-5 py-3 font-medium">Zone</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse ($domesticMappings as $mapping)
+                    @php
+                        $sameState = $mapping->stateA->id === $mapping->stateB->id;
+                        $sameTerritory = ! $sameState && $mapping->stateA->territory_id && $mapping->stateA->territory_id === $mapping->stateB->territory_id;
+                        $aHasAirport = $mapping->stateA->has_airport;
+                        $bHasAirport = $mapping->stateB->has_airport;
+                    @endphp
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateA->name }}</td>
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->stateB->name }}</td>
+                        <td class="px-5 py-3 text-ink-500">
+                            @if ($sameState)
+                                <span class="text-ink-500">Same state</span>
+                            @elseif ($sameTerritory)
+                                <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-2.5 py-0.5 text-xs font-medium text-status-delivered">Yes</span>
+                            @else
+                                <span class="inline-flex items-center rounded-full bg-ink-500/10 px-2.5 py-0.5 text-xs font-medium text-ink-500">No</span>
+                            @endif
+                        </td>
+                        <td class="px-5 py-3 text-ink-500">
+                            @if ($sameState)
+                                {{ $aHasAirport ? 'Yes' : 'No' }}
+                            @elseif ($aHasAirport && $bHasAirport)
+                                Both
+                            @elseif ($aHasAirport)
+                                {{ $mapping->stateA->name }} only
+                            @elseif ($bHasAirport)
+                                {{ $mapping->stateB->name }} only
+                            @else
+                                Neither
+                            @endif
+                        </td>
                         <td class="px-5 py-3">
                             <form method="POST" action="{{ route('zone-mappings.update-zone', $mapping) }}">
                                 @csrf @method('PATCH')
@@ -53,7 +83,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="px-5 py-8 text-center text-sm text-ink-500">No combinations generated yet — click "Generate Nigeria combinations" above.</td></tr>
+                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No combinations generated yet — click "Generate Nigeria combinations" above.</td></tr>
                 @endforelse
             </tbody>
         </table>
