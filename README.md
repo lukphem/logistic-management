@@ -2433,3 +2433,109 @@ routes/web.php
 ```powershell
 php artisan migrate
 ```
+
+## Increment 44 — Pricing Engine: Standard Billing + Rate Checker
+
+The first real billing model, built exactly per the "Zoning & Standard
+Billing Specification" discussed in chat, plus a model-agnostic quote
+checker on top of it.
+
+### The Pricing Engine
+
+`PricingEngine::quote(array $context): array` — the single entry point
+every quote and booking now goes through. Looks up the requested
+`ServiceType`, dispatches to whichever billing model it's assigned
+(`ServiceType::billing_model`), and returns `base_amount`,
+`transit_days`, `shipping_type`, `zone_id`. Adding a second billing
+model later is one more `match` arm inside it — nothing about its
+contract changes for any caller.
+
+**Never returns a guessed price.** Throws `PricingUnavailableException`
+whenever the service type has no model assigned, the model isn't
+implemented, the route has no zone mapping, or no tariff matches — per
+the spec's explicit rule: *"the shipment should not be rated, and the
+user should receive an error indicating that the route or tariff has
+not been configured."* Every booking endpoint now catches this and
+returns a 422 with that message — no shipment is created.
+
+### Standard Billing — the spec, exactly
+
+- `standard_billing_tariffs` (service_type_id, min_weight, max_weight,
+  additional_weight) — a weight band per service type
+- `tariff_zone_prices` (tariff_id, zone_id, charge, additional_charge,
+  transit_days) — **one row per zone**, not fixed `zone1`..`zoneN`
+  columns, so the number of zones a business has is never a schema
+  concern
+- Overage: weight beyond a tariff's `max_weight` is billed in
+  `additional_weight`-sized increments at the resolved zone's
+  `additional_charge` — the exact formula from the spec, verified
+  against both worked examples in the document
+- If weight exceeds every configured band, the highest band is used as
+  a base with overage still applied — a shipment never fails to price
+  just for being heavier than anticipated
+
+**`shipping_type` is never a manual field**, per your direction — it's
+auto-derived in `PricingEngine::resolveZoneAndType()`: both sides
+resolve to Nigerian cities → domestic (via `ZoneMapping`); either side
+is a foreign country → international (via `ZoneCountryMapping`,
+destination checked first, then origin for inbound). Stamped onto the
+shipment record purely for reporting.
+
+Management screens at **Billing → Standard Billing**: create a tariff,
+then add zone prices to it one at a time, same pattern as the deleted
+`zone_weight_rates` editor.
+
+### Rate Checker
+
+**Billing → Rate Checker** — a form (service type, domestic/international
+toggle, weight) that calls `PricingEngine::quote()` directly and shows
+the result or the exact error a real booking would produce, without
+creating a shipment. Built model-agnostically on purpose: it doesn't
+know anything about Standard Billing specifically, so the moment a
+second billing model exists and a service type is assigned to it, the
+checker prices that too — no changes needed here.
+
+### Every booking endpoint now actually prices
+
+`ClientController::quote()`, `ClientShipmentController::store()`, and
+staff `ShipmentController::store()` all now call `PricingEngine::quote()`
+before `ShipmentPricingService::priceShipment()` — `base_amount` is real
+now, not a placeholder 0. `promised_delivery_at` is derived from the
+returned `transit_days`. All three accept optional
+`origin_country_id`/`destination_country_id` for international routing.
+
+### Files
+
+```
+database/migrations/2026_01_30_000001_add_billing_model_to_service_types_table.php
+database/migrations/2026_01_30_000002_create_standard_billing_tariff_tables.php
+database/migrations/2026_01_30_000003_add_shipping_type_to_shipments_table.php
+app/Models/StandardBillingTariff.php, TariffZonePrice.php
+app/Models/ServiceType.php   (billing_model)
+app/Models/Setting.php   (standard_billing added to BILLING_MODELS)
+app/Models/Shipment.php   (shipping_type)
+app/Services/PricingEngine.php, PricingUnavailableException.php
+app/Http/Controllers/Web/StandardBillingController.php, RateCheckerController.php
+app/Http/Controllers/Web/ServiceTypeController.php   (billing_model field)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php   (PricingEngine wired in)
+resources/views/standard-billing/, rate-checker/
+resources/views/service-types/   (billing_model field/column)
+resources/views/components/layouts/app.blade.php   (nav items)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+### Setup order for a working quote
+
+1. Setups → Billing → Service Types — set a service type's Billing model
+   to "Standard Billing"
+2. Setups → Billing → Zone Mapping — assign zones to state pairs (or
+   countries, for international)
+3. Setups → Billing → Standard Billing — create a tariff for that
+   service type's weight range, then add a price per zone
+4. Setups → Billing → Rate Checker — verify it prices correctly

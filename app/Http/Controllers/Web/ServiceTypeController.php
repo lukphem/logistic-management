@@ -54,12 +54,17 @@ class ServiceTypeController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:service_types,code,' . $ignoreId,
+            'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
             'is_active' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
         $data = $validator->validated();
         $data['is_active'] = $request->boolean('is_active', true);
+
+        if (($data['billing_model'] ?? null) === '') {
+            $data['billing_model'] = null;
+        }
 
         return $data;
     }

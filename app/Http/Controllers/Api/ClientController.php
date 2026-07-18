@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
 use App\Models\ClientWallet;
 use App\Models\Shipment;
+use App\Services\PricingEngine;
+use App\Services\PricingUnavailableException;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,8 +15,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ClientController extends Controller
 {
-    public function __construct(private ShipmentPricingService $pricingService)
-    {
+    public function __construct(
+        private ShipmentPricingService $pricingService,
+        private PricingEngine $pricingEngine,
+    ) {
     }
 
     /**
@@ -22,11 +26,6 @@ class ClientController extends Controller
      * by the client portal (JWT) and external integrators (API key) —
      * see routes/api.php: /client/quote and /integration/quote both point
      * here.
-     *
-     * base_amount is currently always 0 — the billing-model calculation
-     * layer was cleared and is being rebuilt one model at a time (see
-     * ShipmentPricingService). Everything else (discount resolution,
-     * insurance, onforwarding, VAT) already works correctly.
      */
     public function quote(Request $request): JsonResponse
     {
@@ -36,8 +35,10 @@ class ClientController extends Controller
             'destination_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
             'origin_district_id' => 'nullable|exists:districts,id',
+            'origin_country_id' => 'nullable|exists:countries,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',
+            'destination_country_id' => 'nullable|exists:countries,id',
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
             'quantity' => 'nullable|integer|min:1',
@@ -53,13 +54,25 @@ class ClientController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
+        $data = $validator->validated();
+
+        try {
+            $quote = $this->pricingEngine->quote($data);
+        } catch (PricingUnavailableException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $data['base_amount'] = $quote['base_amount'];
+
         $breakdown = $this->pricingService->priceShipment(
-            $validator->validated(),
+            $data,
             ClientBillingProfile::resolveForRequest($request)
         );
 
         return response()->json([
             'service_type_id' => (int) $request->service_type_id,
+            'shipping_type' => $quote['shipping_type'],
+            'transit_days' => $quote['transit_days'],
             ...$breakdown,
         ]);
     }

@@ -26,6 +26,17 @@
                    class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
         </div>
 
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <select name="billing_model" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <option value="">Not set — can't be quoted or booked yet</option>
+                @foreach (\App\Models\Setting::BILLING_MODELS as $key => $label)
+                    <option value="{{ $key }}" @selected(old('billing_model', $serviceType->billing_model) === $key)>{{ $label }}</option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-500">Which calculation model prices shipments booked under this service type.</p>
+        </div>
+
         <label class="flex items-center gap-2 text-sm text-ink-900">
             <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $serviceType->exists ? $serviceType->is_active : true)) class="rounded border-line">
             Active (selectable when booking a shipment)

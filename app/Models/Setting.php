@@ -32,7 +32,7 @@ class Setting extends Model
      * when it isn't yet.
      */
     public const BILLING_MODELS = [
-        // e.g. 'flat' => 'Flat Rate', — added here once actually built.
+        'standard_billing' => 'Standard Billing (Zone + Weight)',
     ];
 
     /**

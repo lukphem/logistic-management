@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
 use App\Models\Shipment;
+use App\Services\PricingEngine;
+use App\Services\PricingUnavailableException;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,8 +14,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ShipmentController extends Controller
 {
-    public function __construct(private ShipmentPricingService $pricingService)
-    {
+    public function __construct(
+        private ShipmentPricingService $pricingService,
+        private PricingEngine $pricingEngine,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -33,8 +37,8 @@ class ShipmentController extends Controller
 
     /**
      * Staff-initiated (walk-in) booking — resolves pricing exactly the
-     * way ClientShipmentController does. base_amount is currently always
-     * 0 — see ShipmentPricingService.
+     * way ClientShipmentController does, and refuses to book (422) the
+     * same way when the route/tariff isn't configured.
      *
      * client_user_id is optional — a walk-in customer may not have a
      * portal account at all. When it IS provided and that client has a
@@ -47,10 +51,23 @@ class ShipmentController extends Controller
     {
         $data = $this->validateShipment($request);
 
+        try {
+            $quote = $this->pricingEngine->quote($data);
+        } catch (PricingUnavailableException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $data['base_amount'] = $quote['base_amount'];
+
         $billingProfile = ClientBillingProfile::resolveForClientUser($data['client_user_id'] ?? null);
         $pricing = $this->pricingService->priceShipment($data, $billingProfile);
 
-        $shipment = Shipment::create([...$data, ...$pricing]);
+        $shipment = Shipment::create([
+            ...$data,
+            'shipping_type' => $quote['shipping_type'],
+            'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
+            ...$pricing,
+        ]);
 
         return response()->json($shipment, 201);
     }
@@ -98,12 +115,14 @@ class ShipmentController extends Controller
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
             'origin_district_id' => 'nullable|exists:districts,id',
+            'origin_country_id' => 'nullable|exists:countries,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'destination_hub_id' => 'nullable|exists:hubs,id',
             'destination_address' => 'required|string',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',
+            'destination_country_id' => 'nullable|exists:countries,id',
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
             'quantity' => 'nullable|integer|min:1',

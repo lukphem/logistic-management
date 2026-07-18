@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\HubController;
 use App\Http\Controllers\Web\InvoiceController;
 use App\Http\Controllers\Web\OnforwardingClassificationController;
 use App\Http\Controllers\Web\OutletController;
+use App\Http\Controllers\Web\RateCheckerController;
 use App\Http\Controllers\Web\RegionController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\RouteController;
@@ -17,6 +18,7 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
+use App\Http\Controllers\Web\StandardBillingController;
 use App\Http\Controllers\Web\StateController;
 use App\Http\Controllers\Web\TerritoryController;
 use App\Http\Controllers\Web\UnitController;
@@ -158,6 +160,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
 
     Route::middleware('can:billing:read')->group(function () {
         Route::get('/service-types', [ServiceTypeController::class, 'index'])->name('service-types.index');
+        Route::get('/standard-billing', [StandardBillingController::class, 'index'])->name('standard-billing.index');
+        Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
         Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
@@ -169,6 +173,13 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/service-types/{serviceType}/edit', [ServiceTypeController::class, 'edit'])->name('service-types.edit');
         Route::put('/service-types/{serviceType}', [ServiceTypeController::class, 'update'])->name('service-types.update');
         Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy'])->name('service-types.destroy');
+        Route::get('/standard-billing/create', [StandardBillingController::class, 'create'])->name('standard-billing.create');
+        Route::post('/standard-billing', [StandardBillingController::class, 'store'])->name('standard-billing.store');
+        Route::get('/standard-billing/{tariff}/edit', [StandardBillingController::class, 'edit'])->name('standard-billing.edit');
+        Route::put('/standard-billing/{tariff}', [StandardBillingController::class, 'update'])->name('standard-billing.update');
+        Route::delete('/standard-billing/{tariff}', [StandardBillingController::class, 'destroy'])->name('standard-billing.destroy');
+        Route::post('/standard-billing/{tariff}/zone-prices', [StandardBillingController::class, 'addZonePrice'])->name('standard-billing.zone-prices.store');
+        Route::delete('/standard-billing/{tariff}/zone-prices/{zonePrice}', [StandardBillingController::class, 'destroyZonePrice'])->name('standard-billing.zone-prices.destroy');
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
         Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
         Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');

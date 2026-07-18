@@ -58,6 +58,8 @@
                         ['label' => 'Zones', 'route' => 'zones.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Onforwarding', 'route' => 'onforwarding-classifications.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Zone Mapping', 'route' => 'zone-mappings.index', 'icon' => 'layers', 'permission' => 'rates:read'],
+                        ['label' => 'Standard Billing', 'route' => 'standard-billing.index', 'icon' => 'sliders', 'permission' => 'billing:read'],
+                        ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
                         ['label' => 'Invoice', 'route' => 'invoices.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Client Billing', 'route' => 'client-billing.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                     ];

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
 use App\Models\Shipment;
+use App\Services\PricingEngine;
+use App\Services\PricingUnavailableException;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,8 +14,10 @@ use Illuminate\Support\Facades\Validator;
 
 class ClientShipmentController extends Controller
 {
-    public function __construct(private ShipmentPricingService $pricingService)
-    {
+    public function __construct(
+        private ShipmentPricingService $pricingService,
+        private PricingEngine $pricingEngine,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -30,7 +34,8 @@ class ClientShipmentController extends Controller
      * key expected via the Idempotency-Key header; enforcement to be added
      * alongside the queue/webhook layer in a later increment).
      *
-     * base_amount is currently always 0 — see ShipmentPricingService.
+     * Refuses to book (422, no shipment created) when the route/tariff
+     * isn't configured — never books at a guessed or zero price.
      */
     public function store(Request $request): JsonResponse
     {
@@ -40,12 +45,14 @@ class ClientShipmentController extends Controller
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
             'origin_district_id' => 'nullable|exists:districts,id',
+            'origin_country_id' => 'nullable|exists:countries,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'destination_hub_id' => 'nullable|exists:hubs,id',
             'destination_address' => 'required|string',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',
+            'destination_country_id' => 'nullable|exists:countries,id',
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
             'quantity' => 'nullable|integer|min:1',
@@ -65,12 +72,21 @@ class ClientShipmentController extends Controller
 
         $data = $validator->validated();
 
+        try {
+            $quote = $this->pricingEngine->quote($data);
+        } catch (PricingUnavailableException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $data['base_amount'] = $quote['base_amount'];
         $pricing = $this->pricingService->priceShipment($data, ClientBillingProfile::resolveForRequest($request));
 
         $shipment = Shipment::create([
             ...$data,
             'client_user_id' => $request->user()?->id,
             'api_client_id' => $request->attributes->get('api_client')?->id,
+            'shipping_type' => $quote['shipping_type'],
+            'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
             ...$pricing,
         ]);
 
