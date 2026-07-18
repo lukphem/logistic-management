@@ -2967,3 +2967,38 @@ resources/views/standard-billing/index.blade.php   (one row per zone price, tari
 ```
 
 No migration needed.
+
+## Increment 57 — Bug Fix: Zone Price Rows Now Preserve Old Input on Validation Failure
+
+Real, confirmed bug: the top-level tariff fields (Service Type, weight
+range, Active) all correctly used Laravel's `old()` helper, but every
+zone-price row field (Zone, Charge, Additional Charge, Transit Days)
+never did. Any validation failure anywhere on the form — including the
+overlap check from Increment 51 — wiped out every zone price that had
+been typed in, forcing a full re-entry.
+
+### The fix
+
+The zone-rows section is now driven by one unified `$rowsToShow` array:
+`old('zone_prices')` when a submission just failed (preserving exactly
+what was typed, including rows added via "+ Add zone" that don't exist
+in the database yet, and correctly handling gaps left by rows removed
+via "Remove" before submitting — HTML form arrays don't renumber
+themselves), falling back to the tariff's actual saved prices on a
+normal page load, falling back further to one blank starter row if
+there's neither.
+
+The "next new row" index is now read from a `data-next-index` attribute
+computed server-side as `max(existing indices) + 1`, rather than a
+simple count — this matters specifically because of the gap-handling
+above: if rows 0 and 2 survive a failed submission (1 was removed
+client-side), the next added row needs to be 3, not "count of visible
+rows."
+
+### Files
+
+```
+resources/views/standard-billing/form.blade.php   (zone-rows section rebuilt around old('zone_prices'), JS reads the next index from a data attribute)
+```
+
+No migration, no controller changes — this was purely a view-layer bug.

@@ -70,66 +70,67 @@
                 <button type="button" id="add-zone-row" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">+ Add zone</button>
             </div>
 
-            @php $existingPrices = $tariff->exists ? $zonePrices : collect(); @endphp
+            @php
+                // On a failed submission, old('zone_prices') has exactly
+                // what was typed — including any rows added via "+ Add
+                // zone" that don't exist in the database yet, and
+                // preserving gaps left by rows removed via "Remove"
+                // before submitting. Without this, every zone price
+                // typed in would be wiped out by any validation error,
+                // anywhere else on the form.
+                $oldZonePrices = old('zone_prices');
 
-            <div id="zone-rows" class="space-y-2">
-                @forelse ($existingPrices as $i => $price)
+                if ($oldZonePrices !== null) {
+                    $rowsToShow = $oldZonePrices;
+                } else {
+                    $existingPrices = $tariff->exists ? $zonePrices : collect();
+                    $rowsToShow = $existingPrices->mapWithKeys(fn ($price, $i) => [$i => [
+                        'id' => $price->id,
+                        'zone_id' => $price->zone_id,
+                        'charge' => $price->charge,
+                        'additional_charge' => $price->additional_charge,
+                        'transit_days' => $price->transit_days,
+                    ]])->all();
+                }
+
+                if (empty($rowsToShow)) {
+                    $rowsToShow = [0 => ['id' => null, 'zone_id' => '', 'charge' => '', 'additional_charge' => '', 'transit_days' => '']];
+                }
+            @endphp
+
+            <div id="zone-rows" class="space-y-2" data-next-index="{{ max(array_keys($rowsToShow)) + 1 }}">
+                @foreach ($rowsToShow as $i => $row)
                     <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-                        <input type="hidden" name="zone_prices[{{ $i }}][id]" value="{{ $price->id }}">
+                        @if (! empty($row['id']))
+                            <input type="hidden" name="zone_prices[{{ $i }}][id]" value="{{ $row['id'] }}">
+                        @endif
                         <div>
                             <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
                             <select name="zone_prices[{{ $i }}][zone_id]" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">— None —</option>
                                 @foreach ($zones as $zone)
-                                    <option value="{{ $zone->id }}" @selected($zone->id === $price->zone_id)>{{ $zone->name }}</option>
+                                    <option value="{{ $zone->id }}" @selected((string) ($row['zone_id'] ?? '') === (string) $zone->id)>{{ $zone->name }}</option>
                                 @endforeach
                             </select>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
-                            <input type="number" step="0.01" min="0" name="zone_prices[{{ $i }}][charge]" value="{{ $price->charge }}"
+                            <input type="number" step="0.01" min="0" name="zone_prices[{{ $i }}][charge]" value="{{ $row['charge'] ?? '' }}"
                                    class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-ink-900">Additional charge</label>
-                            <input type="number" step="0.01" min="0" name="zone_prices[{{ $i }}][additional_charge]" value="{{ $price->additional_charge }}"
+                            <input type="number" step="0.01" min="0" name="zone_prices[{{ $i }}][additional_charge]" value="{{ $row['additional_charge'] ?? '' }}"
                                    class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label>
-                            <input type="number" min="0" name="zone_prices[{{ $i }}][transit_days]" value="{{ $price->transit_days }}"
+                            <input type="number" min="0" name="zone_prices[{{ $i }}][transit_days]" value="{{ $row['transit_days'] ?? '' }}"
                                    class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         </div>
                         <button type="button" class="remove-zone-row rounded-md px-2 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
                     </div>
-                @empty
-                    <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
-                            <select name="zone_prices[0][zone_id]" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                <option value="">— None —</option>
-                                @foreach ($zones as $zone)
-                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
-                            <input type="number" step="0.01" min="0" name="zone_prices[0][charge]"
-                                   class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Additional charge</label>
-                            <input type="number" step="0.01" min="0" name="zone_prices[0][additional_charge]"
-                                   class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label>
-                            <input type="number" min="0" name="zone_prices[0][transit_days]"
-                                   class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        </div>
-                        <button type="button" class="remove-zone-row hidden rounded-md px-2 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
-                    </div>
-                @endforelse
+                @endforeach
             </div>
             <p class="mt-2 text-xs text-ink-500">Leave a row's Charge blank (or remove it) to clear that zone's price. New rows need a zone and a charge to be saved.</p>
         </div>
@@ -151,12 +152,10 @@
         (function () {
             const addButton = document.getElementById('add-zone-row');
             const container = document.getElementById('zone-rows');
-            let index = {{ $existingPrices->count() > 0 ? $existingPrices->count() : 1 }};
+            let index = parseInt(container.dataset.nextIndex, 10);
 
             function wireRemove(row) {
-                const button = row.querySelector('.remove-zone-row');
-                button.classList.remove('hidden');
-                button.addEventListener('click', function () {
+                row.querySelector('.remove-zone-row').addEventListener('click', function () {
                     row.remove();
                 });
             }
