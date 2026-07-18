@@ -2750,3 +2750,45 @@ resources/views/standard-billing/form.blade.php   (repeatable range rows on crea
 ```
 
 No migration needed.
+
+## Increment 51 — Bug Fix: Overlapping/Duplicate Weight Ranges Now Rejected
+
+Real bug, caught in use: nothing stopped two tariffs for the same
+service type from covering the same (or overlapping) weight range —
+exactly what happened when "Domestic Express" ended up with two
+separate tariffs both for 0.5–20kg. `PricingEngine`'s tariff lookup
+(Increment 45) picks the lowest-`min_weight` one deterministically when
+that happens, so it wasn't silently broken, but it's not something that
+should be possible to create in the first place.
+
+### The fix
+
+`rangesOverlap()` — a standard closed-interval overlap test, shared by
+both create and edit. Touching endpoints count as overlapping on
+purpose (0–20 and 20–40 would double-match a 20kg shipment, since
+`max_weight` is an inclusive boundary in the calculation).
+
+- **Creating** (multiple ranges in one submission, Increment 50): every
+  row is checked against every *other* row in the same submission, and
+  against every existing active tariff for that service type. Either
+  kind of overlap blocks the whole submission with a specific message —
+  which row conflicts with which existing tariff, or which two rows
+  conflict with each other
+- **Editing** a single tariff: checked against every *other* active
+  tariff for the same service type (excluding itself)
+
+Only compares against **active** tariffs — an inactive one covering the
+same range isn't in conflict with anything, since it can't be matched
+by a real quote anyway.
+
+**This doesn't retroactively fix data that's already duplicated** —
+the two "Domestic Express 0.5–20kg" tariffs already created need to be
+resolved manually: open the one that's wrong and use Remove.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (rangesOverlap(), validation on both store() and update())
+```
+
+No migration needed.
