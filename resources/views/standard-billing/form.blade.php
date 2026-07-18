@@ -9,7 +9,12 @@
     @if ($tariff->exists)
         <div class="mb-5 max-w-2xl">
             <x-csv-actions :export-route="route('standard-billing.zone-prices.export', $tariff)" :import-route="route('standard-billing.zone-prices.import', $tariff)" label="Zone Prices" />
-            <p class="-mt-3 text-xs text-ink-500">For bulk-adding many zones at once instead of one row at a time below.</p>
+            <p class="-mt-3 text-xs text-ink-500">
+                For bulk-adding many zones to THIS tariff at once (4 columns: zone_code, charge, additional_charge, transit_days).
+                To set up multiple tariffs across multiple service types from one file instead, use the Export/Import on the
+                <a href="{{ route('standard-billing.index') }}" class="text-[var(--brand-primary)] hover:underline">Standard Billing list page</a> —
+                that one includes service type and weight range too.
+            </p>
         </div>
     @endif
 

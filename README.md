@@ -2917,3 +2917,28 @@ routes/web.php   (zone-prices.store/destroy routes removed)
 ```
 
 No migration needed.
+
+## Increment 55 — Clarified: Two CSVs, Different Scopes, Cross-Linked
+
+No functional change — both CSV formats already worked exactly as
+designed (confirmed by tracing a real multi-service-type,
+multi-range file through `importAll()` line by line). The confusion was
+navigational: the tariff-scoped 4-column CSV (zone_code, charge,
+additional_charge, transit_days) lives on an individual tariff's edit
+page; the combined 8-column CSV (adds service_type_code, min_weight,
+max_weight, additional_weight) lives on the Standard Billing **list**
+page. Landing on the wrong one looks like a missing feature rather than
+a different screen.
+
+Each CSV action bar now says explicitly what it covers and links to the
+other one, so which file format you're looking at — and where to find
+the other — is clear without needing to ask.
+
+### Files
+
+```
+resources/views/standard-billing/form.blade.php   (tariff-scoped CSV note + link to the list page's combined CSV)
+resources/views/standard-billing/index.blade.php  (combined CSV note + link to a tariff's own edit-page CSV)
+```
+
+No migration, no controller changes.
