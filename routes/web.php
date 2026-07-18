@@ -161,6 +161,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:billing:read')->group(function () {
         Route::get('/service-types', [ServiceTypeController::class, 'index'])->name('service-types.index');
         Route::get('/standard-billing', [StandardBillingController::class, 'index'])->name('standard-billing.index');
+        Route::get('/standard-billing/export', [StandardBillingController::class, 'exportAll'])->name('standard-billing.export');
         Route::get('/standard-billing/{tariff}/zone-prices/export', [StandardBillingController::class, 'exportZonePrices'])->name('standard-billing.zone-prices.export');
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
@@ -176,6 +177,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy'])->name('service-types.destroy');
         Route::get('/standard-billing/create', [StandardBillingController::class, 'create'])->name('standard-billing.create');
         Route::post('/standard-billing', [StandardBillingController::class, 'store'])->name('standard-billing.store');
+        Route::post('/standard-billing/import', [StandardBillingController::class, 'importAll'])->name('standard-billing.import');
         Route::get('/standard-billing/{tariff}/edit', [StandardBillingController::class, 'edit'])->name('standard-billing.edit');
         Route::put('/standard-billing/{tariff}', [StandardBillingController::class, 'update'])->name('standard-billing.update');
         Route::delete('/standard-billing/{tariff}', [StandardBillingController::class, 'destroy'])->name('standard-billing.destroy');

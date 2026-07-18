@@ -37,112 +37,67 @@ class StandardBillingController extends Controller
     }
 
     /**
-     * Creates one or more weight-band tariffs for the same service type
-     * in a single submission — e.g. 0.5–20kg and 20.5–40kg entered as two
-     * rows on one form, instead of visiting "Add tariff" twice. Each row
-     * still becomes its own StandardBillingTariff record; nothing about
-     * how they're matched at quote time changes, this only changes how
-     * many you can set up in one go.
-     *
-     * Each row can also carry ONE zone price (zone/charge/additional
-     * charge/transit days) — filling those in creates the tariff AND its
-     * first zone price together, instead of needing a separate trip to
-     * the edit page just to price the one zone you already had in mind.
-     * Leaving them blank still creates the tariff with no zone prices
-     * yet, exactly as before — prices can always be added afterward from
-     * the edit page, one at a time or via CSV.
+     * One weight range, plus as many zone prices as needed for it, all
+     * in a single submission — service type + min/max/additional weight
+     * once, then a repeatable Zone/Charge/Additional charge/Transit days
+     * section. Creates one StandardBillingTariff and, for every zone row
+     * that was filled in, its matching TariffZonePrice — no separate
+     * trip to the edit page needed for the common case of setting up a
+     * tariff with several zones already known up front.
      */
     public function store(Request $request): RedirectResponse
     {
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
-            'ranges' => 'required|array|min:1',
-            'ranges.*.min_weight' => 'required|numeric|min:0',
-            'ranges.*.max_weight' => 'required|numeric|gt:ranges.*.min_weight',
-            'ranges.*.additional_weight' => 'required|numeric|min:0.01',
-            'ranges.*.zone_id' => 'nullable|exists:zones,id',
-            'ranges.*.charge' => 'nullable|required_with:ranges.*.zone_id|numeric|min:0',
-            'ranges.*.zone_additional_charge' => 'nullable|numeric|min:0',
-            'ranges.*.transit_days' => 'nullable|integer|min:0',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|gt:min_weight',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'zone_prices' => 'nullable|array',
+            'zone_prices.*.zone_id' => 'nullable|exists:zones,id',
+            'zone_prices.*.charge' => 'nullable|required_with:zone_prices.*.zone_id|numeric|min:0',
+            'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
+            'zone_prices.*.transit_days' => 'nullable|integer|min:0',
         ]);
 
         $validator->after(function ($validator) use ($request) {
-            $serviceTypeId = $request->input('service_type_id');
-            $ranges = $request->input('ranges', []);
-
-            // Existing active tariffs for this service type — every new
-            // row is checked against these too, not just against each
-            // other, since a duplicate/overlap against an already-saved
-            // tariff is exactly what caused the "same weight range
-            // twice" bug this validation exists to prevent.
-            $existing = StandardBillingTariff::where('service_type_id', $serviceTypeId)
-                ->where('is_active', true)
-                ->get(['min_weight', 'max_weight']);
-
-            $seen = [];
-
-            foreach ($ranges as $index => $range) {
-                if (! isset($range['min_weight'], $range['max_weight'])) {
-                    continue; // already flagged by the required/numeric rules above
-                }
-
-                $min = (float) $range['min_weight'];
-                $max = (float) $range['max_weight'];
-
-                foreach ($existing as $tariff) {
-                    if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight)) {
-                        $validator->errors()->add(
-                            "ranges.{$index}.min_weight",
-                            "Row " . ($index + 1) . " ({$min}–{$max}kg) overlaps an existing tariff for this service type ({$tariff->min_weight}–{$tariff->max_weight}kg)."
-                        );
-                    }
-                }
-
-                foreach ($seen as $otherIndex => $other) {
-                    if ($this->rangesOverlap($min, $max, $other[0], $other[1])) {
-                        $validator->errors()->add(
-                            "ranges.{$index}.min_weight",
-                            "Row " . ($index + 1) . " ({$min}–{$max}kg) overlaps row " . ($otherIndex + 1) . " ({$other[0]}–{$other[1]}kg) in this same submission."
-                        );
-                    }
-                }
-
-                $seen[$index] = [$min, $max];
-            }
+            $this->rejectIfOverlapping(
+                $validator,
+                'max_weight',
+                (int) $request->input('service_type_id'),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight')
+            );
         });
 
         $data = $validator->validate();
-        $isActive = $request->boolean('is_active', true);
 
-        $created = 0;
+        $tariff = StandardBillingTariff::create([
+            'service_type_id' => $data['service_type_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'additional_weight' => $data['additional_weight'],
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
         $priced = 0;
-        foreach ($data['ranges'] as $range) {
-            $tariff = StandardBillingTariff::create([
-                'service_type_id' => $data['service_type_id'],
-                'min_weight' => $range['min_weight'],
-                'max_weight' => $range['max_weight'],
-                'additional_weight' => $range['additional_weight'],
-                'is_active' => $isActive,
-            ]);
-            $created++;
-
-            if (! empty($range['zone_id']) && isset($range['charge']) && $range['charge'] !== '') {
-                TariffZonePrice::create([
-                    'tariff_id' => $tariff->id,
-                    'zone_id' => $range['zone_id'],
-                    'charge' => $range['charge'],
-                    'additional_charge' => $range['zone_additional_charge'] ?? 0,
-                    'transit_days' => ($range['transit_days'] ?? '') !== '' ? $range['transit_days'] : null,
-                ]);
-                $priced++;
+        foreach ($data['zone_prices'] ?? [] as $row) {
+            if (empty($row['zone_id']) || ! isset($row['charge']) || $row['charge'] === '') {
+                continue;
             }
+
+            TariffZonePrice::create([
+                'tariff_id' => $tariff->id,
+                'zone_id' => $row['zone_id'],
+                'charge' => $row['charge'],
+                'additional_charge' => $row['additional_charge'] ?? 0,
+                'transit_days' => ($row['transit_days'] ?? '') !== '' ? $row['transit_days'] : null,
+            ]);
+            $priced++;
         }
 
-        $message = $created === 1
-            ? 'Tariff created' . ($priced ? ' with its zone price.' : ' — add zone prices below.')
-            : "{$created} tariffs created" . ($priced ? " ({$priced} with a zone price already set)." : ' — add zone prices to each from the list.');
+        $message = 'Tariff created' . ($priced ? " with {$priced} zone price" . ($priced === 1 ? '' : 's') . '.' : ' — add zone prices below.');
 
-        return redirect()->route('standard-billing.index')->with('status', $message);
+        return redirect()->route('standard-billing.edit', $tariff)->with('status', $message);
     }
 
     public function edit(StandardBillingTariff $tariff): View
@@ -170,8 +125,8 @@ class StandardBillingController extends Controller
     }
 
     /**
-     * One line at a time, via a plain form — same pattern as every
-     * other setup screen in this app. Adds or updates whichever zone is
+     * One line at a time, via a plain form — for adding one more zone to
+     * a tariff that already exists. Adds or updates whichever zone is
      * selected; re-selecting an already-priced zone updates it rather
      * than duplicating.
      */
@@ -206,11 +161,10 @@ class StandardBillingController extends Controller
     }
 
     /**
-     * Zone prices are scoped to a single tariff (each tariff is a
-     * different weight band/service type), so export/import work on
-     * this one tariff's rows, not the whole standard_billing_tariffs
-     * table — the natural key is the zone's code, same pattern used
-     * throughout every other CSV round trip in this app.
+     * Zone prices for ONE existing tariff — for adding more zones to a
+     * tariff that already exists. See exportAll()/importAll() below for
+     * the combined format that creates tariffs and their zone prices
+     * together from scratch.
      */
     public function exportZonePrices(StandardBillingTariff $tariff): \Symfony\Component\HttpFoundation\StreamedResponse
     {
@@ -255,6 +209,120 @@ class StandardBillingController extends Controller
         return redirect()->route('standard-billing.edit', $tariff)->with('status', "Imported {$count} zone prices" . ($skipped ? ", skipped {$skipped} (unknown zone code or missing charge)." : '.'));
     }
 
+    /**
+     * The combined format matching what the create form now collects in
+     * one go: service type + weight range + zone price, one row per
+     * zone. A tariff with no zone prices yet still gets one row (blank
+     * zone columns) so its weight range isn't lost on export. Covers
+     * every tariff, not just one.
+     */
+    public function exportAll(): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        $rows = [];
+
+        foreach (StandardBillingTariff::with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get() as $tariff) {
+            if ($tariff->zonePrices->isEmpty()) {
+                $rows[] = [$tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->additional_weight, '', '', '', ''];
+                continue;
+            }
+
+            foreach ($tariff->zonePrices as $price) {
+                $rows[] = [
+                    $tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->additional_weight,
+                    $price->zone->code, $price->charge, $price->additional_charge, $price->transit_days,
+                ];
+            }
+        }
+
+        return $this->csv->download(
+            'standard-billing.csv',
+            ['service_type_code', 'min_weight', 'max_weight', 'additional_weight', 'zone_code', 'charge', 'additional_charge', 'transit_days'],
+            $rows
+        );
+    }
+
+    /**
+     * Creates tariffs AND their zone prices together from one file —
+     * rows sharing the same (service_type_code, min_weight, max_weight)
+     * build up one tariff's several zone prices. An exact-match tariff
+     * is reused (so re-importing an amended export updates rather than
+     * duplicates); a NEW range that overlaps an existing active tariff
+     * for that service type is skipped, same protection as the form
+     * (Increment 51) — CSV import can't be used to bypass it.
+     */
+    public function importAll(Request $request): RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $tariffCache = [];
+        $tariffsCreated = 0;
+        $pricesSaved = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $serviceType = ServiceType::where('code', strtoupper(trim($row['service_type_code'] ?? '')))->first();
+            $minWeight = $row['min_weight'] ?? null;
+            $maxWeight = $row['max_weight'] ?? null;
+
+            if (! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeight)) {
+                $skipped++;
+                continue;
+            }
+
+            $cacheKey = "{$serviceType->id}:{$minWeight}:{$maxWeight}";
+
+            if (! isset($tariffCache[$cacheKey])) {
+                $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
+                    ->where('min_weight', $minWeight)->where('max_weight', $maxWeight)->first();
+
+                if (! $tariff) {
+                    $overlaps = StandardBillingTariff::where('service_type_id', $serviceType->id)
+                        ->where('is_active', true)
+                        ->get(['min_weight', 'max_weight'])
+                        ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeight, (float) $t->min_weight, (float) $t->max_weight));
+
+                    if ($overlaps) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    $tariff = StandardBillingTariff::create([
+                        'service_type_id' => $serviceType->id,
+                        'min_weight' => $minWeight,
+                        'max_weight' => $maxWeight,
+                        'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
+                        'is_active' => true,
+                    ]);
+                    $tariffsCreated++;
+                }
+
+                $tariffCache[$cacheKey] = $tariff;
+            }
+
+            if (! empty($row['zone_code'])) {
+                $zone = Zone::where('code', strtoupper(trim($row['zone_code'])))->first();
+
+                if ($zone && is_numeric($row['charge'] ?? null)) {
+                    TariffZonePrice::updateOrCreate(
+                        ['tariff_id' => $tariffCache[$cacheKey]->id, 'zone_id' => $zone->id],
+                        [
+                            'charge' => $row['charge'],
+                            'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
+                            'transit_days' => ($row['transit_days'] ?? '') !== '' ? (int) $row['transit_days'] : null,
+                        ]
+                    );
+                    $pricesSaved++;
+                }
+            }
+        }
+
+        return redirect()->route('standard-billing.index')->with(
+            'status',
+            "Imported: {$tariffsCreated} tariffs created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type, overlapping range, or missing weight)." : '.')
+        );
+    }
+
     private function validated(Request $request, ?StandardBillingTariff $ignoring = null): array
     {
         $validator = Validator::make($request->all(), [
@@ -266,28 +334,43 @@ class StandardBillingController extends Controller
         ]);
 
         $validator->after(function ($validator) use ($request, $ignoring) {
-            $min = (float) $request->input('min_weight');
-            $max = (float) $request->input('max_weight');
-
-            $others = StandardBillingTariff::where('service_type_id', $request->input('service_type_id'))
-                ->where('is_active', true)
-                ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
-                ->get(['min_weight', 'max_weight']);
-
-            foreach ($others as $tariff) {
-                if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight)) {
-                    $validator->errors()->add(
-                        'max_weight',
-                        "This range ({$min}–{$max}kg) overlaps another tariff for this service type ({$tariff->min_weight}–{$tariff->max_weight}kg)."
-                    );
-                }
-            }
+            $this->rejectIfOverlapping(
+                $validator,
+                'max_weight',
+                (int) $request->input('service_type_id'),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight'),
+                $ignoring
+            );
         });
 
         $data = $validator->validate();
         $data['is_active'] = $request->boolean('is_active', true);
 
         return $data;
+    }
+
+    /**
+     * Shared by store() and validated() (update) — adds a validation
+     * error if the given range overlaps any other ACTIVE tariff for the
+     * same service type. Only compares against active tariffs, since an
+     * inactive one can't be matched by a real quote anyway.
+     */
+    private function rejectIfOverlapping($validator, string $errorField, int $serviceTypeId, float $min, float $max, ?StandardBillingTariff $ignoring = null): void
+    {
+        $others = StandardBillingTariff::where('service_type_id', $serviceTypeId)
+            ->where('is_active', true)
+            ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
+            ->get(['min_weight', 'max_weight']);
+
+        foreach ($others as $tariff) {
+            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight)) {
+                $validator->errors()->add(
+                    $errorField,
+                    "This range ({$min}–{$max}kg) overlaps another tariff for this service type ({$tariff->min_weight}–{$tariff->max_weight}kg)."
+                );
+            }
+        }
     }
 
     /**

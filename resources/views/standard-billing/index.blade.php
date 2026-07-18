@@ -11,6 +11,9 @@
         resolved zone (Billing → Zone Mapping) picks which price applies.
     </p>
 
+    <x-csv-actions :export-route="route('standard-billing.export')" :import-route="route('standard-billing.import')" label="Standard Billing" />
+    <p class="mb-5 -mt-3 text-xs text-ink-500">Covers every tariff and zone price together — one row per zone, sharing service type/weight range across rows. Import creates tariffs and prices that don't exist yet, and updates ones that do.</p>
+
     <div class="mb-5 flex items-center justify-between">
         <span></span>
         <a href="{{ route('standard-billing.create') }}" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">

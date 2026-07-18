@@ -2819,3 +2819,62 @@ resources/views/standard-billing/form.blade.php   (Zone/Charge/Additional charge
 ```
 
 No migration needed.
+
+## Increment 53 — One Form for Everything, Same Structure on CSV
+
+Answers "can this be done?" directly: yes. Simplified back to one weight
+range per tariff (no nested range-repeaters — cleaner than trying to
+nest a repeatable zone list inside a repeatable range list), but the
+**Zone Prices section is now fully repeatable** — add as many
+Zone/Charge/Additional charge/Transit days rows as needed, all
+submitted together with the tariff in one request.
+
+### The single form
+
+Service Type → Min/Max/Additional weight → **Zone prices** (repeatable:
++ Add zone) → Active → Create tariff. One submission creates the
+tariff and every zone price that was filled in. Still genuinely
+optional — leave the zone rows blank and add them later, exactly as
+before.
+
+Editing an existing tariff is unchanged — the weight fields are now
+visually identical between create and edit (they were always the same
+shape underneath), but the zone-price *section* differs: edit still
+shows the existing list + a plain one-at-a-time form below it
+(Increment 49), since at that point you're managing zones that already
+exist, not bulk-declaring new ones.
+
+### The CSV, same structure
+
+New combined export/import at **Billing → Standard Billing** (the list
+page, not scoped to one tariff): one row per zone, columns
+`service_type_code, min_weight, max_weight, additional_weight,
+zone_code, charge, additional_charge, transit_days`. Rows sharing the
+same service type + weight range build up one tariff's several zone
+prices — exactly the same shape the form now collects in one
+submission, just as a file instead of a page.
+
+**Import creates tariffs that don't exist yet and updates ones that
+do** (matched by exact service-type + weight-range), same
+upsert-not-duplicate principle as every other CSV in this app. It also
+respects the overlap protection from Increment 51 — a row whose weight
+range overlaps an existing active tariff (without being an exact match)
+is skipped and counted, not silently created as a conflict. A tariff
+with no zone prices yet still gets one row on export (blank zone
+columns) so its weight range isn't lost.
+
+The tariff-scoped CSV from Increment 49 (`Zone Prices` on the edit
+page) still exists too — for adding more zones to one specific
+already-existing tariff, which is a different, still-useful job from
+"set everything up from scratch in one file."
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (store() takes one range + repeatable zone_prices[]; new exportAll()/importAll(); shared rejectIfOverlapping() used by both create and edit)
+resources/views/standard-billing/form.blade.php   (weight fields unified between create/edit; repeatable zone-price rows on create only)
+resources/views/standard-billing/index.blade.php   (combined CSV bar)
+routes/web.php   (standard-billing.export, standard-billing.import)
+```
+
+No migration needed.
