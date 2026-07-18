@@ -178,8 +178,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/standard-billing/{tariff}/edit', [StandardBillingController::class, 'edit'])->name('standard-billing.edit');
         Route::put('/standard-billing/{tariff}', [StandardBillingController::class, 'update'])->name('standard-billing.update');
         Route::delete('/standard-billing/{tariff}', [StandardBillingController::class, 'destroy'])->name('standard-billing.destroy');
-        Route::post('/standard-billing/{tariff}/zone-prices', [StandardBillingController::class, 'addZonePrice'])->name('standard-billing.zone-prices.store');
-        Route::delete('/standard-billing/{tariff}/zone-prices/{zonePrice}', [StandardBillingController::class, 'destroyZonePrice'])->name('standard-billing.zone-prices.destroy');
+        Route::put('/standard-billing/{tariff}/zone-prices', [StandardBillingController::class, 'updateZonePrices'])->name('standard-billing.zone-prices.update');
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
         Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
         Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');

@@ -2645,3 +2645,41 @@ resources/views/rate-checker/index.blade.php   (filterServiceTypes() checks both
 ```powershell
 php artisan migrate
 ```
+
+## Increment 48 — Standard Billing Zone Prices: One Screen, Not One Zone at a Time
+
+Every field (`additional_weight`, `charge`, `additional_charge`,
+`transit_days`) already existed and worked correctly since Increment 44
+— what was actually incomplete was the workflow: setting up a tariff's
+zone prices meant submitting a separate form for every single zone, one
+at a time. With 4-6 zones, that's 4-6 round trips to fully configure one
+tariff.
+
+### Now: every zone listed, filled in inline, saved together
+
+`StandardBillingController::edit()` now merges **every** zone (not just
+already-priced ones) with its existing price if one exists. The form
+shows one row per zone with editable Charge/Additional Charge/Transit
+Days fields directly in the table — pre-filled where a price already
+exists, blank otherwise — and a single **Save zone prices** button
+commits all of them in one request.
+
+Leaving a zone's Charge blank means "this tariff doesn't cover that
+zone" — saving removes any existing price for it. Filling it in
+upserts. `updateZonePrices()` (replacing the old `addZonePrice()`/
+`destroyZonePrice()` pair) reports back exactly how many were saved and
+how many were cleared.
+
+The tariff's own fields (weight band, `additional_weight`) are
+unchanged — Increment 44 already had those right; this increment is
+purely about the zone-pricing sub-table underneath them.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (edit() merges every zone; updateZonePrices() replaces the one-at-a-time pair)
+resources/views/standard-billing/form.blade.php   (single inline-editable table, one save)
+routes/web.php   (one PUT route replaces the old POST+DELETE pair)
+```
+
+No migration needed — this increment is controller and view logic only.

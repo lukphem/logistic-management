@@ -66,65 +66,68 @@
     </form>
 
     @if ($tariff->exists)
-        <div class="mt-8 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
+        <div class="mt-8 max-w-3xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
             <h2 class="mb-1 text-sm font-semibold text-ink-900">Zone prices</h2>
-            <p class="mb-4 text-xs text-ink-500">One row per zone — add however many your business actually has.</p>
+            <p class="mb-4 text-xs text-ink-500">
+                Every zone is listed — fill in whichever ones this tariff actually prices and save them all at once.
+                Leave Charge blank for a zone this tariff doesn't cover.
+            </p>
 
-            <table class="mb-5 w-full text-left text-sm">
-                <thead>
-                    <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
-                        <th class="py-2 font-medium">Zone</th>
-                        <th class="py-2 font-medium">Charge</th>
-                        <th class="py-2 font-medium">Additional charge</th>
-                        <th class="py-2 font-medium">Transit days</th>
-                        <th class="py-2"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse ($zonePrices as $price)
-                        <tr class="border-b border-line last:border-0">
-                            <td class="py-2 text-ink-900">{{ $price->zone->name }}</td>
-                            <td class="py-2 font-mono text-ink-900">{{ number_format($price->charge, 2) }}</td>
-                            <td class="py-2 font-mono text-ink-500">{{ number_format($price->additional_charge, 2) }}</td>
-                            <td class="py-2 text-ink-500">{{ $price->transit_days ?? '—' }}</td>
-                            <td class="py-2 text-right">
-                                <form method="POST" action="{{ route('standard-billing.zone-prices.destroy', [$tariff, $price]) }}" onsubmit="return confirm('Remove this zone price?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
-                                </form>
-                            </td>
+            <form method="POST" action="{{ route('standard-billing.zone-prices.update', $tariff) }}">
+                @csrf @method('PUT')
+
+                @if ($errors->any())
+                    <div class="mb-4 rounded-md bg-status-exception/10 px-4 py-3 text-sm text-status-exception">
+                        <ul class="list-inside list-disc">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <table class="mb-5 w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                            <th class="py-2 pr-3 font-medium">Zone</th>
+                            <th class="py-2 pr-3 font-medium">Charge</th>
+                            <th class="py-2 pr-3 font-medium">Additional charge</th>
+                            <th class="py-2 font-medium">Transit days</th>
                         </tr>
-                    @empty
-                        <tr><td colspan="5" class="py-6 text-center text-sm text-ink-500">No zone prices set yet.</td></tr>
-                    @endforelse
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @forelse ($zoneRows as $row)
+                            <tr class="border-b border-line last:border-0">
+                                <td class="py-2 pr-3 text-ink-900">{{ $row->zone->name }}</td>
+                                <td class="py-2 pr-3">
+                                    <input type="number" step="0.01" min="0" name="zone_prices[{{ $row->zone->id }}][charge]"
+                                           value="{{ old('zone_prices.' . $row->zone->id . '.charge', $row->charge) }}" placeholder="—"
+                                           class="w-28 rounded-md border border-line px-2 py-1.5 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                </td>
+                                <td class="py-2 pr-3">
+                                    <input type="number" step="0.01" min="0" name="zone_prices[{{ $row->zone->id }}][additional_charge]"
+                                           value="{{ old('zone_prices.' . $row->zone->id . '.additional_charge', $row->additional_charge) }}" placeholder="0"
+                                           class="w-28 rounded-md border border-line px-2 py-1.5 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                </td>
+                                <td class="py-2">
+                                    <input type="number" min="0" name="zone_prices[{{ $row->zone->id }}][transit_days]"
+                                           value="{{ old('zone_prices.' . $row->zone->id . '.transit_days', $row->transit_days) }}" placeholder="—"
+                                           class="w-20 rounded-md border border-line px-2 py-1.5 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="4" class="py-6 text-center text-sm text-ink-500">No zones exist yet — create one under Billing → Zones first.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
 
-            <form method="POST" action="{{ route('standard-billing.zone-prices.store', $tariff) }}" class="flex flex-wrap items-end gap-3">
-                @csrf
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
-                    <select name="zone_id" class="w-36 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        @foreach ($zones as $zone)
-                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
-                    <input type="number" step="0.01" min="0" name="charge" class="w-28 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Additional charge</label>
-                    <input type="number" step="0.01" min="0" name="additional_charge" class="w-28 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label>
-                    <input type="number" min="0" name="transit_days" class="w-24 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
-                    Save price
-                </button>
+                @if ($zoneRows->isNotEmpty())
+                    <div class="flex justify-end">
+                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                            Save zone prices
+                        </button>
+                    </div>
+                @endif
             </form>
         </div>
     @endif
