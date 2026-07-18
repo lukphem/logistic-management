@@ -32,6 +32,7 @@ class StandardBillingController extends Controller
         return view('standard-billing.form', [
             'tariff' => new StandardBillingTariff(),
             'serviceTypes' => ServiceType::where('billing_model', 'standard_billing')->orderBy('name')->get(),
+            'zones' => Zone::orderBy('name')->get(),
         ]);
     }
 
@@ -42,6 +43,14 @@ class StandardBillingController extends Controller
      * still becomes its own StandardBillingTariff record; nothing about
      * how they're matched at quote time changes, this only changes how
      * many you can set up in one go.
+     *
+     * Each row can also carry ONE zone price (zone/charge/additional
+     * charge/transit days) — filling those in creates the tariff AND its
+     * first zone price together, instead of needing a separate trip to
+     * the edit page just to price the one zone you already had in mind.
+     * Leaving them blank still creates the tariff with no zone prices
+     * yet, exactly as before — prices can always be added afterward from
+     * the edit page, one at a time or via CSV.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -51,6 +60,10 @@ class StandardBillingController extends Controller
             'ranges.*.min_weight' => 'required|numeric|min:0',
             'ranges.*.max_weight' => 'required|numeric|gt:ranges.*.min_weight',
             'ranges.*.additional_weight' => 'required|numeric|min:0.01',
+            'ranges.*.zone_id' => 'nullable|exists:zones,id',
+            'ranges.*.charge' => 'nullable|required_with:ranges.*.zone_id|numeric|min:0',
+            'ranges.*.zone_additional_charge' => 'nullable|numeric|min:0',
+            'ranges.*.transit_days' => 'nullable|integer|min:0',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -102,8 +115,9 @@ class StandardBillingController extends Controller
         $isActive = $request->boolean('is_active', true);
 
         $created = 0;
+        $priced = 0;
         foreach ($data['ranges'] as $range) {
-            StandardBillingTariff::create([
+            $tariff = StandardBillingTariff::create([
                 'service_type_id' => $data['service_type_id'],
                 'min_weight' => $range['min_weight'],
                 'max_weight' => $range['max_weight'],
@@ -111,11 +125,22 @@ class StandardBillingController extends Controller
                 'is_active' => $isActive,
             ]);
             $created++;
+
+            if (! empty($range['zone_id']) && isset($range['charge']) && $range['charge'] !== '') {
+                TariffZonePrice::create([
+                    'tariff_id' => $tariff->id,
+                    'zone_id' => $range['zone_id'],
+                    'charge' => $range['charge'],
+                    'additional_charge' => $range['zone_additional_charge'] ?? 0,
+                    'transit_days' => ($range['transit_days'] ?? '') !== '' ? $range['transit_days'] : null,
+                ]);
+                $priced++;
+            }
         }
 
         $message = $created === 1
-            ? 'Tariff created — add zone prices below.'
-            : "{$created} tariffs created — add zone prices to each from the list.";
+            ? 'Tariff created' . ($priced ? ' with its zone price.' : ' — add zone prices below.')
+            : "{$created} tariffs created" . ($priced ? " ({$priced} with a zone price already set)." : ' — add zone prices to each from the list.');
 
         return redirect()->route('standard-billing.index')->with('status', $message);
     }

@@ -2792,3 +2792,30 @@ app/Http/Controllers/Web/StandardBillingController.php   (rangesOverlap(), valid
 ```
 
 No migration needed.
+
+## Increment 52 — Create Tariff + First Zone Price in One Submission
+
+Each weight-range row on the **Add Tariff** screen now has an optional
+"Zone price for this range" sub-section — Zone, Charge, Additional
+charge, Transit days — right below the weight fields. Filling it in
+creates the tariff **and** that zone's price together in one submit,
+instead of always needing a second trip to the edit page just to price
+the one zone you already had in mind.
+
+Leaving it blank works exactly as before — the tariff is created with
+no zone prices yet, to be added afterward one at a time or via CSV.
+This is genuinely optional per row, not required: a tariff with 6 zones
+still needs the other 5 added afterward regardless, this only removes
+the guaranteed first trip.
+
+The overlap validation from Increment 51 is unaffected — it only looks
+at the weight-range fields, which didn't change.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (create() passes zones; store() optionally creates a TariffZonePrice per row)
+resources/views/standard-billing/form.blade.php   (Zone/Charge/Additional charge/Transit days added to each range row; clone JS handles the new <select>)
+```
+
+No migration needed.

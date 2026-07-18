@@ -63,24 +63,54 @@
                     created together. Max weight also sets the overage threshold for that range.
                 </p>
 
-                <div id="range-rows" class="space-y-3">
-                    <div class="range-row grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Min weight (kg)</label>
-                            <input type="number" step="0.01" min="0" name="ranges[0][min_weight]"
-                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <div id="range-rows" class="space-y-4">
+                    <div class="range-row rounded-lg border border-line p-3">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Min weight (kg)</label>
+                                <input type="number" step="0.01" min="0" name="ranges[0][min_weight]"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Max weight (kg)</label>
+                                <input type="number" step="0.01" min="0" name="ranges[0][max_weight]"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Additional weight (kg)</label>
+                                <input type="number" step="0.01" min="0.01" name="ranges[0][additional_weight]" value="1"
+                                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <button type="button" class="remove-range hidden rounded-md px-3 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Max weight (kg)</label>
-                            <input type="number" step="0.01" min="0" name="ranges[0][max_weight]"
-                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+
+                        <p class="mb-2 mt-3 text-xs font-medium text-ink-500">Zone price for this range <span class="font-normal">(optional — add the rest from the edit page after, one at a time or via CSV)</span></p>
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
+                                <select name="ranges[0][zone_id]" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">— None —</option>
+                                    @foreach ($zones as $zone)
+                                        <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
+                                <input type="number" step="0.01" min="0" name="ranges[0][charge]"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Additional charge</label>
+                                <input type="number" step="0.01" min="0" name="ranges[0][zone_additional_charge]"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label>
+                                <input type="number" min="0" name="ranges[0][transit_days]"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Additional weight (kg)</label>
-                            <input type="number" step="0.01" min="0.01" name="ranges[0][additional_weight]" value="1"
-                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        </div>
-                        <button type="button" class="remove-range hidden rounded-md px-3 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
                     </div>
                 </div>
             </div>
@@ -181,6 +211,11 @@
                     if (!input.name.includes('additional_weight')) {
                         input.value = '';
                     }
+                });
+
+                row.querySelectorAll('select').forEach(function (select) {
+                    select.name = select.name.replace(/ranges\[\d+\]/, `ranges[${index}]`);
+                    select.selectedIndex = 0;
                 });
 
                 row.querySelector('.remove-range').classList.remove('hidden');
