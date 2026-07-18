@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Setting extends Model
 {
     protected $fillable = [
-        'company_name', 'logo_path', 'service_names',
+        'company_name', 'logo_path',
         'color_primary', 'color_secondary', 'login_design',
         'vat_percentage', 'currency',
         'waybill_thermal_size', 'waybill_show_qr',
@@ -16,7 +16,6 @@ class Setting extends Model
     ];
 
     protected $casts = [
-        'service_names' => 'array',
         'operating_regions' => 'array',
         'waybill_show_qr' => 'boolean',
         'vat_percentage' => 'float',
@@ -56,7 +55,6 @@ class Setting extends Model
     {
         return static::firstOrCreate(['id' => 1], [
             'company_name' => config('branding.company_name'),
-            'service_names' => config('branding.service_names'),
             'color_primary' => config('branding.colors.primary'),
             'color_secondary' => config('branding.colors.secondary'),
             'vat_percentage' => config('branding.vat_percentage'),

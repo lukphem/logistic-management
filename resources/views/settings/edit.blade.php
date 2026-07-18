@@ -52,22 +52,6 @@
             </div>
         </div>
 
-        {{-- Service Names --}}
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <h2 class="mb-1 text-sm font-semibold text-ink-900">Service names</h2>
-            <p class="mb-4 text-xs text-ink-500">These map to the <code class="font-mono">service_type</code> used when configuring rate cards.</p>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                @php $serviceNames = old('service_names', $settings->service_names ?? []); @endphp
-                @foreach (['express' => 'Express', 'same_day' => 'Same-Day', 'economy' => 'Economy'] as $key => $default)
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-900">{{ $default }} label <x-required /></label>
-                        <input type="text" name="service_names[{{ $key }}]" value="{{ $serviceNames[$key] ?? $default }}"
-                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    </div>
-                @endforeach
-            </div>
-        </div>
-
         {{-- Branding --}}
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Branding</h2>

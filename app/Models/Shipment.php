@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class Shipment extends Model
 {
     protected $fillable = [
-        'tracking_number', 'client_user_id', 'api_client_id', 'service_type',
+        'tracking_number', 'client_user_id', 'api_client_id', 'service_type_id',
         'origin_address', 'origin_zone_id', 'origin_city_id', 'origin_district_id', 'destination_address', 'destination_zone_id', 'destination_city_id', 'destination_district_id', 'distance_km',
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg', 'quantity', 'carton_size',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
@@ -144,6 +144,11 @@ class Shipment extends Model
     public function destinationDistrict(): BelongsTo
     {
         return $this->belongsTo(District::class, 'destination_district_id');
+    }
+
+    public function serviceType(): BelongsTo
+    {
+        return $this->belongsTo(ServiceType::class);
     }
 
     public function clientUser(): BelongsTo

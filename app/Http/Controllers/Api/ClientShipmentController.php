@@ -35,7 +35,7 @@ class ClientShipmentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'service_type' => 'required|string',
+            'service_type_id' => 'required|exists:service_types,id',
             'origin_address' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',

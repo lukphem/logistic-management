@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\RegionController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\RouteController;
 use App\Http\Controllers\Web\ScanStatusController;
+use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StateController;
@@ -156,12 +157,18 @@ Route::middleware(['auth', 'staff'])->group(function () {
     });
 
     Route::middleware('can:billing:read')->group(function () {
+        Route::get('/service-types', [ServiceTypeController::class, 'index'])->name('service-types.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
         Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     });
     Route::middleware('can:billing:update')->group(function () {
+        Route::get('/service-types/create', [ServiceTypeController::class, 'create'])->name('service-types.create');
+        Route::post('/service-types', [ServiceTypeController::class, 'store'])->name('service-types.store');
+        Route::get('/service-types/{serviceType}/edit', [ServiceTypeController::class, 'edit'])->name('service-types.edit');
+        Route::put('/service-types/{serviceType}', [ServiceTypeController::class, 'update'])->name('service-types.update');
+        Route::delete('/service-types/{serviceType}', [ServiceTypeController::class, 'destroy'])->name('service-types.destroy');
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
         Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
         Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');

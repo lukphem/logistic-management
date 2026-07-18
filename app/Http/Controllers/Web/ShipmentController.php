@@ -11,7 +11,7 @@ class ShipmentController extends Controller
 {
     public function index(Request $request): View
     {
-        $query = Shipment::with(['originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet']);
+        $query = Shipment::with(['serviceType', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet']);
 
         $user = auth()->user();
 
@@ -43,7 +43,7 @@ class ShipmentController extends Controller
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
-        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet', 'originHub', 'destinationHub']);
+        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'serviceType', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet', 'originHub', 'destinationHub']);
 
         return view('shipments.show', compact('shipment'));
     }

@@ -23,8 +23,6 @@ class SettingsController extends Controller
         $validator = Validator::make($request->all(), [
             'company_name' => 'required|string|max:255',
             'logo' => 'nullable|image|max:2048',
-            'service_names' => 'required|array|min:1',
-            'service_names.*' => 'required|string|max:100',
             'color_primary' => 'required|string|max:20',
             'color_secondary' => 'required|string|max:20',
             'login_design' => 'required|in:' . implode(',', array_keys(Setting::LOGIN_DESIGNS)),

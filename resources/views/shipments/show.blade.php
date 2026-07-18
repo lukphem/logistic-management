@@ -30,7 +30,7 @@
                 <h2 class="mb-4 text-sm font-semibold text-ink-900">Shipment details</h2>
                 <dl class="grid grid-cols-2 gap-y-3 text-sm">
                     <dt class="text-ink-500">Service type</dt>
-                    <dd class="text-ink-900">{{ ucfirst($shipment->service_type) }}</dd>
+                    <dd class="text-ink-900">{{ $shipment->serviceType->name ?? '—' }}</dd>
 
                     <dt class="text-ink-500">Weight</dt>
                     <dd class="text-ink-900">{{ $shipment->weight_kg ?? '—' }} kg</dd>

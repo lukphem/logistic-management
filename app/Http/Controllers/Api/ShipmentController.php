@@ -92,7 +92,7 @@ class ShipmentController extends Controller
     private function validateShipment(Request $request): array
     {
         $validator = Validator::make($request->all(), [
-            'service_type' => 'required|string',
+            'service_type_id' => 'required|exists:service_types,id',
             'client_user_id' => 'nullable|exists:users,id',
             'origin_address' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',

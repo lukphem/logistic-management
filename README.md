@@ -2357,3 +2357,79 @@ resources/views/settings/edit.blade.php   (empty-state message)
 ```
 
 No migration needed.
+
+## Increment 43 — Service Type Becomes a Real Entity
+
+First concrete piece of the Standard Billing rebuild (spec discussed in
+chat): Service Type moves from a flat, enforced list of strings to a
+proper, creatable table.
+
+### What changed
+
+- **New `service_types` table** (name, code, active) with full CRUD at
+  **Setups → Billing → Service Types** — created and managed exactly
+  like every other setup entity in this app, not configured as a
+  settings blob
+- **`settings.service_names` removed entirely** — it was a JSON array of
+  free-typed strings ("Express", "Economy") with no real entity behind
+  them and no referential integrity. `service_types` is now the single
+  source of truth
+- **`shipments.service_type` (a free string) converted to
+  `shipments.service_type_id` (a real FK)** — every booking endpoint
+  (client portal, API integrators, staff walk-in) now validates
+  `service_type_id` against the real table instead of accepting any
+  string. Every view that displayed the raw string now shows
+  `$shipment->serviceType->name` via eager-loading
+
+### Reconciled with the Zone Matrix spec — no changes needed there
+
+Walked through the "Zoning & Standard Billing Specification" against
+what's already built:
+
+- The spec's Zone Matrix (origin_state, destination_state, zone_number)
+  **is** our existing `ZoneMapping` table — same three columns, `zone_id`
+  pointing to a real `Zone` record instead of a bare integer, bidirectional
+  by design exactly as already confirmed. Nothing to change.
+- `shipping_type` (domestic/international) doesn't need a manual field
+  anywhere — it's already implicit in which system resolved the zone
+  (`ZoneMapping` for domestic, `ZoneCountryMapping` for international).
+  Per discussion, this gets auto-derived and stamped onto the
+  **shipment** record for reporting purposes once the tariff calculation
+  is built — not a field anyone picks.
+- The spec's fixed `zone1_charge`...`zone4_charge` columns won't be used
+  as-is — a courier business isn't guaranteed to always have exactly 4
+  zones. The upcoming tariff will use a proper child table (one row per
+  zone) instead, so the number of zones can be anything without a schema
+  change.
+
+### Next
+
+The tariff table itself (`standard_billing_tariffs` +
+`tariff_zone_prices`, keyed off `service_type_id` and weight bands) and
+the calculation logic that consumes it — building those next.
+
+### Files
+
+```
+database/migrations/2026_01_29_000001_create_service_types_table.php
+database/migrations/2026_01_29_000002_convert_shipments_service_type_to_fk.php
+app/Models/ServiceType.php
+app/Models/Setting.php   (service_names removed)
+app/Models/Shipment.php   (service_type_id, serviceType() relation)
+app/Http/Controllers/Web/ServiceTypeController.php
+app/Http/Controllers/Web/SettingsController.php, DashboardController.php, ShipmentController.php
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php
+app/Providers/BrandingServiceProvider.php   (service_names overlay removed)
+config/branding.php   (service_names default removed)
+resources/views/service-types/   (index + form)
+resources/views/settings/edit.blade.php   (Service Names section removed)
+resources/views/shipments/, dashboard/index.blade.php   (display via serviceType relation)
+resources/views/components/layouts/app.blade.php   (Service Types nav item)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

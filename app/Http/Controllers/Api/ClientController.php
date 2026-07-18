@@ -31,7 +31,7 @@ class ClientController extends Controller
     public function quote(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'service_type' => 'required|string',
+            'service_type_id' => 'required|exists:service_types,id',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
@@ -59,7 +59,7 @@ class ClientController extends Controller
         );
 
         return response()->json([
-            'service_type' => $request->service_type,
+            'service_type_id' => (int) $request->service_type_id,
             ...$breakdown,
         ]);
     }

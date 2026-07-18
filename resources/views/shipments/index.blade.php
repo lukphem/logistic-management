@@ -45,7 +45,7 @@
                                 <span class="block text-xs">At {{ $shipment->currentOutlet->name }}</span>
                             @endif
                         </td>
-                        <td class="px-5 py-3 text-ink-900">{{ ucfirst($shipment->service_type) }}</td>
+                        <td class="px-5 py-3 text-ink-900">{{ $shipment->serviceType->name ?? '—' }}</td>
                         <td class="px-5 py-3"><x-status-pill :status="$shipment->current_status" /></td>
                         <td class="px-5 py-3 text-ink-500">{{ $shipment->assignedRider?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right font-mono text-ink-900">{{ number_format($shipment->total_amount, 2) }}</td>

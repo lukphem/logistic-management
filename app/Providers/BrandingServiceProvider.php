@@ -31,7 +31,6 @@ class BrandingServiceProvider extends ServiceProvider
         config([
             'branding.company_name' => $settings->company_name ?? config('branding.company_name'),
             'branding.logo_url' => $settings->logo_url,
-            'branding.service_names' => $settings->service_names ?? config('branding.service_names'),
             'branding.colors.primary' => $settings->color_primary ?? config('branding.colors.primary'),
             'branding.colors.secondary' => $settings->color_secondary ?? config('branding.colors.secondary'),
             'branding.vat_percentage' => $settings->vat_percentage ?? config('branding.vat_percentage'),

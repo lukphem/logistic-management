@@ -8,11 +8,6 @@
  */
 return [
     'company_name' => env('COMPANY_NAME', 'Courier Co.'),
-    'service_names' => [
-        'express' => 'Express',
-        'same_day' => 'Same-Day',
-        'economy' => 'Economy',
-    ],
     'colors' => [
         'primary' => env('BRAND_COLOR_PRIMARY', '#1F3864'),
         'secondary' => env('BRAND_COLOR_SECONDARY', '#F2A900'),

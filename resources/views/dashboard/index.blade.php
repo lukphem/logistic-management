@@ -52,7 +52,7 @@
                                 {{ $shipment->tracking_number }}
                             </a>
                         </td>
-                        <td class="px-5 py-3 text-ink-900">{{ ucfirst($shipment->service_type) }}</td>
+                        <td class="px-5 py-3 text-ink-900">{{ $shipment->serviceType->name ?? '—' }}</td>
                         <td class="px-5 py-3"><x-status-pill :status="$shipment->current_status" /></td>
                         <td class="px-5 py-3 text-ink-500">{{ $shipment->assignedRider?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $shipment->created_at->format('d M, H:i') }}</td>

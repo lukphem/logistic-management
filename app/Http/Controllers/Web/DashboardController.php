@@ -21,7 +21,7 @@ class DashboardController extends Controller
                 ->count(),
         ];
 
-        $recentShipments = Shipment::with('assignedRider')->latest()->limit(8)->get();
+        $recentShipments = Shipment::with(['assignedRider', 'serviceType'])->latest()->limit(8)->get();
 
         return view('dashboard.index', compact('stats', 'recentShipments'));
     }
