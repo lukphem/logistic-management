@@ -2150,3 +2150,92 @@ routes/web.php   (export routes under *:read, import routes under *:update)
 
 No migration needed — this increment only adds controller methods,
 routes, and view markup.
+
+## Increment 40 — Billing Corrections: Zone Model Clarity, Real Carton Rate, Walk-In Pricing
+
+Three corrections identified in a full system review, tackled together
+since billing is foundational to everything built on top of it.
+
+### 1. Zone-to-Zone vs Origin-Destination — clarified, not merged
+
+Both models price a route between two zones, but solve different
+problems, and the near-identical old labels made the choice a guess:
+
+- **`zone_to_zone`** — one fixed price per zone pair, full stop
+- **`origin_destination_weight`** — a full rate table: price varies by
+  weight band and service type, with transit days and an overage rate
+
+Relabeled both, and added live guidance text under the billing-model
+picker on the Rate Card form (`RateCardController::ZONE_MODEL_GUIDANCE`)
+that shows/hides with the same JS that already toggles the model-specific
+fields — so the distinction is explained right where the decision gets
+made, not buried in documentation.
+
+### 2. Carton Rate — now actually zone + size aware
+
+Previously `carton_rate` was `quantity × a single flat number` —
+ignoring both carton size and zone entirely, despite that being the
+explicit original spec ("small carton, big, medium... will use zone too,
+with pieces as multiplier"). Corrected:
+
+- New `carton_rates` table: one row per (rate card, zone, carton size),
+  same "each rate card owns its own table" pattern as
+  `zone_weight_rates`
+- `shipments.carton_size` (small/medium/large) — accepted now by every
+  booking endpoint alongside the existing `quantity`
+- `RateEngine::cartonRate()` resolves the shipment's zone the same way
+  `originDestinationWeight()` does (city → state → `ZoneMapping`), looks
+  up the matching `(zone, carton_size)` row, multiplies by quantity.
+  Degrades to 0 rather than throwing if no matching row exists — a
+  missing setup row shouldn't hard-fail a booking
+- New "Carton rates" management section on the Rate Card edit page (only
+  shown when `carton_rate` is the selected billing model), same
+  add/remove pattern as the weight-rate table
+
+### 3. Staff walk-in bookings now price correctly — the oldest open gap, closed
+
+`Api\ShipmentController::store()` previously created a shipment with
+**no price at all** — every billing feature built since Increment 10
+(special discounts, onforwarding, zone-based rates, now carton rates)
+only ever applied to client-portal/API bookings. It now resolves pricing
+exactly the way `ClientShipmentController` does: looks up the active
+rate card for the service type (or uses an explicitly provided
+`rate_card_id`), resolves any billing discount, and calls
+`ShipmentPricingService::priceShipment()` before creating the shipment.
+
+`client_user_id` is now accepted (optional — a walk-in customer may not
+have a portal account at all). When provided and that client has a
+Special billing profile, their discount applies here too — via the new
+`ClientBillingProfile::resolveForClientUser()`, since
+`resolveForRequest()` would have resolved the **staff member's** own
+(nonexistent) billing profile instead of the client's — the requester
+and the client are different people in this flow, unlike the client
+portal where they're the same.
+
+**Related gap, not fixed here:** there's still no staff-facing Blade
+booking form — walk-in booking is API-only right now (confirmed by
+checking `resources/views/shipments/`, which only has `index` and
+`show`). This endpoint now prices correctly, but nothing in the staff
+dashboard actually calls it yet. Flag it if a booking screen should be
+built next.
+
+### Files
+
+```
+database/migrations/2026_01_27_000001_create_carton_rates_table.php
+app/Models/CartonRate.php
+app/Models/Shipment.php   (carton_size)
+app/Models/ClientBillingProfile.php   (resolveForClientUser())
+app/Services/RateEngine.php   (cartonRate(), perUnit() now truckload-only)
+app/Http/Controllers/Web/RateCardController.php   (relabeled models, ZONE_MODEL_GUIDANCE, carton-rate CRUD)
+app/Http/Controllers/Api/ShipmentController.php   (rewritten: resolves pricing, accepts client_user_id)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php   (carton_size accepted)
+resources/views/rate-cards/form.blade.php   (guidance text, carton-rates section)
+routes/web.php   (carton-rates routes)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

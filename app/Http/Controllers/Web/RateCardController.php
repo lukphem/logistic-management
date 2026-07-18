@@ -17,8 +17,8 @@ class RateCardController extends Controller
     private array $billingModels = [
         'flat' => 'Flat Rate',
         'distance' => 'Distance-Based',
-        'zone_to_zone' => 'Zone-to-Zone (Origin-Destination)',
-        'origin_destination_weight' => 'Origin-Destination + Weight (by Service Type)',
+        'zone_to_zone' => 'Zone-to-Zone — fixed price per zone pair',
+        'origin_destination_weight' => 'Origin-Destination — weight bands + service type',
         'weight' => 'Weight-Based',
         'volumetric' => 'Volumetric/Dimensional',
         'hybrid' => 'Hybrid (Base + Distance + Weight)',
@@ -26,7 +26,25 @@ class RateCardController extends Controller
         'time_surcharge' => 'Time-Based Surcharge',
         'contract' => 'Client-Specific Contract Rate',
         'truckload' => 'Truckload (Flat Rate per Truck)',
-        'carton_rate' => 'Carton Rate (Flat Rate per Carton)',
+        'carton_rate' => 'Carton Rate — by zone + carton size',
+    ];
+
+    /**
+     * Both zone_to_zone and origin_destination_weight price a route
+     * between two zones — they're not duplicates, they solve different
+     * problems:
+     *   - zone_to_zone: one fixed price per zone pair, full stop. Use
+     *     when price doesn't vary by weight or service level.
+     *   - origin_destination_weight: a full rate table — weight bands,
+     *     service type, transit days, and an overage rate for anything
+     *     heavier than the top band. Use when price genuinely depends on
+     *     more than just which two zones are involved.
+     * Shown as help text on the rate card form so the choice is
+     * intentional, not a guess between two similarly-named options.
+     */
+    public const ZONE_MODEL_GUIDANCE = [
+        'zone_to_zone' => 'One fixed price per zone pair — doesn\'t vary by weight or service type. Simplest option when price only depends on where it\'s going.',
+        'origin_destination_weight' => 'A full rate table: price varies by weight band and service type, with transit days and an overage rate for anything heavier than your top band.',
     ];
 
     public function index(): View
@@ -41,6 +59,7 @@ class RateCardController extends Controller
         return view('rate-cards.form', [
             'rateCard' => new RateCard(),
             'billingModels' => $this->billingModels,
+            'zoneModelGuidance' => self::ZONE_MODEL_GUIDANCE,
             'serviceNames' => config('branding.service_names', []),
         ]);
     }
@@ -64,13 +83,20 @@ class RateCardController extends Controller
             ? ZoneWeightRate::where('rate_card_id', $rateCard->id)->with('zone')->orderBy('zone_id')->orderBy('min_weight')->get()
             : collect();
 
+        $cartonRates = $rateCard->billing_model === 'carton_rate'
+            ? \App\Models\CartonRate::where('rate_card_id', $rateCard->id)->with('zone')->get()
+                ->sortBy(fn ($r) => $r->zone_id * 10 + array_search($r->carton_size, \App\Models\CartonRate::SIZES))
+            : collect();
+
         return view('rate-cards.form', [
             'rateCard' => $rateCard,
             'billingModels' => $this->billingModels,
+            'zoneModelGuidance' => self::ZONE_MODEL_GUIDANCE,
             'serviceNames' => config('branding.service_names', []),
             'zones' => $zones,
             'matrixEntries' => $matrixEntries,
             'weightRates' => $weightRates,
+            'cartonRates' => $cartonRates,
         ]);
     }
 
@@ -159,6 +185,37 @@ class RateCardController extends Controller
         return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Rate row removed.');
     }
 
+    /**
+     * Adds/updates one row of the carton_rate table: a (zone, carton
+     * size) combination with its price per carton. Same pattern as
+     * addWeightRate — one rate card owns its own table, not shared
+     * globally.
+     */
+    public function addCartonRate(Request $request, RateCard $rateCard): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'zone_id' => 'required|exists:zones,id',
+            'carton_size' => 'required|in:' . implode(',', \App\Models\CartonRate::SIZES),
+            'price_per_carton' => 'required|numeric|min:0',
+        ]);
+
+        $data = $validator->validate();
+
+        \App\Models\CartonRate::updateOrCreate(
+            ['rate_card_id' => $rateCard->id, 'zone_id' => $data['zone_id'], 'carton_size' => $data['carton_size']],
+            ['price_per_carton' => $data['price_per_carton']]
+        );
+
+        return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Carton rate saved.');
+    }
+
+    public function destroyCartonRate(RateCard $rateCard, \App\Models\CartonRate $cartonRate): RedirectResponse
+    {
+        $cartonRate->delete();
+
+        return redirect()->route('rate-cards.edit', $rateCard)->with('status', 'Carton rate removed.');
+    }
+
     private function validated(Request $request): array
     {
         $validator = Validator::make($request->all(), [
@@ -180,7 +237,6 @@ class RateCardController extends Controller
             'weekend_multiplier' => 'nullable|numeric',
             'fixed_amount' => 'nullable|numeric',
             'rate_per_truckload' => 'nullable|numeric',
-            'rate_per_carton' => 'nullable|numeric',
         ]);
 
         $validator->validate();
@@ -201,7 +257,7 @@ class RateCardController extends Controller
             'zone_to_zone' => [], // prices live in zone_rate_matrix instead
             'origin_destination_weight' => [], // prices live in zone_weight_rates instead
             'truckload' => ['rate_per_truckload'],
-            'carton_rate' => ['rate_per_carton'],
+            'carton_rate' => [], // prices live in carton_rates instead
         ];
 
         $relevantKeys = $configKeysByModel[$data['billing_model']] ?? [];

@@ -56,11 +56,20 @@
             <p class="mb-4 text-xs text-ink-500">Determines how the price is calculated. Fields below change based on your selection.</p>
 
             <select id="billing_model" name="billing_model"
-                    class="mb-5 w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    class="mb-2 w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 @foreach ($billingModels as $value => $label)
                     <option value="{{ $value }}" @selected(old('billing_model', $rateCard->billing_model ?? 'flat') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
+
+            @foreach ($zoneModelGuidance as $modelKey => $guidance)
+                <p data-zone-guidance="{{ $modelKey }}" class="mb-5 max-w-sm text-xs text-ink-500" style="{{ old('billing_model', $rateCard->billing_model ?? 'flat') === $modelKey ? '' : 'display:none' }}">
+                    {{ $guidance }}
+                </p>
+            @endforeach
+            @if (! in_array(old('billing_model', $rateCard->billing_model ?? 'flat'), array_keys($zoneModelGuidance)))
+                <div class="mb-5"></div>
+            @endif
 
             @php $config = old() ? old() : ($rateCard->model_config ?? []); @endphp
 
@@ -346,14 +355,83 @@
         </div>
     @endif
 
+    @if ($rateCard->exists && $rateCard->billing_model === 'carton_rate')
+        <div class="mt-8 rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Carton rates</h2>
+            <p class="mb-4 text-xs text-ink-500">
+                Price per carton by zone and size — the zone is resolved the same way as Origin-Destination rate
+                cards (Billing → Zone Mapping). Final price is price × number of cartons on the shipment.
+            </p>
+
+            <table class="mb-5 w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                        <th class="py-2 font-medium">Zone</th>
+                        <th class="py-2 font-medium">Carton size</th>
+                        <th class="py-2 font-medium">Price per carton</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($cartonRates as $rate)
+                        <tr class="border-b border-line last:border-0">
+                            <td class="py-2 text-ink-900">{{ $rate->zone->name }}</td>
+                            <td class="py-2 text-ink-900">{{ ucfirst($rate->carton_size) }}</td>
+                            <td class="py-2 font-mono text-ink-900">{{ number_format($rate->price_per_carton, 2) }}</td>
+                            <td class="py-2 text-right">
+                                <form method="POST" action="{{ route('rate-cards.carton-rates.destroy', [$rateCard, $rate]) }}" onsubmit="return confirm('Remove this carton rate?')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="py-6 text-center text-sm text-ink-500">No carton rates set yet.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+
+            <form method="POST" action="{{ route('rate-cards.carton-rates.store', $rateCard) }}" class="flex flex-wrap items-end gap-3">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
+                    <select name="zone_id" class="w-36 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        @foreach ($zones as $zone)
+                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Carton size</label>
+                    <select name="carton_size" class="w-32 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        @foreach (\App\Models\CartonRate::SIZES as $size)
+                            <option value="{{ $size }}">{{ ucfirst($size) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Price per carton</label>
+                    <input type="number" step="0.01" min="0" name="price_per_carton" class="w-32 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                </div>
+                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                    Save rate
+                </button>
+            </form>
+        </div>
+    @endif
+
     <script>
         (function () {
             const select = document.getElementById('billing_model');
             const groups = document.querySelectorAll('[data-model-group]');
+            const guidance = document.querySelectorAll('[data-zone-guidance]');
 
             function sync() {
                 groups.forEach(function (group) {
                     group.style.display = group.dataset.modelGroup === select.value ? '' : 'none';
+                });
+                guidance.forEach(function (p) {
+                    p.style.display = p.dataset.zoneGuidance === select.value ? '' : 'none';
                 });
             }
 

@@ -37,6 +37,7 @@ class ClientController extends Controller
             'distance_km' => 'nullable|numeric',
             'weight_kg' => 'nullable|numeric',
             'quantity' => 'nullable|integer|min:1',
+            'carton_size' => 'nullable|in:small,medium,large',
             'length_cm' => 'nullable|numeric',
             'width_cm' => 'nullable|numeric',
             'height_cm' => 'nullable|numeric',

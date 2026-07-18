@@ -43,6 +43,22 @@ class ClientBillingProfile extends Model
         return null;
     }
 
+    /**
+     * For contexts where the requester isn't the client themselves —
+     * staff booking a walk-in shipment on a known client's behalf, where
+     * $request->user() is the STAFF member, not the client.
+     * resolveForRequest() would resolve the wrong person's profile here;
+     * this looks up the client directly by the ID staff provided.
+     */
+    public static function resolveForClientUser(?int $clientUserId): ?self
+    {
+        if (! $clientUserId) {
+            return null;
+        }
+
+        return static::where('client_user_id', $clientUserId)->first();
+    }
+
     public function discountFraction(): float
     {
         if ($this->billing_type !== 'special') {

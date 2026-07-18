@@ -34,7 +34,7 @@ class RateEngine
             'contract' => $this->contract($rateCard),
             'origin_destination_weight' => $this->originDestinationWeight($rateCard, $context),
             'truckload' => $this->perUnit($rateCard, $context, 'rate_per_truckload'),
-            'carton_rate' => $this->perUnit($rateCard, $context, 'rate_per_carton'),
+            'carton_rate' => $this->cartonRate($rateCard, $context),
             default => throw new InvalidArgumentException("Unsupported billing model: {$rateCard->billing_model}"),
         };
     }
@@ -211,10 +211,41 @@ class RateEngine
     }
 
     /**
-     * Shared by 'truckload' and 'carton_rate' — both are simply
-     * quantity × a flat per-unit rate, just naming the unit differently
-     * (truckloads vs cartons) and therefore reading a different
-     * model_config key.
+     * Resolves the shipment's zone (same resolution as
+     * originDestinationWeight — city → state → ZoneMapping), then looks
+     * up this rate card's CartonRate row for (zone, carton_size), and
+     * multiplies by quantity (number of cartons). Falls back to zero
+     * rather than throwing if no matching row exists, since a missing
+     * carton-rate row is a setup gap, not something that should hard-fail
+     * a booking — same "degrade gracefully" posture as
+     * originDestinationWeight's weight-band fallback.
+     */
+    private function cartonRate(RateCard $rateCard, array $context): float
+    {
+        $zoneId = $this->resolveZoneIdForRoute(
+            $context['origin_city_id'] ?? null,
+            $context['destination_city_id'] ?? null
+        );
+
+        $cartonSize = $context['carton_size'] ?? null;
+        $quantity = (float) ($context['quantity'] ?? 0);
+
+        if (! $zoneId || ! $cartonSize || $quantity <= 0) {
+            return 0.0;
+        }
+
+        $rate = \App\Models\CartonRate::where('rate_card_id', $rateCard->id)
+            ->where('zone_id', $zoneId)
+            ->where('carton_size', $cartonSize)
+            ->first();
+
+        return $rate ? $quantity * (float) $rate->price_per_carton : 0.0;
+    }
+
+    /**
+     * Used by 'truckload' — a flat quantity × per-unit rate from the
+     * rate card's own model_config. carton_rate used to share this too,
+     * but now has its own zone/size-aware calculation above.
      */
     private function perUnit(RateCard $rateCard, array $context, string $rateConfigKey): float
     {

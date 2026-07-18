@@ -159,6 +159,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/rate-cards/{rateCard}/zone-prices/{zonePrice}', [RateCardController::class, 'destroyZonePrice'])->name('rate-cards.zone-prices.destroy');
         Route::post('/rate-cards/{rateCard}/weight-rates', [RateCardController::class, 'addWeightRate'])->name('rate-cards.weight-rates.store');
         Route::delete('/rate-cards/{rateCard}/weight-rates/{weightRate}', [RateCardController::class, 'destroyWeightRate'])->name('rate-cards.weight-rates.destroy');
+        Route::post('/rate-cards/{rateCard}/carton-rates', [RateCardController::class, 'addCartonRate'])->name('rate-cards.carton-rates.store');
+        Route::delete('/rate-cards/{rateCard}/carton-rates/{cartonRate}', [RateCardController::class, 'destroyCartonRate'])->name('rate-cards.carton-rates.destroy');
         Route::post('/zone-mappings/generate-domestic', [ZoneMappingController::class, 'generateDomestic'])->name('zone-mappings.generate-domestic');
         Route::post('/zone-mappings/generate-international', [ZoneMappingController::class, 'generateInternational'])->name('zone-mappings.generate-international');
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
