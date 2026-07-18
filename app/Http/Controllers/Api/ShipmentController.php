@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
-use App\Models\RateCard;
 use App\Models\Shipment;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
@@ -33,45 +32,32 @@ class ShipmentController extends Controller
     }
 
     /**
-     * Staff-initiated (walk-in) booking. Previously created the shipment
-     * with no price at all — every billing feature (discounts,
-     * onforwarding, zone-based rates, carton rates) only ever applied to
-     * client-portal/API bookings via ClientShipmentController. This now
-     * resolves pricing exactly the same way that controller does, so a
-     * walk-in booking and a client-booked one for the same
-     * origin/destination/weight/service produce the same price.
+     * Staff-initiated (walk-in) booking — resolves pricing exactly the
+     * way ClientShipmentController does. base_amount is currently always
+     * 0 — see ShipmentPricingService.
      *
      * client_user_id is optional — a walk-in customer may not have a
      * portal account at all. When it IS provided and that client has a
-     * Special billing profile, their discount still applies here.
+     * Special billing profile, their discount still applies here, via
+     * ClientBillingProfile::resolveForClientUser() rather than
+     * resolveForRequest() — the requester here is the STAFF member, not
+     * the client, so resolveForRequest() would resolve the wrong person.
      */
     public function store(Request $request): JsonResponse
     {
         $data = $this->validateShipment($request);
 
-        $rateCard = ($data['rate_card_id'] ?? null)
-            ? RateCard::find($data['rate_card_id'])
-            : RateCard::where('service_type', $data['service_type'])->where('is_active', true)->orderByDesc('priority')->first();
-
-        if (! $rateCard) {
-            return response()->json(['message' => 'No active rate card configured for this service type'], 422);
-        }
-
         $billingProfile = ClientBillingProfile::resolveForClientUser($data['client_user_id'] ?? null);
-        $pricing = $this->pricingService->priceShipment($rateCard, $data, $billingProfile);
+        $pricing = $this->pricingService->priceShipment($data, $billingProfile);
 
-        $shipment = Shipment::create([
-            ...$data,
-            'rate_card_id' => $rateCard->id,
-            ...$pricing,
-        ]);
+        $shipment = Shipment::create([...$data, ...$pricing]);
 
         return response()->json($shipment, 201);
     }
 
     public function show(Shipment $shipment): JsonResponse
     {
-        return response()->json($shipment->load(['scanEvents', 'rateCard', 'originZone', 'destinationZone', 'assignedRider']));
+        return response()->json($shipment->load(['scanEvents', 'originZone', 'destinationZone', 'assignedRider']));
     }
 
     public function update(Request $request, Shipment $shipment): JsonResponse
@@ -107,7 +93,6 @@ class ShipmentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'service_type' => 'required|string',
-            'rate_card_id' => 'nullable|exists:rate_cards,id',
             'client_user_id' => 'nullable|exists:users,id',
             'origin_address' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',

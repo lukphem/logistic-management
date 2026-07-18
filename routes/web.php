@@ -10,7 +10,6 @@ use App\Http\Controllers\Web\HubController;
 use App\Http\Controllers\Web\InvoiceController;
 use App\Http\Controllers\Web\OnforwardingClassificationController;
 use App\Http\Controllers\Web\OutletController;
-use App\Http\Controllers\Web\RateCardController;
 use App\Http\Controllers\Web\RegionController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\RouteController;
@@ -141,35 +140,19 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/zones/{zone}', [ZoneController::class, 'destroy'])->name('zones.destroy');
     });
 
-    // Billing setup: rate cards (the standard rate) + per-client standard/special assignment.
+    // Billing setup: zone mapping (rate cards being rebuilt one billing model at a time).
     Route::middleware('can:rates:read')->group(function () {
-        Route::get('/rate-cards', [RateCardController::class, 'index'])->name('rate-cards.index');
         Route::get('/zone-mappings', [ZoneMappingController::class, 'index'])->name('zone-mappings.index');
         Route::get('/zone-mappings/export-domestic', [ZoneMappingController::class, 'exportDomestic'])->name('zone-mappings.export-domestic');
         Route::get('/zone-mappings/export-international', [ZoneMappingController::class, 'exportInternational'])->name('zone-mappings.export-international');
     });
-    Route::middleware('can:rates:create')->group(function () {
-        Route::get('/rate-cards/create', [RateCardController::class, 'create'])->name('rate-cards.create');
-        Route::post('/rate-cards', [RateCardController::class, 'store'])->name('rate-cards.store');
-    });
     Route::middleware('can:rates:update')->group(function () {
-        Route::get('/rate-cards/{rateCard}/edit', [RateCardController::class, 'edit'])->name('rate-cards.edit');
-        Route::put('/rate-cards/{rateCard}', [RateCardController::class, 'update'])->name('rate-cards.update');
-        Route::post('/rate-cards/{rateCard}/zone-prices', [RateCardController::class, 'setZonePrice'])->name('rate-cards.zone-prices.store');
-        Route::delete('/rate-cards/{rateCard}/zone-prices/{zonePrice}', [RateCardController::class, 'destroyZonePrice'])->name('rate-cards.zone-prices.destroy');
-        Route::post('/rate-cards/{rateCard}/weight-rates', [RateCardController::class, 'addWeightRate'])->name('rate-cards.weight-rates.store');
-        Route::delete('/rate-cards/{rateCard}/weight-rates/{weightRate}', [RateCardController::class, 'destroyWeightRate'])->name('rate-cards.weight-rates.destroy');
-        Route::post('/rate-cards/{rateCard}/carton-rates', [RateCardController::class, 'addCartonRate'])->name('rate-cards.carton-rates.store');
-        Route::delete('/rate-cards/{rateCard}/carton-rates/{cartonRate}', [RateCardController::class, 'destroyCartonRate'])->name('rate-cards.carton-rates.destroy');
         Route::post('/zone-mappings/generate-domestic', [ZoneMappingController::class, 'generateDomestic'])->name('zone-mappings.generate-domestic');
         Route::post('/zone-mappings/generate-international', [ZoneMappingController::class, 'generateInternational'])->name('zone-mappings.generate-international');
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
         Route::patch('/zone-country-mappings/{zoneCountryMapping}/zone', [ZoneMappingController::class, 'updateCountryZone'])->name('zone-mappings.update-country-zone');
         Route::post('/zone-mappings/import-domestic', [ZoneMappingController::class, 'importDomestic'])->name('zone-mappings.import-domestic');
         Route::post('/zone-mappings/import-international', [ZoneMappingController::class, 'importInternational'])->name('zone-mappings.import-international');
-    });
-    Route::middleware('can:rates:delete')->group(function () {
-        Route::delete('/rate-cards/{rateCard}', [RateCardController::class, 'destroy'])->name('rate-cards.destroy');
     });
 
     Route::middleware('can:billing:read')->group(function () {

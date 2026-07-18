@@ -12,6 +12,7 @@ class Setting extends Model
         'vat_percentage', 'currency',
         'waybill_thermal_size', 'waybill_show_qr',
         'operating_regions', 'invoice_header', 'invoice_footer',
+        'supported_billing_models',
     ];
 
     protected $casts = [
@@ -19,6 +20,31 @@ class Setting extends Model
         'operating_regions' => 'array',
         'waybill_show_qr' => 'boolean',
         'vat_percentage' => 'float',
+        'supported_billing_models' => 'array',
+    ];
+
+    /**
+     * The fixed catalog of known billing-model TYPES — a reference list
+     * only. No calculation logic exists behind any of these right now;
+     * the whole billing-model layer (RateCard, RateEngine, and every
+     * per-model rate table) was cleared to be rebuilt one model at a
+     * time, each discussed and configured deliberately. This list is
+     * step one of that: pick which of these the business actually uses
+     * (supported_billing_models below) before any of them get built.
+     */
+    public const BILLING_MODELS = [
+        'flat' => 'Flat Rate',
+        'distance' => 'Distance-Based',
+        'weight' => 'Weight-Based',
+        'zone_to_zone' => 'Zone-to-Zone — fixed price per zone pair',
+        'origin_destination_weight' => 'Origin-Destination — weight bands + service type',
+        'volumetric' => 'Volumetric/Dimensional',
+        'hybrid' => 'Hybrid (Base + Distance + Weight)',
+        'service_multiplier' => 'Service-Type Multiplier',
+        'time_surcharge' => 'Time-Based Surcharge',
+        'contract' => 'Client-Specific Contract Rate',
+        'truckload' => 'Truckload (Flat Rate per Truck)',
+        'carton_rate' => 'Carton Rate — by zone + carton size',
     ];
 
     /**

@@ -41,6 +41,7 @@ class BrandingServiceProvider extends ServiceProvider
             'branding.invoice.header' => $settings->invoice_header,
             'branding.invoice.footer' => $settings->invoice_footer,
             'branding.login_design' => $settings->login_design ?? 'route',
+            'branding.supported_billing_models' => $settings->supported_billing_models ?? array_keys(\App\Models\Setting::BILLING_MODELS),
         ]);
     }
 }

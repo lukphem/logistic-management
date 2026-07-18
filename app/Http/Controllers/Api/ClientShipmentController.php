@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
-use App\Models\RateCard;
 use App\Models\Shipment;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +29,8 @@ class ClientShipmentController extends Controller
      * endpoint external integrators hit to book a shipment (idempotency
      * key expected via the Idempotency-Key header; enforcement to be added
      * alongside the queue/webhook layer in a later increment).
+     *
+     * base_amount is currently always 0 — see ShipmentPricingService.
      */
     public function store(Request $request): JsonResponse
     {
@@ -64,20 +65,10 @@ class ClientShipmentController extends Controller
 
         $data = $validator->validated();
 
-        $rateCard = RateCard::where('service_type', $data['service_type'])
-            ->where('is_active', true)
-            ->orderByDesc('priority')
-            ->first();
-
-        if (! $rateCard) {
-            return response()->json(['message' => 'No active rate card configured for this service type'], 422);
-        }
-
-        $pricing = $this->pricingService->priceShipment($rateCard, $data, ClientBillingProfile::resolveForRequest($request));
+        $pricing = $this->pricingService->priceShipment($data, ClientBillingProfile::resolveForRequest($request));
 
         $shipment = Shipment::create([
             ...$data,
-            'rate_card_id' => $rateCard->id,
             'client_user_id' => $request->user()?->id,
             'api_client_id' => $request->attributes->get('api_client')?->id,
             ...$pricing,

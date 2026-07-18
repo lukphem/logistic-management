@@ -28,6 +28,8 @@ class SettingsController extends Controller
             'color_primary' => 'required|string|max:20',
             'color_secondary' => 'required|string|max:20',
             'login_design' => 'required|in:' . implode(',', array_keys(Setting::LOGIN_DESIGNS)),
+            'supported_billing_models' => 'nullable|array',
+            'supported_billing_models.*' => 'in:' . implode(',', array_keys(Setting::BILLING_MODELS)),
             'vat_percentage' => 'required|numeric|min:0|max:100',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
@@ -45,6 +47,7 @@ class SettingsController extends Controller
         unset($data['logo']);
 
         $data['waybill_show_qr'] = $request->boolean('waybill_show_qr');
+        $data['supported_billing_models'] = $data['supported_billing_models'] ?? [];
         $data['operating_regions'] = $request->filled('operating_regions')
             ? array_map('trim', explode(',', $request->operating_regions))
             : [];

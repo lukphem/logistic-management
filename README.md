@@ -2239,3 +2239,94 @@ routes/web.php   (carton-rates routes)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 41 — Billing Model Layer Cleared, Rebuilding From a Reference List
+
+Per explicit instruction: the whole billing-model calculation layer is
+deleted, to be rebuilt one model at a time — each discussed and
+configured deliberately rather than shipping all 12 at once. This
+increment does the deletion and lays down step one of the rebuild: a
+simple reference list.
+
+### What was deleted
+
+- `rate_cards`, `zone_rate_matrix`, `zone_weight_rates`, `carton_rates`
+  tables — dropped, not migrated forward (nothing in this build has ever
+  run against real data, so there was nothing to preserve)
+- `shipments.rate_card_id` — dropped
+- `RateCard`, `ZoneRateMatrix`, `ZoneWeightRate`, `CartonRate` models
+- `RateEngine` service (the actual per-model calculation logic)
+- `RateCardController` (Web) and its views
+- `Api\RateController` — a **dead duplicate** discovered during this
+  cleanup: an old API-only rate-card controller from Increment 3, still
+  registered in `routes/api.php`, fully superseded by the Web
+  `RateCardController` years ago but never removed. Deleted along with
+  everything else.
+
+### What was deliberately kept — this isn't a billing wipe, just the calculation layer
+
+- `ClientBillingProfile` (discounts) — separate concern from *how* a
+  base rate is calculated
+- `OnforwardingClassification`, `Zone`, `ZoneMapping`,
+  `ZoneCountryMapping`, `Territory`, `Route` — the classification/mapping
+  layer that rebuilt billing models will plug into
+- Every price column already on `shipments` (`base_amount`,
+  `surcharge_amount`, `onforwarding_amount`, `discount_amount`,
+  `insurance_amount`, `vat_amount`, `total_amount`)
+- `ShipmentPricingService` — kept, but simplified: it no longer computes
+  `base_amount` itself (that was `RateEngine`'s job). It now reads
+  `base_amount` from the context array (defaulting to 0) and still
+  correctly handles discount, insurance, onforwarding, and VAT — none of
+  which depend on how the base freight charge was calculated. Every
+  booking endpoint (client portal, API integrators, staff walk-in) still
+  calls it the same way; base pricing is just 0 until a given model is
+  rebuilt and starts populating that context value.
+
+### Step one of the rebuild: a reference list, nothing more
+
+`Setting::BILLING_MODELS` — the fixed catalog of known billing-model
+*types* (Flat, Distance-Based, Weight-Based, Zone-to-Zone,
+Origin-Destination, Volumetric, Hybrid, Service-Type Multiplier,
+Time-Based Surcharge, Contract, Truckload, Carton Rate). Same pattern as
+`Zone::TIERS`/`Zone::TYPES` — a plain PHP array, not a database table,
+since each entry is a piece of calculation logic that doesn't exist yet,
+not a row of data.
+
+**No calculation logic exists behind any of these right now.** This is
+purely a checklist on **Setups → Company Settings → Supported billing
+models** — which of the 12 this business actually uses. Defaults to all
+12 checked (via `BrandingServiceProvider`'s fallback) so nothing about
+existing config assumes a narrower set until you deliberately narrow it.
+
+Next: pick one model from that list, and we build it — its
+configuration screen, its rate table (if it needs one), and its actual
+calculation logic — before moving to the next.
+
+### Files
+
+```
+database/migrations/2026_01_28_000001_drop_billing_model_tables.php
+database/migrations/2026_01_28_000002_add_supported_billing_models_to_settings_table.php
+app/Models/Setting.php   (BILLING_MODELS catalog)
+app/Models/Shipment.php, Zone.php   (stale references removed)
+app/Providers/BrandingServiceProvider.php   (supported_billing_models overlay)
+app/Http/Controllers/Web/SettingsController.php   (checklist validation)
+app/Http/Controllers/Api/ClientController.php, ClientShipmentController.php, ShipmentController.php   (RateCard lookups removed)
+app/Services/ShipmentPricingService.php   (rewritten: base_amount from context, not RateEngine)
+resources/views/settings/edit.blade.php   (Supported Billing Models checklist)
+resources/views/components/layouts/app.blade.php   (Rate Cards nav item removed)
+routes/web.php, routes/api.php   (rate-cards/rates routes removed)
+
+DELETED:
+app/Models/RateCard.php, ZoneRateMatrix.php, ZoneWeightRate.php, CartonRate.php
+app/Services/RateEngine.php
+app/Http/Controllers/Web/RateCardController.php
+app/Http/Controllers/Api/RateController.php (dead duplicate from Increment 3)
+resources/views/rate-cards/
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

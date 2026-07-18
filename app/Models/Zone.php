@@ -17,9 +17,9 @@ class Zone extends Model
      * grouping the way "West Africa" does). `type` (domestic/
      * international) is the required, primary classification when
      * creating a zone; `tier` is an optional refinement only offered in
-     * the UI when type = domestic. Reference data only — the actual
-     * price between zones still lives entirely in ZoneRateMatrix
-     * (Billing → Zone Mapping).
+     * the UI when type = domestic. Reference data only — Zone itself
+     * never holds a price; whichever billing model actually prices a
+     * zone (being rebuilt one model at a time) owns that.
      */
     public const TIERS = [
         'A' => ['label' => 'Zone A', 'coverage' => 'Same city / Local delivery', 'purpose' => 'Lowest tariff'],

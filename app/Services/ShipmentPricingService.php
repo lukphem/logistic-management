@@ -3,34 +3,30 @@
 namespace App\Services;
 
 use App\Models\ClientBillingProfile;
-use App\Models\RateCard;
 
 class ShipmentPricingService
 {
-    public function __construct(private RateEngine $rateEngine)
-    {
-    }
-
     /**
      * Returns the full pricing breakdown for a shipment quote.
-     * $context should include the raw shipment attributes (see RateEngine::calculateBase)
-     * plus optional 'insurance_value' and 'vat_percentage' overrides.
+     *
+     * base_amount is read from $context['base_amount'] rather than
+     * calculated here — the billing-model calculation layer (previously
+     * RateEngine/RateCard) was cleared to be rebuilt one model at a time.
+     * Until a given billing model is rebuilt and its result placed into
+     * the context by the caller, base_amount is 0 — everything else
+     * (discount, insurance, onforwarding, VAT) still works correctly in
+     * the meantime, since none of that depends on how the base freight
+     * charge was calculated.
      *
      * $billingProfile is optional — pass the requester's
-     * ClientBillingProfile (see ClientBillingProfile::resolveForRequest)
-     * to apply a 'special' discount. Standard clients (the default, and
-     * anyone with no profile at all) pass null or a 'standard' profile
-     * and get the plain rate-card price with no adjustment.
-     *
-     * The discount is always applied against whatever the standard rate
-     * resolves to right now — it is never a frozen number. Raise the
-     * standard rate later and every special client's price moves with
-     * it automatically; only the discount_percentage itself is a
-     * separate, deliberate edit.
+     * ClientBillingProfile (see ClientBillingProfile::resolveForRequest
+     * or ::resolveForClientUser) to apply a 'special' discount. Standard
+     * clients (the default, and anyone with no profile at all) pass null
+     * and get the plain price with no adjustment.
      */
-    public function priceShipment(RateCard $rateCard, array $context, ?ClientBillingProfile $billingProfile = null): array
+    public function priceShipment(array $context, ?ClientBillingProfile $billingProfile = null): array
     {
-        $baseAmount = $this->rateEngine->calculateBase($rateCard, $context);
+        $baseAmount = (float) ($context['base_amount'] ?? 0);
         $surchargeAmount = $this->calculateSurcharges($context);
 
         $discountFraction = $billingProfile?->discountFraction() ?? 0.0;

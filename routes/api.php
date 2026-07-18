@@ -21,8 +21,6 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('roles', \App\Http\Controllers\Api\RoleController::class);
         Route::apiResource('permissions', \App\Http\Controllers\Api\PermissionController::class)->only(['index']);
         Route::apiResource('shipments', \App\Http\Controllers\Api\ShipmentController::class);
-        Route::apiResource('rates', \App\Http\Controllers\Api\RateController::class);
-        Route::post('/rates/{rate}/zone-price', [\App\Http\Controllers\Api\RateController::class, 'setZonePrice']);
         Route::get('/reports/exceptions', [\App\Http\Controllers\Api\ReportController::class, 'exceptions']);
     });
 

@@ -111,6 +111,25 @@
             </div>
         </div>
 
+        {{-- Supported Billing Models --}}
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Supported billing models</h2>
+            <p class="mb-4 text-xs text-ink-500">
+                Which billing models this business actually uses. This is a reference list only right now — each
+                model gets built and configured individually before it can actually be used on a rate card.
+            </p>
+
+            @php $selectedModels = old('supported_billing_models', $settings->supported_billing_models ?? array_keys(\App\Models\Setting::BILLING_MODELS)); @endphp
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                @foreach (\App\Models\Setting::BILLING_MODELS as $key => $label)
+                    <label class="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="checkbox" name="supported_billing_models[]" value="{{ $key }}" class="mt-0.5 rounded border-line" @checked(in_array($key, $selectedModels))>
+                        <span class="text-sm text-ink-900">{{ $label }}</span>
+                    </label>
+                @endforeach
+            </div>
+        </div>
+
         {{-- Billing Defaults --}}
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Billing defaults</h2>

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientBillingProfile;
 use App\Models\ClientWallet;
-use App\Models\RateCard;
 use App\Models\Shipment;
 use App\Services\ShipmentPricingService;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +22,11 @@ class ClientController extends Controller
      * by the client portal (JWT) and external integrators (API key) —
      * see routes/api.php: /client/quote and /integration/quote both point
      * here.
+     *
+     * base_amount is currently always 0 — the billing-model calculation
+     * layer was cleared and is being rebuilt one model at a time (see
+     * ShipmentPricingService). Everything else (discount resolution,
+     * insurance, onforwarding, VAT) already works correctly.
      */
     public function quote(Request $request): JsonResponse
     {
@@ -49,25 +53,13 @@ class ClientController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $rateCard = RateCard::where('service_type', $request->service_type)
-            ->where('is_active', true)
-            ->orderByDesc('priority')
-            ->first();
-
-        if (! $rateCard) {
-            return response()->json(['message' => 'No active rate card configured for this service type'], 422);
-        }
-
         $breakdown = $this->pricingService->priceShipment(
-            $rateCard,
             $validator->validated(),
             ClientBillingProfile::resolveForRequest($request)
         );
 
         return response()->json([
             'service_type' => $request->service_type,
-            'rate_card_id' => $rateCard->id,
-            'billing_model' => $rateCard->billing_model,
             ...$breakdown,
         ]);
     }
