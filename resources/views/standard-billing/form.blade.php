@@ -32,25 +32,59 @@
             @endif
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Min weight (kg) <x-required /></label>
-                <input type="number" step="0.01" min="0" name="min_weight" value="{{ old('min_weight', $tariff->min_weight) }}"
-                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+        @if ($tariff->exists)
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Min weight (kg) <x-required /></label>
+                    <input type="number" step="0.01" min="0" name="min_weight" value="{{ old('min_weight', $tariff->min_weight) }}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Max weight (kg) <x-required /></label>
+                    <input type="number" step="0.01" min="0" name="max_weight" value="{{ old('max_weight', $tariff->max_weight) }}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <p class="mt-1 text-xs text-ink-500">Also the overage threshold — weight above this is billed in increments below.</p>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Additional weight (kg) <x-required /></label>
+                    <input type="number" step="0.01" min="0.01" name="additional_weight" value="{{ old('additional_weight', $tariff->additional_weight ?? 1) }}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <p class="mt-1 text-xs text-ink-500">The increment size overage is charged in.</p>
+                </div>
             </div>
+        @else
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Max weight (kg) <x-required /></label>
-                <input type="number" step="0.01" min="0" name="max_weight" value="{{ old('max_weight', $tariff->max_weight) }}"
-                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                <p class="mt-1 text-xs text-ink-500">Also the overage threshold — weight above this is billed in increments below.</p>
+                <div class="mb-2 flex items-center justify-between">
+                    <label class="block text-sm font-medium text-ink-900">Weight ranges <x-required /></label>
+                    <button type="button" id="add-range" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">+ Add another range</button>
+                </div>
+                <p class="mb-3 text-xs text-ink-500">
+                    One tariff per range, all for the service type above — e.g. 0.5–20kg and 20.5–40kg as two rows,
+                    created together. Max weight also sets the overage threshold for that range.
+                </p>
+
+                <div id="range-rows" class="space-y-3">
+                    <div class="range-row grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Min weight (kg)</label>
+                            <input type="number" step="0.01" min="0" name="ranges[0][min_weight]"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Max weight (kg)</label>
+                            <input type="number" step="0.01" min="0" name="ranges[0][max_weight]"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Additional weight (kg)</label>
+                            <input type="number" step="0.01" min="0.01" name="ranges[0][additional_weight]" value="1"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <button type="button" class="remove-range hidden rounded-md px-3 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
+                    </div>
+                </div>
             </div>
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Additional weight (kg) <x-required /></label>
-                <input type="number" step="0.01" min="0.01" name="additional_weight" value="{{ old('additional_weight', $tariff->additional_weight ?? 1) }}"
-                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                <p class="mt-1 text-xs text-ink-500">The increment size overage is charged in.</p>
-            </div>
-        </div>
+        @endif
 
         <label class="flex items-center gap-2 text-sm text-ink-900">
             <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $tariff->exists ? $tariff->is_active : true)) class="rounded border-line">
@@ -130,5 +164,34 @@
             </form>
         </div>
     @endif
+
+    <script>
+        (function () {
+            const addButton = document.getElementById('add-range');
+            if (!addButton) return; // editing an existing tariff — no repeatable rows here
+
+            const container = document.getElementById('range-rows');
+            let index = 1;
+
+            addButton.addEventListener('click', function () {
+                const row = container.querySelector('.range-row').cloneNode(true);
+
+                row.querySelectorAll('input').forEach(function (input) {
+                    input.name = input.name.replace(/ranges\[\d+\]/, `ranges[${index}]`);
+                    if (!input.name.includes('additional_weight')) {
+                        input.value = '';
+                    }
+                });
+
+                row.querySelector('.remove-range').classList.remove('hidden');
+                row.querySelector('.remove-range').addEventListener('click', function () {
+                    row.remove();
+                });
+
+                container.appendChild(row);
+                index++;
+            });
+        })();
+    </script>
 
 </x-layouts.app>

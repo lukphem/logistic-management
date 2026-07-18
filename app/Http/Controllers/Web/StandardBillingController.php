@@ -35,11 +35,44 @@ class StandardBillingController extends Controller
         ]);
     }
 
+    /**
+     * Creates one or more weight-band tariffs for the same service type
+     * in a single submission — e.g. 0.5–20kg and 20.5–40kg entered as two
+     * rows on one form, instead of visiting "Add tariff" twice. Each row
+     * still becomes its own StandardBillingTariff record; nothing about
+     * how they're matched at quote time changes, this only changes how
+     * many you can set up in one go.
+     */
     public function store(Request $request): RedirectResponse
     {
-        $tariff = StandardBillingTariff::create($this->validated($request));
+        $validator = Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'ranges' => 'required|array|min:1',
+            'ranges.*.min_weight' => 'required|numeric|min:0',
+            'ranges.*.max_weight' => 'required|numeric|gt:ranges.*.min_weight',
+            'ranges.*.additional_weight' => 'required|numeric|min:0.01',
+        ]);
 
-        return redirect()->route('standard-billing.edit', $tariff)->with('status', 'Tariff created — add zone prices below.');
+        $data = $validator->validate();
+        $isActive = $request->boolean('is_active', true);
+
+        $created = 0;
+        foreach ($data['ranges'] as $range) {
+            StandardBillingTariff::create([
+                'service_type_id' => $data['service_type_id'],
+                'min_weight' => $range['min_weight'],
+                'max_weight' => $range['max_weight'],
+                'additional_weight' => $range['additional_weight'],
+                'is_active' => $isActive,
+            ]);
+            $created++;
+        }
+
+        $message = $created === 1
+            ? 'Tariff created — add zone prices below.'
+            : "{$created} tariffs created — add zone prices to each from the list.";
+
+        return redirect()->route('standard-billing.index')->with('status', $message);
     }
 
     public function edit(StandardBillingTariff $tariff): View

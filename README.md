@@ -2717,3 +2717,36 @@ routes/web.php
 ```
 
 No migration needed.
+
+## Increment 50 — Multiple Weight Ranges in One Submission
+
+Creating a tariff previously only accepted one weight band per
+submission — adding several ranges for the same service type (e.g.
+0.5–20kg, then 20.5–40kg) meant visiting "Add tariff" repeatedly,
+re-selecting the same service type each time.
+
+The **Add Tariff** screen now shows a repeatable "Weight ranges" section
+— pick the service type once, add as many min/max/additional-weight
+rows as needed via "+ Add another range," submit once. Each row still
+becomes its own `StandardBillingTariff` record — nothing about how
+`PricingEngine` matches a weight to a band changes, this only changes
+how many bands can be set up in one go.
+
+**Editing an existing tariff is unchanged** — a single tariff still has
+one weight band, edited with the same plain fields as before. The
+repeatable-rows UI only appears on the create screen, since editing is
+always about one specific existing record.
+
+After creating multiple tariffs at once, the redirect goes to the
+tariff list instead of a single edit page (there's no longer one
+obvious "the" tariff to land on) — each new tariff still needs its own
+zone prices set up individually from there.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (store() accepts a ranges[] array, creates one tariff per row)
+resources/views/standard-billing/form.blade.php   (repeatable range rows on create, unchanged single fields on edit)
+```
+
+No migration needed.
