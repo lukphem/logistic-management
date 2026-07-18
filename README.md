@@ -2878,3 +2878,42 @@ routes/web.php   (standard-billing.export, standard-billing.import)
 ```
 
 No migration needed.
+
+## Increment 54 — Edit Mode Unified Into the Same Single Form Too
+
+Increment 53 unified Create into one form but left Edit with two —
+the tariff's own fields, and a separate "add one zone" form below it.
+That's almost certainly what "form still not showing as one" meant.
+
+**Now there's exactly one `<form>` on this page, in both modes.** Editing
+an existing tariff pre-populates the Zone Prices section with its
+current prices as the same repeatable rows Create already used — each
+carries a hidden `id` — plus "+ Add zone" for new ones. Saving updates
+the tariff and every zone price together:
+
+- A row with its `id` present and Charge filled → updates that price
+- A row with its `id` present and Charge blank → deletes that price
+- A row with no `id` and Charge + Zone filled → creates a new price
+- An existing price whose row was removed client-side (the Remove
+  button deletes it from the page) never reaches the request at all —
+  deleted server-side too, since it's no longer represented in the
+  submission
+
+The old one-at-a-time `addZonePrice()`/`destroyZonePrice()` actions (and
+their routes) are gone — genuinely replaced, not just superseded, since
+nothing calls them anymore.
+
+**The tariff-scoped CSV Export/Import stays** — moved to sit clearly
+above the form now, since bulk-importing many zones from a file is a
+different, still-useful action from typing rows by hand, not something
+that needs to be "the same form" to make sense as one coherent screen.
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (update() processes zone_prices[] with id-based create/update/delete; addZonePrice()/destroyZonePrice() removed)
+resources/views/standard-billing/form.blade.php   (single form in both modes; existing prices pre-populate as removable rows)
+routes/web.php   (zone-prices.store/destroy routes removed)
+```
+
+No migration needed.

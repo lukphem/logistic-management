@@ -110,11 +110,74 @@ class StandardBillingController extends Controller
         ]);
     }
 
+    /**
+     * Same single-form principle as store(): the tariff's own fields and
+     * every zone price are submitted together. Each zone-price row may
+     * carry a hidden `id` (an existing TariffZonePrice) — present + blank
+     * charge deletes it, present + filled updates it, absent + filled
+     * creates a new one. Any existing price whose id isn't present in
+     * this submission at all was removed client-side (the "Remove"
+     * button deletes its row from the DOM) and gets deleted here too.
+     */
     public function update(Request $request, StandardBillingTariff $tariff): RedirectResponse
     {
-        $tariff->update($this->validated($request, $tariff));
+        $data = $this->validated($request, $tariff);
 
-        return redirect()->route('standard-billing.edit', $tariff)->with('status', 'Tariff updated.');
+        $validator = Validator::make($request->all(), [
+            'zone_prices' => 'nullable|array',
+            'zone_prices.*.id' => 'nullable|integer|exists:tariff_zone_prices,id',
+            'zone_prices.*.zone_id' => 'nullable|exists:zones,id',
+            'zone_prices.*.charge' => 'nullable|numeric|min:0',
+            'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
+            'zone_prices.*.transit_days' => 'nullable|integer|min:0',
+        ]);
+        $zoneData = $validator->validate();
+
+        $tariff->update($data);
+
+        $submittedIds = [];
+        $saved = 0;
+
+        foreach ($zoneData['zone_prices'] ?? [] as $row) {
+            $hasCharge = isset($row['charge']) && $row['charge'] !== '';
+
+            if (! empty($row['id'])) {
+                $submittedIds[] = $row['id'];
+
+                if (! $hasCharge) {
+                    TariffZonePrice::where('id', $row['id'])->where('tariff_id', $tariff->id)->delete();
+                    continue;
+                }
+
+                TariffZonePrice::where('id', $row['id'])->where('tariff_id', $tariff->id)->update([
+                    'zone_id' => $row['zone_id'],
+                    'charge' => $row['charge'],
+                    'additional_charge' => $row['additional_charge'] ?? 0,
+                    'transit_days' => ($row['transit_days'] ?? '') !== '' ? $row['transit_days'] : null,
+                ]);
+                $saved++;
+                continue;
+            }
+
+            if ($hasCharge && ! empty($row['zone_id'])) {
+                $new = TariffZonePrice::create([
+                    'tariff_id' => $tariff->id,
+                    'zone_id' => $row['zone_id'],
+                    'charge' => $row['charge'],
+                    'additional_charge' => $row['additional_charge'] ?? 0,
+                    'transit_days' => ($row['transit_days'] ?? '') !== '' ? $row['transit_days'] : null,
+                ]);
+                $submittedIds[] = $new->id;
+                $saved++;
+            }
+        }
+
+        // A row removed via the "Remove" button never reaches this
+        // request at all — its existing price is deleted here since it's
+        // no longer represented in the submission.
+        TariffZonePrice::where('tariff_id', $tariff->id)->whereNotIn('id', $submittedIds)->delete();
+
+        return redirect()->route('standard-billing.edit', $tariff)->with('status', "Tariff updated, {$saved} zone price" . ($saved === 1 ? '' : 's') . ' saved.');
     }
 
     public function destroy(StandardBillingTariff $tariff): RedirectResponse
@@ -122,42 +185,6 @@ class StandardBillingController extends Controller
         $tariff->delete();
 
         return redirect()->route('standard-billing.index')->with('status', 'Tariff removed.');
-    }
-
-    /**
-     * One line at a time, via a plain form — for adding one more zone to
-     * a tariff that already exists. Adds or updates whichever zone is
-     * selected; re-selecting an already-priced zone updates it rather
-     * than duplicating.
-     */
-    public function addZonePrice(Request $request, StandardBillingTariff $tariff): RedirectResponse
-    {
-        $validator = Validator::make($request->all(), [
-            'zone_id' => 'required|exists:zones,id',
-            'charge' => 'required|numeric|min:0',
-            'additional_charge' => 'nullable|numeric|min:0',
-            'transit_days' => 'nullable|integer|min:0',
-        ]);
-
-        $data = $validator->validate();
-
-        TariffZonePrice::updateOrCreate(
-            ['tariff_id' => $tariff->id, 'zone_id' => $data['zone_id']],
-            [
-                'charge' => $data['charge'],
-                'additional_charge' => $data['additional_charge'] ?? 0,
-                'transit_days' => $data['transit_days'] ?? null,
-            ]
-        );
-
-        return redirect()->route('standard-billing.edit', $tariff)->with('status', 'Zone price saved.');
-    }
-
-    public function destroyZonePrice(StandardBillingTariff $tariff, TariffZonePrice $zonePrice): RedirectResponse
-    {
-        $zonePrice->delete();
-
-        return redirect()->route('standard-billing.edit', $tariff)->with('status', 'Zone price removed.');
     }
 
     /**
