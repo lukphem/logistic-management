@@ -3002,3 +3002,33 @@ resources/views/standard-billing/form.blade.php   (zone-rows section rebuilt aro
 ```
 
 No migration, no controller changes — this was purely a view-layer bug.
+
+## Increment 58 — Bug Fix: Rate Checker's City/District Dropdowns Now Survive a Reload
+
+Same symptom as Increment 57, different root cause: the Rate Checker is
+a GET form (every "Check rate" click reloads the same page with the
+selections in the query string), and the State dropdowns correctly
+showed their previous selection on reload — but City and District are
+entirely JS-populated, and that population only ever ran in response to
+a user's manual `change` event, never on the page simply loading with a
+state already selected. The result: after checking a rate, the form
+looked like it had forgotten the city and district, even though they
+were sitting right there in the URL the whole time.
+
+### The fix
+
+`wireCascade()` now exposes `populateCities()`/`populateDistricts()` as
+shared functions, used by both the `change` listeners and a new restore
+step: if a state is already selected when the page loads (i.e., this
+came from a real submission, not a first visit), the city list is
+rebuilt immediately and the previously-chosen city is re-selected —
+same for district once the city's set. Both origin and destination
+sides get this independently.
+
+### Files
+
+```
+resources/views/rate-checker/index.blade.php   (wireCascade() rebuilt to restore state on page load, not just respond to change events)
+```
+
+No migration, no controller changes.

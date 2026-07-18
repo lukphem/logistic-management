@@ -187,12 +187,23 @@
             const citiesByState = @json($cities->groupBy('state_id')->map->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]));
             const districtsByCity = @json($districts->groupBy('city_id')->map->map(fn ($d) => ['id' => $d->id, 'name' => $d->name]));
 
-            function wireCascade(stateSelectId, citySelectId, districtSelectId) {
+            /**
+             * Reloading with a state already in the query string (every
+             * "Check rate" click reloads this GET form) previously left
+             * City/District empty — they're entirely JS-populated and
+             * only responded to a user's manual change event, never to
+             * the page simply loading with a value already selected.
+             * populateCities()/populateDistricts() are now shared by
+             * both the change listeners AND an explicit restore step
+             * below, so a reload rebuilds the full cascade and
+             * re-selects what was actually chosen.
+             */
+            function wireCascade(stateSelectId, citySelectId, districtSelectId, initialCityId, initialDistrictId) {
                 const stateSelect = document.getElementById(stateSelectId);
                 const citySelect = document.getElementById(citySelectId);
                 const districtSelect = districtSelectId ? document.getElementById(districtSelectId) : null;
 
-                stateSelect.addEventListener('change', function () {
+                function populateCities(selectCityId) {
                     citySelect.innerHTML = '<option value="">Select a city</option>';
                     if (districtSelect) districtSelect.innerHTML = '<option value="">Select a district</option>';
 
@@ -200,25 +211,50 @@
                         const opt = document.createElement('option');
                         opt.value = city.id;
                         opt.textContent = city.name;
+                        if (selectCityId && String(city.id) === String(selectCityId)) {
+                            opt.selected = true;
+                        }
                         citySelect.appendChild(opt);
                     });
+                }
+
+                function populateDistricts(selectDistrictId) {
+                    if (!districtSelect) return;
+
+                    districtSelect.innerHTML = '<option value="">Select a district</option>';
+
+                    (districtsByCity[citySelect.value] || []).forEach(function (district) {
+                        const opt = document.createElement('option');
+                        opt.value = district.id;
+                        opt.textContent = district.name;
+                        if (selectDistrictId && String(district.id) === String(selectDistrictId)) {
+                            opt.selected = true;
+                        }
+                        districtSelect.appendChild(opt);
+                    });
+                }
+
+                stateSelect.addEventListener('change', function () {
+                    populateCities();
                 });
 
                 if (districtSelect) {
                     citySelect.addEventListener('change', function () {
-                        districtSelect.innerHTML = '<option value="">Select a district</option>';
-                        (districtsByCity[citySelect.value] || []).forEach(function (district) {
-                            const opt = document.createElement('option');
-                            opt.value = district.id;
-                            opt.textContent = district.name;
-                            districtSelect.appendChild(opt);
-                        });
+                        populateDistricts();
                     });
+                }
+
+                if (stateSelect.value) {
+                    populateCities(initialCityId);
+
+                    if (districtSelect && citySelect.value) {
+                        populateDistricts(initialDistrictId);
+                    }
                 }
             }
 
-            wireCascade('origin-state', 'origin-city', 'origin-district');
-            wireCascade('destination-state', 'destination-city', 'destination-district');
+            wireCascade('origin-state', 'origin-city', 'origin-district', @json(request('origin_city_id')), @json(request('origin_district_id')));
+            wireCascade('destination-state', 'destination-city', 'destination-district', @json(request('destination_city_id')), @json(request('destination_district_id')));
         })();
     </script>
 
