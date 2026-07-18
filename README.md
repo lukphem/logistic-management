@@ -2558,3 +2558,51 @@ bands) — only makes the edge case predictable instead of undefined.
 ```
 app/Services/PricingEngine.php
 ```
+
+## Increment 46 — Rate Checker: State/District Selection, Full Breakdown, Filtered by Billing Model
+
+Three related improvements to the Rate Checker, based on feedback after
+Increment 44.
+
+### State and District added — the checker now runs the full pricing pipeline
+
+Previously the checker only called `PricingEngine::quote()` (base
+freight only) — there was no way to preview onforwarding at all, since
+that depends on `origin_district_id`/`destination_district_id`, which
+the form never collected. It now:
+
+- Collects **State** (new — cascades the City list), **City**, and
+  **District** (new, optional) for both origin and destination
+- Calls `ShipmentPricingService::priceShipment()` with the full context
+  after getting `base_amount` from `PricingEngine`, so the result shows
+  the complete breakdown — base, surcharges, onforwarding, discount,
+  insurance, VAT, total — exactly what a real booking would produce
+  (minus any client-specific discount, since no client is selected here)
+
+### `PricingEngine` now accepts a State directly
+
+`resolveZoneAndType()` previously required a City (and derived the state
+from it internally) — a state can now be passed directly
+(`origin_state_id`/`destination_state_id`), with City still supported as
+before. A city is one way to arrive at a state, not the only way; this
+lets the Rate Checker (and any future caller) resolve a zone from just a
+state when that's all that's known or relevant.
+
+### Billing Model + Route Type now filter Service Type, not the other way around
+
+Previously Service Type was the first, independent field. Now Billing
+Model and Route Type come first, and Service Type is filtered live
+(client-side, no page reload) to only the ones using the selected
+billing model — picking a mismatched combination isn't possible anymore.
+Route Type continues to control which fields show (State/City/District
+for domestic, Country for international) exactly as before.
+
+### Files
+
+```
+app/Services/PricingEngine.php   (resolveZoneAndType accepts state_id directly)
+app/Http/Controllers/Web/RateCheckerController.php   (full pipeline, state/district support)
+resources/views/rate-checker/index.blade.php   (rebuilt: Billing Model/Route Type first, State→City→District cascading, full breakdown)
+```
+
+No migration needed.

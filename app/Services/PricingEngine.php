@@ -119,26 +119,29 @@ class PricingEngine
 
     /**
      * Domestic when both origin and destination resolve to a Nigerian
-     * city/state — uses ZoneMapping (state-pairs), same as the Zone
-     * Mapping screen. International when either side is a foreign
-     * country — uses ZoneCountryMapping, checking destination first
-     * (the far more common outbound case) then origin (inbound).
+     * state — uses ZoneMapping (state-pairs), same as the Zone Mapping
+     * screen. International when either side is a foreign country —
+     * uses ZoneCountryMapping, checking destination first (the far more
+     * common outbound case) then origin (inbound).
+     *
+     * A state can be given directly (origin_state_id/destination_state_id)
+     * or derived from a city (origin_city_id/destination_city_id) — a
+     * city is one way to arrive at a state for zone resolution, not the
+     * only way. Explicit state_id takes priority when both are somehow
+     * present.
      */
     private function resolveZoneAndType(array $context): array
     {
-        $originCityId = $context['origin_city_id'] ?? null;
-        $destinationCityId = $context['destination_city_id'] ?? null;
+        $originStateId = $context['origin_state_id']
+            ?? (! empty($context['origin_city_id']) ? City::find($context['origin_city_id'])?->state_id : null);
+        $destinationStateId = $context['destination_state_id']
+            ?? (! empty($context['destination_city_id']) ? City::find($context['destination_city_id'])?->state_id : null);
 
-        if ($originCityId && $destinationCityId) {
-            $originStateId = City::find($originCityId)?->state_id;
-            $destinationStateId = City::find($destinationCityId)?->state_id;
+        if ($originStateId && $destinationStateId) {
+            $zone = ZoneMapping::resolveZone($originStateId, $destinationStateId);
 
-            if ($originStateId && $destinationStateId) {
-                $zone = ZoneMapping::resolveZone($originStateId, $destinationStateId);
-
-                if ($zone) {
-                    return [$zone, 'domestic'];
-                }
+            if ($zone) {
+                return [$zone, 'domestic'];
             }
         }
 
