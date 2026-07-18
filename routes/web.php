@@ -161,6 +161,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:billing:read')->group(function () {
         Route::get('/service-types', [ServiceTypeController::class, 'index'])->name('service-types.index');
         Route::get('/standard-billing', [StandardBillingController::class, 'index'])->name('standard-billing.index');
+        Route::get('/standard-billing/{tariff}/zone-prices/export', [StandardBillingController::class, 'exportZonePrices'])->name('standard-billing.zone-prices.export');
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
@@ -178,7 +179,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/standard-billing/{tariff}/edit', [StandardBillingController::class, 'edit'])->name('standard-billing.edit');
         Route::put('/standard-billing/{tariff}', [StandardBillingController::class, 'update'])->name('standard-billing.update');
         Route::delete('/standard-billing/{tariff}', [StandardBillingController::class, 'destroy'])->name('standard-billing.destroy');
-        Route::put('/standard-billing/{tariff}/zone-prices', [StandardBillingController::class, 'updateZonePrices'])->name('standard-billing.zone-prices.update');
+        Route::post('/standard-billing/{tariff}/zone-prices', [StandardBillingController::class, 'addZonePrice'])->name('standard-billing.zone-prices.store');
+        Route::delete('/standard-billing/{tariff}/zone-prices/{zonePrice}', [StandardBillingController::class, 'destroyZonePrice'])->name('standard-billing.zone-prices.destroy');
+        Route::post('/standard-billing/{tariff}/zone-prices/import', [StandardBillingController::class, 'importZonePrices'])->name('standard-billing.zone-prices.import');
         Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
         Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
         Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');

@@ -2683,3 +2683,37 @@ routes/web.php   (one PUT route replaces the old POST+DELETE pair)
 ```
 
 No migration needed — this increment is controller and view logic only.
+
+## Increment 49 — Zone Prices: Simple Form Restored + CSV Export/Import
+
+Reverses Increment 48's bulk inline-table approach — it was a worse UX
+than the plain form it replaced. Restored the clean, simple pattern
+(list of existing prices + one plain form below to add/update a single
+zone), matching how every other setup screen in this app already works,
+and added what actually solves the "many zones to enter" problem
+properly: CSV export/import, using the same `CsvService`
+pattern already proven on Zone Mapping, Countries, States, etc.
+
+### What changed
+
+- `addZonePrice()`/`destroyZonePrice()` restored — one zone at a time,
+  via a plain form (Zone / Charge / Additional charge / Transit days /
+  Save)
+- New `exportZonePrices()`/`importZonePrices()` — scoped to a single
+  tariff (each tariff is its own weight band/service type, so its zone
+  prices are its own CSV, not a global one). Natural key is the zone's
+  **code**, same convention used throughout every other CSV round trip
+  in this app — download, fill in the rest of the zones in a
+  spreadsheet, re-upload
+- `<x-csv-actions>` (the shared component from Increment 39) now appears
+  on the tariff edit page, right above the zone-prices table
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (addZonePrice/destroyZonePrice restored, exportZonePrices/importZonePrices added)
+resources/views/standard-billing/form.blade.php   (simple list + form restored, CSV bar added)
+routes/web.php
+```
+
+No migration needed.
