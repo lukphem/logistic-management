@@ -69,10 +69,16 @@ class PricingEngine
 
         $weight = (float) ($context['weight_kg'] ?? 0);
 
+        // orderBy makes this deterministic if two tariffs for the same
+        // service type ever have overlapping weight bands (a setup
+        // mistake nothing currently prevents) — picks the narrowest/
+        // lowest-starting band rather than depending on database row
+        // order, which would otherwise vary by engine.
         $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
             ->where('is_active', true)
             ->where('min_weight', '<=', $weight)
             ->where('max_weight', '>=', $weight)
+            ->orderBy('min_weight')
             ->first();
 
         // Heavier than every configured band? Fall back to the highest

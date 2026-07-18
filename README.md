@@ -2539,3 +2539,22 @@ php artisan migrate
 3. Setups → Billing → Standard Billing — create a tariff for that
    service type's weight range, then add a price per zone
 4. Setups → Billing → Rate Checker — verify it prices correctly
+
+## Increment 45 — Standard Billing Tariff Lookup Made Deterministic
+
+Self-audit fix on Increment 44: the tariff-matching query had no
+explicit `orderBy`, so if two tariffs for the same service type ever end
+up with overlapping weight bands (nothing currently validates against
+that), which one won would depend on database row order — unpredictable,
+and could differ between environments. Added `orderBy('min_weight')` so
+the narrowest/lowest-starting band always wins consistently, regardless
+of insertion order or database engine.
+
+No schema change, no behavior change for the normal case (non-overlapping
+bands) — only makes the edge case predictable instead of undefined.
+
+### Files
+
+```
+app/Services/PricingEngine.php
+```
