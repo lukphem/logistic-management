@@ -29,6 +29,7 @@ class SettingsController extends Controller
             'supported_billing_models' => 'nullable|array',
             'supported_billing_models.*' => 'in:' . implode(',', array_keys(Setting::BILLING_MODELS)),
             'vat_percentage' => 'required|numeric|min:0|max:100',
+            'volumetric_divisor' => 'required|integer|min:1',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
             'waybill_show_qr' => 'sometimes|boolean',

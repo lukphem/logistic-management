@@ -168,6 +168,19 @@
                        class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
             </div>
 
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Dimensions (cm) <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                <div class="flex max-w-md gap-3">
+                    <input type="number" step="0.1" min="0" name="length_cm" value="{{ request('length_cm') }}" placeholder="Length"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <input type="number" step="0.1" min="0" name="width_cm" value="{{ request('width_cm') }}" placeholder="Width"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <input type="number" step="0.1" min="0" name="height_cm" value="{{ request('height_cm') }}" placeholder="Height"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                </div>
+                <p class="mt-1 text-xs text-ink-500">If given, priced by whichever is greater — actual weight above, or the volumetric weight these work out to.</p>
+            </div>
+
             @if ($additionalServices->isNotEmpty())
                 <div>
                     <label class="mb-2 block text-sm font-medium text-ink-900">Additional services <span class="text-xs font-normal text-ink-500">(optional)</span></label>
@@ -209,7 +222,10 @@
             <p class="mb-1 text-sm font-semibold text-ink-900">Quote</p>
             <p class="mb-4 text-sm text-ink-500">
                 {{ $result['service_type_name'] }} · {{ $result['origin_label'] ?? '—' }} → {{ $result['destination_label'] ?? '—' }} · {{ rtrim(rtrim(number_format($result['weight_kg'], 2), '0'), '.') }} kg
-                @if ($result['billed_weight_kg'] && $result['billed_weight_kg'] != $result['weight_kg'])
+                @if ($result['chargeable_weight_kg'] && $result['chargeable_weight_kg'] != $result['weight_kg'])
+                    <span class="text-ink-900">(volumetric: {{ rtrim(rtrim(number_format($result['chargeable_weight_kg'], 2), '0'), '.') }} kg)</span>
+                @endif
+                @if ($result['billed_weight_kg'] && $result['billed_weight_kg'] != ($result['chargeable_weight_kg'] ?: $result['weight_kg']))
                     <span class="text-ink-900">(billed as {{ rtrim(rtrim(number_format($result['billed_weight_kg'], 2), '0'), '.') }} kg)</span>
                 @endif
             </p>

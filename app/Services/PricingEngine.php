@@ -19,15 +19,19 @@ class PricingEngine
      * ServiceType, dispatches to whichever billing model it's assigned
      * to (see ServiceType::billing_model / Setting::BILLING_MODELS), and
      * returns:
-     *   base_amount      float
-     *   transit_days     ?int
-     *   shipping_type    'domestic'|'international'
-     *   zone_id          int
-     *   billed_weight_kg ?float — the actual weight rounded up to the
-     *                     matched tariff's own additional_weight
-     *                     increment (Standard Billing only; a future
-     *                     non-weight-based model just wouldn't set
-     *                     this key)
+     *   base_amount          float
+     *   transit_days         ?int
+     *   shipping_type        'domestic'|'international'
+     *   zone_id              int
+     *   chargeable_weight_kg ?float — the greater of actual weight
+     *                        and volumetric weight (L×W×H ÷ the
+     *                        configured divisor), before rounding
+     *   billed_weight_kg     ?float — chargeable_weight_kg rounded up
+     *                        to the matched tariff's own
+     *                        additional_weight increment
+     *                        (Standard Billing only; a future
+     *                        non-weight-based model just wouldn't set
+     *                        these two keys)
      *
      * Throws PricingUnavailableException — never returns a guessed or
      * zero price — whenever the service type has no model assigned, the
@@ -77,6 +81,25 @@ class PricingEngine
 
         $weight = (float) ($context['weight_kg'] ?? 0);
 
+        // Volumetric weight — L×W×H (cm) divided by the company's
+        // configured divisor (Company Settings → Billing defaults) —
+        // only computed when all three dimensions are actually given.
+        // Chargeable weight is whichever is heavier, actual or
+        // volumetric: a large-but-light package is priced by the space
+        // it takes up, not just what it weighs on a scale, matching
+        // standard courier practice.
+        $lengthCm = (float) ($context['length_cm'] ?? 0);
+        $widthCm = (float) ($context['width_cm'] ?? 0);
+        $heightCm = (float) ($context['height_cm'] ?? 0);
+        $volumetricWeight = 0.0;
+
+        if ($lengthCm > 0 && $widthCm > 0 && $heightCm > 0) {
+            $divisor = max(1, (int) (\App\Models\Setting::current()->volumetric_divisor ?? 5000));
+            $volumetricWeight = ($lengthCm * $widthCm * $heightCm) / $divisor;
+        }
+
+        $chargeableWeight = max($weight, $volumetricWeight);
+
         // orderBy makes this deterministic if two tariffs for the same
         // service type ever have overlapping weight bands (a setup
         // mistake nothing currently prevents) — picks the narrowest/
@@ -84,8 +107,8 @@ class PricingEngine
         // order, which would otherwise vary by engine.
         $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
             ->where('is_active', true)
-            ->where('min_weight', '<=', $weight)
-            ->where('max_weight', '>=', $weight)
+            ->where('min_weight', '<=', $chargeableWeight)
+            ->where('max_weight', '>=', $chargeableWeight)
             ->orderBy('min_weight')
             ->first();
 
@@ -117,14 +140,15 @@ class PricingEngine
         // configured band" fallback above), one additional_charge per
         // additional_weight increment.
         //
-        // The actual weight is rounded UP to the tariff's own
-        // additional_weight increment before this math runs — a
-        // shipment is always billed in whole increments (0.6kg bills as
-        // 1kg on a 0.5kg increment, 1.6–1.9kg both bill as 2kg), never a
-        // fraction of one. This only affects the charge calculation —
-        // which tariff band the shipment matched above was decided by
-        // the real, unrounded weight, so a shipment doesn't jump into
-        // the wrong band just from rounding.
+        // The chargeable weight (actual vs volumetric, whichever is
+        // greater) is rounded UP to the tariff's own additional_weight
+        // increment before this math runs — a shipment is always billed
+        // in whole increments (0.6kg bills as 1kg on a 0.5kg increment,
+        // 1.6–1.9kg both bill as 2kg), never a fraction of one. This
+        // only affects the charge calculation — which tariff band the
+        // shipment matched above was decided by the real, unrounded
+        // chargeable weight, so a shipment doesn't jump into the wrong
+        // band just from rounding.
         $additionalWeightUnit = max(0.01, (float) $tariff->additional_weight);
         // A tiny epsilon before ceil() guards against binary
         // floating-point imprecision (e.g. 1.0 / 0.1 landing on
@@ -132,16 +156,17 @@ class PricingEngine
         // that's genuinely an exact multiple up to one extra,
         // unnecessary increment — a real overcharge risk for financial
         // math, not a theoretical one.
-        $chargeableWeight = ceil(($weight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
+        $billedWeight = ceil(($chargeableWeight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
 
-        $overageWeight = max(0, $chargeableWeight - (float) $tariff->min_weight);
+        $overageWeight = max(0, $billedWeight - (float) $tariff->min_weight);
         $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
 
         $baseAmount = (float) $zonePrice->charge + ($increments * (float) $zonePrice->additional_charge);
 
         return [
             'base_amount' => round($baseAmount, 2),
-            'billed_weight_kg' => $chargeableWeight,
+            'chargeable_weight_kg' => round($chargeableWeight, 2),
+            'billed_weight_kg' => $billedWeight,
             'transit_days' => $zonePrice->transit_days,
             'shipping_type' => $shippingType,
             'zone_id' => $zone->id,

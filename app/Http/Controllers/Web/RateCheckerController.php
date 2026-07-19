@@ -52,6 +52,9 @@ class RateCheckerController extends Controller
                 $context = [
                     'service_type_id' => $serviceTypeId,
                     'weight_kg' => (float) $request->weight_kg,
+                    'length_cm' => $request->filled('length_cm') ? (float) $request->length_cm : null,
+                    'width_cm' => $request->filled('width_cm') ? (float) $request->width_cm : null,
+                    'height_cm' => $request->filled('height_cm') ? (float) $request->height_cm : null,
                     'origin_state_id' => $request->filled('origin_state_id') ? $request->integer('origin_state_id') : null,
                     'destination_state_id' => $request->filled('destination_state_id') ? $request->integer('destination_state_id') : null,
                     'origin_city_id' => $request->filled('origin_city_id') ? $request->integer('origin_city_id') : null,
@@ -74,6 +77,7 @@ class RateCheckerController extends Controller
                     'transit_days' => $quote['transit_days'],
                     'shipping_type' => $quote['shipping_type'],
                     'billed_weight_kg' => $quote['billed_weight_kg'] ?? null,
+                    'chargeable_weight_kg' => $quote['chargeable_weight_kg'] ?? null,
                     'zone_name' => $zone?->name,
                     // Echoed back so the quote is self-contained — what
                     // was actually asked for, next to what it costs.

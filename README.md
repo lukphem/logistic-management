@@ -4141,3 +4141,80 @@ resources/views/rate-checker/index.blade.php   (Route Type radio removed, Servic
 
 No migration, no controller changes — this is entirely a Rate Checker
 UI simplification on top of Increment 79's data model.
+
+## Increment 81 — Volumetric Weight: Chargeable Weight Is Whichever Is Greater
+
+This is what `Shipment.chargeable_weight_kg` was originally scaffolded
+for, long before the billing rebuild started, and never actually built
+out. Built now.
+
+### The formula
+
+```
+volumetric_weight = (length_cm × width_cm × height_cm) ÷ volumetric_divisor
+chargeable_weight  = max(actual weight_kg, volumetric_weight)
+billed_weight       = chargeable_weight rounded up to the tariff's own
+                       additional_weight increment (Increment 74)
+```
+
+`volumetric_divisor` is a new **Company Setting** (Billing defaults,
+default 5000 — a common air-freight value, though couriers do vary:
+4000/5000/6000 are all seen in practice) — a fixed company-wide policy
+like VAT, not something that varies per tariff or zone.
+
+Dimensions are optional — if none are given, volumetric weight is 0
+and chargeable weight is just the actual weight, unchanged from before
+this increment.
+
+**Which tariff band a shipment matches is now decided by the
+chargeable weight**, not just actual weight — a large-but-light
+package correctly matches a heavier band based on the space it takes
+up, not just what it weighs on a scale. Rounding (Increment 74) still
+only happens after that match, for the charge calculation specifically.
+
+### Every booking endpoint already worked, zero changes needed
+
+`length_cm`/`width_cm`/`height_cm` were already collected by every
+booking endpoint (client shipments, staff shipments, client-user
+shipments) — this was already-existing scaffolding, confirmed by
+checking each controller directly. Since all three pass their full
+validated data straight through to `PricingEngine::quote()` as
+context, `PricingEngine` reading these fields was the only change
+needed anywhere in the booking flow — not one booking controller
+required touching.
+
+### A real bug caught mid-build
+
+Renaming the "rounded to increment" variable to `$billedWeight` (to
+free up `$chargeableWeight` for its new actual-vs-volumetric meaning)
+left the method's `return` statement pointing at the old variable name
+— `billed_weight_kg` would have silently returned the wrong value.
+Caught by re-tracing every use of both variable names through the
+method immediately after the rename, before moving on.
+
+### Rate Checker
+
+New optional **Dimensions (cm)** fields (Length/Width/Height) next to
+Weight. The quote result now shows the full chain when it matters —
+"(volumetric: X kg)" when volumetric weight was greater than actual,
+"(billed as Y kg)" when rounding changed the final billed figure
+further — both only shown when they actually differ from the previous
+stage.
+
+### Files
+
+```
+database/migrations/2026_02_13_000001_add_volumetric_divisor_to_settings_table.php
+app/Models/Setting.php   (volumetric_divisor)
+app/Http/Controllers/Web/SettingsController.php   (validation)
+resources/views/settings/edit.blade.php   (Volumetric divisor field)
+app/Services/PricingEngine.php   (volumetric calculation, chargeable weight used for tariff matching, chargeable_weight_kg returned)
+app/Http/Controllers/Web/RateCheckerController.php   (dimensions passed through, chargeable_weight_kg surfaced)
+resources/views/rate-checker/index.blade.php   (Dimensions fields, full weight chain shown in the result)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
