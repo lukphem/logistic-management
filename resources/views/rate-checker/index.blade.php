@@ -45,7 +45,7 @@
                 <select id="service-type" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     <option value="">Select a service type</option>
                     @foreach ($serviceTypes as $serviceType)
-                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
+                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
                     @endforeach
                 </select>
             </div>
@@ -101,14 +101,49 @@
                 <p class="text-xs text-ink-500">District is only needed to preview an onforwarding surcharge tied to a specific district rather than the whole city.</p>
             </div>
 
+            @php
+                $selectedServiceType = request('service_type_id') ? \App\Models\ServiceType::find(request('service_type_id')) : null;
+                $tradeDirection = $selectedServiceType?->trade_direction ?? 'export';
+                // Which side Nigeria is on determines which field names
+                // carry the Nigeria state/city vs the foreign country —
+                // export: Nigeria is origin, country is destination.
+                // import: Nigeria is destination, country is origin.
+                $nigeriaStateField = $tradeDirection === 'import' ? 'destination_state_id' : 'origin_state_id';
+                $nigeriaCityField = $tradeDirection === 'import' ? 'destination_city_id' : 'origin_city_id';
+                $foreignCountryField = $tradeDirection === 'import' ? 'origin_country_id' : 'destination_country_id';
+            @endphp
+
             <div id="international-fields" style="{{ request('route_type') !== 'international' ? 'display:none' : '' }}">
-                <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
-                <select name="destination_country_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <option value="">Select a country</option>
-                    @foreach ($countries as $country)
-                        <option value="{{ $country->id }}" @selected(request('destination_country_id') == $country->id)>{{ $country->name }}</option>
-                    @endforeach
-                </select>
+                <p id="trade-direction-label" class="mb-3 text-xs font-medium text-ink-900">
+                    {{ $tradeDirection === 'import' ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin' }}
+                </p>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                        <label id="intl-nigeria-state-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria state ({{ $tradeDirection === 'import' ? 'destination' : 'origin' }})</label>
+                        <select id="intl-nigeria-state" name="{{ $nigeriaStateField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a state</option>
+                            @foreach ($states as $state)
+                                <option value="{{ $state->id }}" @selected(request($nigeriaStateField) == $state->id)>{{ $state->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label id="intl-nigeria-city-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria city <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                        <select id="intl-nigeria-city" name="{{ $nigeriaCityField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a city</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label id="intl-foreign-country-label" class="mb-1 block text-sm font-medium text-ink-900">Foreign country ({{ $tradeDirection === 'import' ? 'origin' : 'destination' }})</label>
+                        <select id="intl-foreign-country" name="{{ $foreignCountryField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a country</option>
+                            @foreach ($countries as $country)
+                                <option value="{{ $country->id }}" @selected(request($foreignCountryField) == $country->id)>{{ $country->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <p class="mt-2 text-xs text-ink-500">Nigeria city is only needed to preview an onforwarding surcharge tied to a specific city.</p>
             </div>
 
             <div>
@@ -244,6 +279,34 @@
             }
         }
 
+        /**
+         * A service type's trade_direction decides which side of the
+         * route Nigeria is on — export: Nigeria origin, foreign country
+         * destination; import: Nigeria destination, foreign country
+         * origin. Renaming the fields (rather than keeping two separate
+         * always-present pairs) means the same state/city/country
+         * inputs work for either direction with no duplicate markup.
+         */
+        function updateTradeDirection() {
+            const selected = serviceTypeSelect.selectedOptions[0];
+            const isImport = (selected?.dataset.tradeDirection || 'export') === 'import';
+
+            const stateSelect = document.getElementById('intl-nigeria-state');
+            const citySelect = document.getElementById('intl-nigeria-city');
+            const countrySelect = document.getElementById('intl-foreign-country');
+
+            stateSelect.name = isImport ? 'destination_state_id' : 'origin_state_id';
+            citySelect.name = isImport ? 'destination_city_id' : 'origin_city_id';
+            countrySelect.name = isImport ? 'origin_country_id' : 'destination_country_id';
+
+            document.getElementById('trade-direction-label').textContent = isImport ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin';
+            document.getElementById('intl-nigeria-state-label').textContent = 'Nigeria state (' + (isImport ? 'destination' : 'origin') + ')';
+            document.getElementById('intl-foreign-country-label').textContent = 'Foreign country (' + (isImport ? 'origin' : 'destination') + ')';
+        }
+
+        serviceTypeSelect.addEventListener('change', updateTradeDirection);
+        updateTradeDirection();
+
         syncModelSection(); // restores the right section on reload, e.g. after "Check rate"
 
         (function () {
@@ -318,6 +381,38 @@
 
             wireCascade('origin-state', 'origin-city', 'origin-district', @json(request('origin_city_id')), @json(request('origin_district_id')));
             wireCascade('destination-state', 'destination-city', 'destination-district', @json(request('destination_city_id')), @json(request('destination_district_id')));
+        })();
+
+        // Same idea as wireCascade() above, simplified for the
+        // international section's single Nigeria-side state/city pair
+        // (no district here — the international form only asked for
+        // state selection, city is a bonus for onforwarding purposes).
+        (function () {
+            const citiesByState = @json($cities->groupBy('state_id')->map->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]));
+            const stateSelect = document.getElementById('intl-nigeria-state');
+            const citySelect = document.getElementById('intl-nigeria-city');
+
+            function populateCities(selectCityId) {
+                citySelect.innerHTML = '<option value="">Select a city</option>';
+
+                (citiesByState[stateSelect.value] || []).forEach(function (city) {
+                    const opt = document.createElement('option');
+                    opt.value = city.id;
+                    opt.textContent = city.name;
+                    if (selectCityId && String(city.id) === String(selectCityId)) {
+                        opt.selected = true;
+                    }
+                    citySelect.appendChild(opt);
+                });
+            }
+
+            stateSelect.addEventListener('change', function () {
+                populateCities();
+            });
+
+            if (stateSelect.value) {
+                populateCities(@json(request('origin_city_id')) || @json(request('destination_city_id')));
+            }
         })();
     </script>
 

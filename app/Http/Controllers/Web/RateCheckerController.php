@@ -58,6 +58,7 @@ class RateCheckerController extends Controller
                     'destination_city_id' => $request->filled('destination_city_id') ? $request->integer('destination_city_id') : null,
                     'origin_district_id' => $request->filled('origin_district_id') ? $request->integer('origin_district_id') : null,
                     'destination_district_id' => $request->filled('destination_district_id') ? $request->integer('destination_district_id') : null,
+                    'origin_country_id' => $request->filled('origin_country_id') ? $request->integer('origin_country_id') : null,
                     'destination_country_id' => $request->filled('destination_country_id') ? $request->integer('destination_country_id') : null,
                     'additional_service_option_ids' => $request->input('additional_service_option_ids', []),
                 ];
@@ -77,8 +78,10 @@ class RateCheckerController extends Controller
                     // Echoed back so the quote is self-contained — what
                     // was actually asked for, next to what it costs.
                     'service_type_name' => ServiceType::find($serviceTypeId)?->name,
-                    'origin_label' => $this->locationLabel($request->origin_state_id ?? null, $request->origin_city_id ?? null),
-                    'destination_label' => $quote['shipping_type'] === 'international'
+                    'origin_label' => $request->filled('origin_country_id')
+                        ? Country::find($request->origin_country_id)?->name
+                        : $this->locationLabel($request->origin_state_id ?? null, $request->origin_city_id ?? null),
+                    'destination_label' => $request->filled('destination_country_id')
                         ? Country::find($request->destination_country_id)?->name
                         : $this->locationLabel($request->destination_state_id ?? null, $request->destination_city_id ?? null),
                     'weight_kg' => (float) $request->weight_kg,

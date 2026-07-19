@@ -39,11 +39,26 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Route type <x-required /></label>
-            <select name="route_type" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+            <select id="route_type" name="route_type" onchange="document.getElementById('trade-direction-field').style.display = this.value === 'international' ? '' : 'none';" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="domestic" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'domestic')>Domestic</option>
                 <option value="international" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'international')>International</option>
             </select>
             <p class="mt-1 text-xs text-ink-500">Every service type is exactly one or the other — e.g. an "International Express" service that should never show up for a domestic booking.</p>
+        </div>
+
+        <div id="trade-direction-field" style="{{ old('route_type', $serviceType->route_type ?? 'domestic') === 'international' ? '' : 'display:none' }}">
+            <label class="mb-1 block text-sm font-medium text-ink-900">Trade direction <x-required /></label>
+            <div class="flex gap-3">
+                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                    <input type="radio" name="trade_direction" value="export" @checked(old('trade_direction', $serviceType->trade_direction) === 'export') class="rounded-full border-line">
+                    Export (Nigeria is the origin)
+                </label>
+                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                    <input type="radio" name="trade_direction" value="import" @checked(old('trade_direction', $serviceType->trade_direction) === 'import') class="rounded-full border-line">
+                    Import (Nigeria is the destination)
+                </label>
+            </div>
+            <p class="mt-1 text-xs text-ink-500">Determines which side of the route Nigeria is on when this service type is used to check a rate or book a shipment.</p>
         </div>
 
         <label class="flex items-center gap-2 text-sm text-ink-900">

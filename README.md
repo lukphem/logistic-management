@@ -3825,3 +3825,74 @@ php artisan migrate
 Check any existing service type you'd previously left as "Both" — it's
 now Domestic by default and needs a manual flip to International if
 that's what it should actually be.
+
+## Increment 76 — International: Import/Export Direction, Determined by Service Type
+
+Three related additions to how international shipments work on the
+Rate Checker.
+
+### Service Type gains a trade direction
+
+Only meaningful for International route type — `trade_direction`
+(Import/Export), nullable, cleared for domestic regardless of what's
+posted (same "don't rely on the form hiding the field alone" principle
+used elsewhere). Shown/required only when Route type is set to
+International on the Service Type form, via the same conditional-field
+JS pattern already used for the tier picker.
+
+**Export** = Nigeria is the origin. **Import** = Nigeria is the
+destination.
+
+### The Rate Checker's international fields are now direction-aware
+
+Previously the international section only had a single "Destination
+country" field — implicitly assuming every international shipment was
+outbound (export). Now, once an International service type is
+selected, its `trade_direction` determines everything:
+
+- **Export**: Nigeria state/city fields carry `origin_state_id`/
+  `origin_city_id`; the country field carries `destination_country_id`
+- **Import**: Nigeria state/city fields carry `destination_state_id`/
+  `destination_city_id`; the country field carries `origin_country_id`
+
+Rather than duplicate the state/city/country inputs for each direction,
+the same three fields have their `name` attribute **rewritten by JS**
+(`updateTradeDirection()`) whenever the service type changes — labels
+update alongside them ("Nigeria state (origin)" vs "(destination)",
+"Foreign country (destination)" vs "(origin)"). `PricingEngine` already
+supported resolving a zone from either `origin_country_id` or
+`destination_country_id` (built that way since Increment 44,
+"checking destination first... then origin (inbound)") — this was a
+UI/context gap, not a pricing engine gap; nothing in the calculation
+layer needed changing.
+
+Also added: a **Nigeria city** dropdown (optional), cascading from the
+new state selector — for previewing an onforwarding surcharge tied to
+a specific city on the Nigeria side of an international shipment,
+which the form previously had no way to specify at all.
+
+`RateCheckerController`'s origin/destination label logic was also
+fixed — it previously assumed destination was always the country field
+(true only for export); now it checks which field actually holds a
+country ID, correctly labeling either direction.
+
+### Files
+
+```
+database/migrations/2026_02_10_000001_add_trade_direction_to_service_types_table.php
+app/Models/ServiceType.php   (trade_direction)
+app/Http/Controllers/Web/ServiceTypeController.php   (required_if international, cleared for domestic)
+resources/views/service-types/form.blade.php, index.blade.php   (conditional field, display)
+app/Http/Controllers/Web/RateCheckerController.php   (origin_country_id added to context, label logic fixed for both directions)
+resources/views/rate-checker/index.blade.php   (direction-aware fields, updateTradeDirection(), Nigeria city cascade)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Set Trade direction on any existing International service types —
+they'll need one explicitly now (Export or Import) before the checker
+can determine which side of the route Nigeria is on for them.

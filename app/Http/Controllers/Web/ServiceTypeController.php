@@ -56,6 +56,7 @@ class ServiceTypeController extends Controller
             'code' => 'required|string|max:50|unique:service_types,code,' . $ignoreId,
             'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
             'route_type' => 'required|in:domestic,international',
+            'trade_direction' => 'required_if:route_type,international|nullable|in:import,export',
             'is_active' => 'sometimes|boolean',
         ]);
 
@@ -65,6 +66,13 @@ class ServiceTypeController extends Controller
 
         if (($data['billing_model'] ?? null) === '') {
             $data['billing_model'] = null;
+        }
+
+        // Trade direction only means anything for an international
+        // service type — clear it for domestic regardless of what was
+        // posted, don't rely on the form hiding the field alone.
+        if ($data['route_type'] !== 'international') {
+            $data['trade_direction'] = null;
         }
 
         return $data;
