@@ -3678,3 +3678,46 @@ Add "Acknowledgement" under Setups → Billing → Additional Services,
 give it an option, set Charge type to **Percentage of a reverse
 shipment**, pick which Service Type and Weight the reverse document
 should be priced at, and set the percentage.
+
+## Increment 73 — Bug Fix: Overage Now Measured From min_weight, Not max_weight
+
+Real bug in the original Standard Billing formula (Increment 44):
+overage was calculated as `weight − max_weight`, meaning extra charges
+only ever applied to weight *above the whole band* — a 1kg shipment on
+a 0.5–20kg tariff correctly matched the band but showed zero overage,
+since 1kg is nowhere near 20kg.
+
+The actual rule: **the zone's charge covers `min_weight` specifically,
+not the whole band** — anything heavier than `min_weight` (continuing
+up through `max_weight`, and beyond it for shipments heavier than every
+configured band) accrues `additional_charge` per `additional_weight`
+increment.
+
+```
+overage    = max(0, weight − min_weight)     // was: weight − max_weight
+increments = ceil(overage / additional_weight)
+price      = zone_charge + (increments × additional_charge)
+```
+
+This wasn't caught earlier because the first worked example (min_weight
+= max_weight = 0.5) couldn't distinguish between the two possible
+reference points — both formulas produce the same answer when min and
+max are equal. A wider band (0.5–20) exposed the difference immediately.
+
+The tariff form's help text was also actively misleading — it described
+Max weight as "the overage threshold," reinforcing the wrong mental
+model for whoever configures a tariff. Moved that explanation to Min
+weight (the real reference point) and gave Max weight its own correct
+description (the top of this tariff's band, not an overage trigger).
+
+### Files
+
+```
+app/Services/PricingEngine.php   (overage now measured from min_weight; docblock corrected)
+resources/views/standard-billing/form.blade.php   (help text corrected on both weight fields)
+```
+
+No migration needed — this is a calculation fix, not a schema change.
+Any tariff with `min_weight` genuinely different from `max_weight` will
+price differently after this fix — narrower bands (like the original
+0.5/0.5 test case) are unaffected.

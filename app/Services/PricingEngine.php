@@ -49,15 +49,17 @@ class PricingEngine
     }
 
     /**
-     * Implements the Standard Billing spec exactly:
+     * Standard Billing pricing:
      *  1. resolve the route to a zone (domestic state-pair or
      *     international country mapping — see resolveZoneAndType())
      *  2. find the tariff for this service type whose weight band
      *     contains the shipment weight
      *  3. find that tariff's price row for the resolved zone
-     *  4. weight beyond the tariff's max_weight is charged in
-     *     additional_weight-sized increments at the zone's
-     *     additional_charge
+     *  4. the zone's charge covers the tariff's min_weight specifically
+     *     — weight above min_weight is charged in additional_weight-
+     *     sized increments at the zone's additional_charge, continuing
+     *     up through max_weight (and beyond, for the "heavier than
+     *     every configured band" fallback below)
      */
     private function standardBilling(ServiceType $serviceType, array $context): array
     {
@@ -103,7 +105,12 @@ class PricingEngine
             throw new PricingUnavailableException("No price configured for {$zone->name} on this tariff.");
         }
 
-        $overageWeight = max(0, $weight - (float) $tariff->max_weight);
+        // Base charge covers the tariff's min_weight specifically, not
+        // the whole band — extra weight accrues from min_weight upward
+        // (continuing past max_weight too, for the "heavier than every
+        // configured band" fallback above), one additional_charge per
+        // additional_weight increment.
+        $overageWeight = max(0, $weight - (float) $tariff->min_weight);
         $additionalWeightUnit = max(0.01, (float) $tariff->additional_weight);
         $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
 
