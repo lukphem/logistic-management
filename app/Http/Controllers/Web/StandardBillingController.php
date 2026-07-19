@@ -21,18 +21,27 @@ class StandardBillingController extends Controller
 
     public function index(): View
     {
-        $tariffs = StandardBillingTariff::with(['serviceType', 'zonePrices.zone'])
-            ->orderBy('service_type_id')->orderBy('min_weight')->paginate(15);
+        $baseQuery = fn (string $routeType) => StandardBillingTariff::with(['serviceType', 'zonePrices.zone'])
+            ->whereHas('serviceType', fn ($q) => $q->where('route_type', $routeType))
+            ->orderBy('service_type_id')->orderBy('min_weight');
 
-        return view('standard-billing.index', compact('tariffs'));
+        $domesticTariffs = $baseQuery('domestic')->paginate(15, ['*'], 'domestic_page');
+        $internationalTariffs = $baseQuery('international')->paginate(15, ['*'], 'international_page');
+
+        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $routeType = $request->query('route_type');
+
         return view('standard-billing.form', [
             'tariff' => new StandardBillingTariff(),
-            'serviceTypes' => ServiceType::where('billing_model', 'standard_billing')->orderBy('name')->get(),
+            'serviceTypes' => ServiceType::where('billing_model', 'standard_billing')
+                ->when($routeType, fn ($q) => $q->where('route_type', $routeType))
+                ->orderBy('name')->get(),
             'zones' => Zone::orderBy('name')->get(),
+            'routeType' => $routeType,
         ]);
     }
 
@@ -182,9 +191,10 @@ class StandardBillingController extends Controller
 
     public function destroy(StandardBillingTariff $tariff): RedirectResponse
     {
+        $routeType = $tariff->serviceType?->route_type;
         $tariff->delete();
 
-        return redirect()->route('standard-billing.index')->with('status', 'Tariff removed.');
+        return redirect()->route('standard-billing.index', ['tab' => $routeType])->with('status', 'Tariff removed.');
     }
 
     /**

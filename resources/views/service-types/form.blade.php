@@ -38,13 +38,12 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Route type <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Route type <x-required /></label>
             <select name="route_type" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <option value="">Both domestic and international</option>
-                <option value="domestic" @selected(old('route_type', $serviceType->route_type) === 'domestic')>Domestic only</option>
-                <option value="international" @selected(old('route_type', $serviceType->route_type) === 'international')>International only</option>
+                <option value="domestic" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'domestic')>Domestic</option>
+                <option value="international" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'international')>International</option>
             </select>
-            <p class="mt-1 text-xs text-ink-500">Restricts which route type this service is offered for — e.g. an "International Express" service that shouldn't show up for domestic bookings.</p>
+            <p class="mt-1 text-xs text-ink-500">Every service type is exactly one or the other — e.g. an "International Express" service that should never show up for a domestic booking.</p>
         </div>
 
         <label class="flex items-center gap-2 text-sm text-ink-900">

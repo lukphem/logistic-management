@@ -3764,3 +3764,64 @@ resources/views/rate-checker/index.blade.php   (shows billed weight when it diff
 ```
 
 No migration needed — calculation and display only.
+
+## Increment 75 — International Billing Gets Its Own Tab, Service Type Restricted to One or the Other
+
+Two changes requested together.
+
+### Service Type: no more "Both"
+
+`route_type` was nullable, with null meaning "offered for both." Now
+required — every service type is explicitly **Domestic** or
+**International**, no third option. Existing service types that had no
+`route_type` set default to Domestic (the more common case throughout
+this build so far) — flip any that should actually be International
+from the Service Types screen.
+
+**Migration note**: modifying an enum column's nullability via
+`->change()` is unreliable with doctrine/dbal across versions, so this
+uses drop-and-recreate instead — every row's *current* value is read
+before the drop and explicitly restored after, so this only affects
+rows that were genuinely null. An earlier draft of this migration would
+have silently reset every row's value to the new default on drop,
+including ones already correctly set to International — caught and
+fixed before committing, not after.
+
+### Standard Billing: Domestic and International as separate tabs
+
+Two independently paginated lists (`domesticTariffs`/
+`internationalTariffs`), filtered by their service type's `route_type` —
+same shape as the Zone Mapping tabs (Increment 65), extracted into a
+shared `_tariff-table` partial so the ~90 lines of table markup aren't
+duplicated between the two tabs.
+
+Each tab's own **"+ Add Tariff"** button carries `?route_type=domestic`
+or `?route_type=international`, which pre-filters the Service Type
+dropdown on the create form to only that route type — the create form
+also shows a small banner ("Adding a Domestic tariff — only domestic
+service types are selectable below") so it's clear which context you're
+in. Deleting a tariff redirects back to the tab it came from
+(`?tab=domestic|international`), read from the tariff's own service
+type before it's deleted.
+
+### Files
+
+```
+database/migrations/2026_02_09_000001_make_service_types_route_type_required.php
+app/Http/Controllers/Web/ServiceTypeController.php   (route_type required)
+resources/views/service-types/form.blade.php, index.blade.php   (Both option removed)
+app/Http/Controllers/Web/StandardBillingController.php   (index() splits by route_type, create() filters by it, destroy() preserves the tab)
+resources/views/standard-billing/index.blade.php   (tabs, restores ?tab= on load)
+resources/views/standard-billing/_tariff-table.blade.php   (new — shared table partial)
+resources/views/standard-billing/form.blade.php   (context banner when creating from a specific tab)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Check any existing service type you'd previously left as "Both" — it's
+now Domestic by default and needs a manual flip to International if
+that's what it should actually be.

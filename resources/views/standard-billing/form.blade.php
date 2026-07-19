@@ -6,6 +6,10 @@
         </div>
     @endif
 
+    @if (! $tariff->exists && ($routeType ?? null))
+        <p class="mb-4 text-sm text-ink-500">Adding a <strong>{{ ucfirst($routeType) }}</strong> tariff — only {{ $routeType }} service types are selectable below.</p>
+    @endif
+
     @if ($tariff->exists)
         <div class="mb-5 max-w-2xl">
             <x-csv-actions :export-route="route('standard-billing.zone-prices.export', $tariff)" :import-route="route('standard-billing.zone-prices.import', $tariff)" label="Zone Prices" />
