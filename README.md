@@ -3523,3 +3523,37 @@ resources/views/zone-mappings/index.blade.php   (every zone-picker select uses t
 ```
 
 No migration needed.
+
+## Increment 70 — Same Zone-Applicability Rule on the Add Tariff Page
+
+Extends Increment 69's zone filtering to the Standard Billing tariff
+form — but the filtering context is different here: a tariff doesn't
+have its own domestic/international classification, it inherits one
+from whichever **Service Type** it's priced under (`route_type`, from
+Increment 47: Domestic only / International only / not set = both).
+
+Since Service Type is a single dropdown the user picks *within* this
+same form (not a fixed per-page context like the two Zone Mapping
+tabs), the filtering is client-side JS rather than server-side: each
+Service Type option carries its `route_type`, each Zone option carries
+its `applies_domestic`/`applies_international`, and
+`filterZoneSelects()` hides non-matching zone options whenever the
+Service Type changes. Re-run after every new zone row is added too,
+since a cloned row starts with every option visible before the filter
+has run on it.
+
+A Service Type with no `route_type` set (applies to both) shows every
+zone, matching the same "both" semantics used everywhere else. Zones
+already selected on existing rows that no longer match get reset to
+blank if the Service Type changes to something incompatible, same
+graceful-degradation behavior as the Rate Checker's filtering.
+
+### Files
+
+```
+resources/views/standard-billing/form.blade.php   (data attributes on Service Type/Zone options, filterZoneSelects())
+```
+
+No migration, no controller changes — the zone list stays unfiltered
+server-side deliberately, since the applicable subset depends on a
+choice made within the same form.

@@ -34,9 +34,9 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
-            <select name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+            <select id="service_type_id" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 @foreach ($serviceTypes as $serviceType)
-                    <option value="{{ $serviceType->id }}" @selected(old('service_type_id', $tariff->service_type_id) == $serviceType->id)>{{ $serviceType->name }}</option>
+                    <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @selected(old('service_type_id', $tariff->service_type_id) == $serviceType->id)>{{ $serviceType->name }}</option>
                 @endforeach
             </select>
             @if ($serviceTypes->isEmpty())
@@ -106,10 +106,10 @@
                         @endif
                         <div>
                             <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
-                            <select name="zone_prices[{{ $i }}][zone_id]" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <select name="zone_prices[{{ $i }}][zone_id]" class="zone-select w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 <option value="">— None —</option>
                                 @foreach ($zones as $zone)
-                                    <option value="{{ $zone->id }}" @selected((string) ($row['zone_id'] ?? '') === (string) $zone->id)>{{ $zone->name }}</option>
+                                    <option value="{{ $zone->id }}" data-domestic="{{ $zone->applies_domestic ? 1 : 0 }}" data-international="{{ $zone->applies_international ? 1 : 0 }}" @selected((string) ($row['zone_id'] ?? '') === (string) $zone->id)>{{ $zone->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -150,9 +150,43 @@
 
     <script>
         (function () {
+            const serviceTypeSelect = document.getElementById('service_type_id');
             const addButton = document.getElementById('add-zone-row');
             const container = document.getElementById('zone-rows');
             let index = parseInt(container.dataset.nextIndex, 10);
+
+            /**
+             * A tariff's applicable zones follow its Service Type's
+             * route_type (Domestic / International / not set = both) —
+             * same filtering principle as the Zone Mapping page
+             * (Increment 69), applied here since a tariff's own
+             * applicability isn't stored directly, it's inherited from
+             * whichever service type it's priced under. Re-run after
+             * every service-type change and after every new row is
+             * added, since cloned rows start with every option visible.
+             */
+            function filterZoneSelects() {
+                const routeType = serviceTypeSelect.selectedOptions[0]?.dataset.routeType || '';
+
+                document.querySelectorAll('.zone-select').forEach(function (select) {
+                    Array.from(select.options).forEach(function (option) {
+                        if (!option.value) return; // keep "— None —" always visible
+
+                        const matches = routeType === ''
+                            || (routeType === 'domestic' && option.dataset.domestic === '1')
+                            || (routeType === 'international' && option.dataset.international === '1');
+
+                        option.hidden = !matches;
+                    });
+
+                    if (select.selectedOptions[0]?.hidden) {
+                        select.value = '';
+                    }
+                });
+            }
+
+            serviceTypeSelect.addEventListener('change', filterZoneSelects);
+            filterZoneSelects();
 
             function wireRemove(row) {
                 row.querySelector('.remove-zone-row').addEventListener('click', function () {
@@ -182,6 +216,7 @@
                 wireRemove(row);
                 container.appendChild(row);
                 index++;
+                filterZoneSelects();
             });
         })();
     </script>
