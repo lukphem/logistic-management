@@ -165,6 +165,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
         Route::patch('/zone-country-mappings/{zoneCountryMapping}/zone', [ZoneMappingController::class, 'updateCountryZone'])->name('zone-mappings.update-country-zone');
         Route::post('/third-party-country-mappings', [ZoneMappingController::class, 'storeThirdParty'])->name('zone-mappings.third-party.store');
+        Route::post('/third-party-country-mappings/generate', [ZoneMappingController::class, 'generateThirdParty'])->name('zone-mappings.third-party.generate');
+        Route::post('/third-party-country-mappings/apply-rule', [ZoneMappingController::class, 'applyThirdPartyRule'])->name('zone-mappings.third-party.apply-rule');
         Route::patch('/third-party-country-mappings/{thirdPartyCountryMapping}/zone', [ZoneMappingController::class, 'updateThirdPartyZone'])->name('zone-mappings.third-party.update-zone');
         Route::delete('/third-party-country-mappings/{thirdPartyCountryMapping}', [ZoneMappingController::class, 'destroyThirdParty'])->name('zone-mappings.third-party.destroy');
         Route::post('/zone-mappings/import-domestic', [ZoneMappingController::class, 'importDomestic'])->name('zone-mappings.import-domestic');

@@ -3987,3 +3987,46 @@ routes/web.php
 ```powershell
 php artisan migrate
 ```
+
+## Increment 78 — Cross-Trade Bulk Management + Renamed Throughout
+
+Bulk tooling for third-party routes, and every user-facing "Third-Party"
+label renamed to **"Cross-Trade (Third-Country Shipping)"** — the
+underlying code (`third_party` route type, `ThirdPartyCountryMapping`
+table/model) deliberately kept as-is, since this is purely a display
+naming change, not a data-model rename.
+
+### Bulk tooling — but shaped differently from domestic/international
+
+Full pair-generation across all ~178 countries would mean over 15,000
+possible pairs — impractical for what's an occasional business
+relationship, not a routine one. Instead:
+
+- **Generate combinations from selected countries** — a checkbox list
+  of every country; pick just the ones actually cross-traded with, and
+  every pair *among just that set* gets created (`firstOrCreate`, safe
+  to re-run after adding more countries later). 15 selected countries →
+  105 pairs, not 15,000+.
+- **Apply a rule to every cross-trade route** — same
+  Continent-only / Continent+Region choice as the International rule,
+  but comparing **the pair's own two countries against each other**,
+  not against Nigeria — there's no fixed side here the way there is
+  internationally. `applyThirdPartyRule()` mirrors
+  `applyInternationalRule()`'s structure but drops the
+  Nigeria-anchoring entirely.
+
+Both tools sit above the existing single-route "Add a single route"
+form, which stays for the case of adding just one specific pair without
+touching the bulk tools at all.
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php   (generateThirdParty(), applyThirdPartyRule())
+resources/views/zone-mappings/index.blade.php   (Generate + Apply a rule sections, Cross-Trade naming)
+resources/views/rate-checker/index.blade.php, service-types/form.blade.php, index.blade.php, standard-billing/index.blade.php, form.blade.php   (Third-Party → Cross-Trade display label, everywhere it appeared)
+routes/web.php
+```
+
+No migration needed — this increment is entirely controller/view logic
+and display labels on top of Increment 77's schema.

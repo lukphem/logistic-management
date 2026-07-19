@@ -339,6 +339,89 @@ class ZoneMappingController extends Controller
         return back()->with('status', 'Third-party route saved.');
     }
 
+    /**
+     * Generates every pair among the SELECTED countries only — not all
+     * ~178 countries, which would mean over 15,000 possible pairs for a
+     * business relationship that's occasional, not routine. Staff pick
+     * which countries they actually cross-trade with here; this creates
+     * one row per pair among just that set, unassigned unless a pair
+     * already exists (untouched, same idempotency as generateDomestic).
+     */
+    public function generateThirdParty(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'country_ids' => 'required|array|min:2',
+            'country_ids.*' => 'exists:countries,id',
+        ]);
+
+        $countryIds = array_values(array_unique($validated['country_ids']));
+        $created = 0;
+
+        for ($i = 0; $i < count($countryIds); $i++) {
+            for ($j = $i + 1; $j < count($countryIds); $j++) {
+                [$a, $b] = $countryIds[$i] <= $countryIds[$j]
+                    ? [$countryIds[$i], $countryIds[$j]]
+                    : [$countryIds[$j], $countryIds[$i]];
+
+                $mapping = ThirdPartyCountryMapping::firstOrCreate(['country_a_id' => $a, 'country_b_id' => $b]);
+                $created += $mapping->wasRecentlyCreated ? 1 : 0;
+            }
+        }
+
+        return back()->with('status', "Cross-trade combinations generated ({$created} new).");
+    }
+
+    /**
+     * Same shape as applyInternationalRule(), except every comparison is
+     * between the pair's own two countries — neither is fixed as
+     * Nigeria the way the international rule is, since a cross-trade
+     * route genuinely doesn't involve Nigeria on either side.
+     */
+    public function applyThirdPartyRule(Request $request): RedirectResponse
+    {
+        $method = $request->input('grouping_method', 'continent_region');
+
+        if ($method === 'continent') {
+            $validated = $request->validate([
+                'zone_same_continent' => 'required|exists:zones,id',
+                'zone_different_continent' => 'required|exists:zones,id',
+            ]);
+        } else {
+            $validated = $request->validate([
+                'zone_same_region' => 'required|exists:zones,id',
+                'zone_same_continent_different_region' => 'required|exists:zones,id',
+                'zone_different_continent' => 'required|exists:zones,id',
+            ]);
+        }
+
+        $updated = 0;
+
+        ThirdPartyCountryMapping::with(['countryA', 'countryB'])->chunkById(100, function ($mappings) use (&$updated, $method, $validated) {
+            foreach ($mappings as $mapping) {
+                $countryA = $mapping->countryA;
+                $countryB = $mapping->countryB;
+                $sameContinent = $countryA->continent && $countryA->continent === $countryB->continent;
+
+                if ($method === 'continent') {
+                    $zoneId = $sameContinent ? $validated['zone_same_continent'] : $validated['zone_different_continent'];
+                } else {
+                    $sameRegion = $countryA->country_region_id && $countryA->country_region_id === $countryB->country_region_id;
+
+                    $zoneId = match (true) {
+                        $sameRegion => $validated['zone_same_region'],
+                        $sameContinent => $validated['zone_same_continent_different_region'],
+                        default => $validated['zone_different_continent'],
+                    };
+                }
+
+                $mapping->update(['zone_id' => $zoneId]);
+                $updated++;
+            }
+        });
+
+        return back()->with('status', "Rule applied to {$updated} cross-trade routes.");
+    }
+
     public function updateThirdPartyZone(Request $request, ThirdPartyCountryMapping $thirdPartyCountryMapping): RedirectResponse
     {
         $validator = Validator::make($request->all(), [

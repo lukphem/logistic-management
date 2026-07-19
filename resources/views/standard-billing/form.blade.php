@@ -7,7 +7,7 @@
     @endif
 
     @if (! $tariff->exists && ($routeType ?? null))
-        <p class="mb-4 text-sm text-ink-500">Adding a <strong>{{ $routeType === 'third_party' ? 'Third-Party' : ucfirst($routeType) }}</strong> tariff — only matching service types are selectable below.</p>
+        <p class="mb-4 text-sm text-ink-500">Adding a <strong>{{ $routeType === 'third_party' ? 'Cross-Trade' : ucfirst($routeType) }}</strong> tariff — only matching service types are selectable below.</p>
     @endif
 
     @if ($tariff->exists)

@@ -8,7 +8,7 @@
 
     <p class="mb-4 text-sm text-ink-500">
         Weight-band tariffs, priced per zone. A shipment matches a tariff by service type and weight, then the
-        resolved zone (Billing → Zone Mapping) picks which price applies. Domestic, International, and Third-Party
+        resolved zone (Billing → Zone Mapping) picks which price applies. Domestic, International, and Cross-Trade
         are configured separately, since every service type is restricted to exactly one of the three.
     </p>
 
@@ -16,7 +16,7 @@
     <p class="mb-5 -mt-3 text-xs text-ink-500">
         Covers every tariff and zone price together (8 columns, including service type and weight range) — one row per
         zone, sharing service type/weight range across rows. Import creates tariffs and prices that don't exist yet,
-        and updates ones that do. Covers Domestic, International, and Third-Party in one file. To bulk-add zones to
+        and updates ones that do. Covers Domestic, International, and Cross-Trade in one file. To bulk-add zones to
         just one already-existing tariff instead, use the smaller Export/Import on that tariff's own edit page.
     </p>
 
@@ -31,7 +31,7 @@
         </button>
         <button type="button" id="tab-btn-third_party" onclick="showStandardBillingTab('third_party')"
                 class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
-            Third-Party
+            Cross-Trade
         </button>
     </div>
 

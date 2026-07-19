@@ -23,7 +23,7 @@
         </button>
         <button type="button" id="tab-btn-third-party" onclick="showZoneTab('third-party')"
                 class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
-            Third-Party
+            Cross-Trade
         </button>
     </div>
 
@@ -322,13 +322,122 @@
 
     <div id="tab-third-party" style="display:none">
         <p class="mb-4 text-sm text-ink-500">
-            For shipments this business arranges entirely between two OTHER countries — neither side is Nigeria (e.g.
-            US to Congo, via a third-party arrangement). Added one route at a time, not bulk-generated — this is
-            expected to stay a short, deliberately-curated list, not an exhaustive matrix.
+            <strong>Cross-Trade (Third-Country Shipping)</strong> — for shipments this business arranges entirely
+            between two OTHER countries, neither side is Nigeria (e.g. US to Congo, via a third-party arrangement).
         </p>
 
+        <details class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm">
+            <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-ink-900">Generate combinations from selected countries</summary>
+            <div class="border-t border-line p-5">
+                <p class="mb-4 text-xs text-ink-500">
+                    Generating every possible pair across all ~178 countries would mean over 15,000 rows for a
+                    relationship that's occasional, not routine — pick just the countries actually cross-traded with,
+                    and every pair among them gets created. Safe to re-run after adding more countries later; existing
+                    pairs are never touched.
+                </p>
+                <form method="POST" action="{{ route('zone-mappings.third-party.generate') }}">
+                    @csrf
+                    <div class="mb-4 grid max-h-64 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto rounded-md border border-line p-3 sm:grid-cols-3 lg:grid-cols-4">
+                        @foreach ($countries as $country)
+                            <label class="flex items-center gap-2 py-0.5 text-sm text-ink-900">
+                                <input type="checkbox" name="country_ids[]" value="{{ $country->id }}" class="rounded border-line">
+                                {{ $country->name }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                            Generate combinations
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
+        <details class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm">
+            <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-ink-900">Apply a rule to every cross-trade route</summary>
+            <div class="border-t border-line p-5">
+                <p class="mb-4 text-xs text-ink-500">
+                    Sets a zone for every existing cross-trade route at once, comparing each pair's own two countries
+                    against each other — <strong>overwrites every existing assignment</strong>, including manual
+                    ones. Neither side is fixed as Nigeria here, unlike the International rule.
+                </p>
+
+                <form method="POST" action="{{ route('zone-mappings.third-party.apply-rule') }}" onsubmit="return confirm('This overwrites the zone on every cross-trade route, including any already set manually. Continue?')">
+                    @csrf
+                    <div class="mb-4">
+                        <span class="mb-2 block text-sm font-medium text-ink-900">Grouping method</span>
+                        <div class="flex gap-3">
+                            <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                <input type="radio" name="grouping_method" value="continent" id="ctp-method-continent" class="rounded-full border-line"
+                                       onchange="document.getElementById('ctp-continent-only-fields').style.display=''; document.getElementById('ctp-continent-region-fields').style.display='none';">
+                                Continent only
+                            </label>
+                            <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                <input type="radio" name="grouping_method" value="continent_region" id="ctp-method-continent-region" checked class="rounded-full border-line"
+                                       onchange="document.getElementById('ctp-continent-only-fields').style.display='none'; document.getElementById('ctp-continent-region-fields').style.display='';">
+                                Continent + Region <span class="text-xs text-ink-500">(recommended)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="ctp-continent-only-fields" style="display:none" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <span class="text-sm text-ink-900">Same continent</span>
+                            <select name="zone_same_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                @foreach ($internationalZones as $zone)
+                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <span class="text-sm text-ink-900">Different continent</span>
+                            <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                @foreach ($internationalZones as $zone)
+                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="ctp-continent-region-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <span class="text-sm text-ink-900">Same region</span>
+                            <select name="zone_same_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                @foreach ($internationalZones as $zone)
+                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <span class="text-sm text-ink-900">Same continent, different region</span>
+                            <select name="zone_same_continent_different_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                @foreach ($internationalZones as $zone)
+                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                            <span class="text-sm text-ink-900">Different continent</span>
+                            <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                @foreach ($internationalZones as $zone)
+                                    <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 flex justify-end">
+                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                            Apply to all cross-trade routes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </details>
+
         <div class="mb-8 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-            <h2 class="mb-3 text-sm font-semibold text-ink-900">Add a route</h2>
+            <h2 class="mb-3 text-sm font-semibold text-ink-900">Add a single route</h2>
             <form method="POST" action="{{ route('zone-mappings.third-party.store') }}" class="flex flex-wrap items-end gap-3">
                 @csrf
                 <div>
@@ -397,7 +506,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No third-party routes added yet.</td></tr>
+                        <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No cross-trade routes added yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

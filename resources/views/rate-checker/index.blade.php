@@ -41,7 +41,7 @@
                         <input type="radio" name="route_type" value="third_party" id="route-third-party"
                                @checked(request('route_type') === 'third_party')
                                onchange="showRateCheckerRouteFields('third_party');">
-                        Third-Party
+                        Cross-Trade
                     </label>
                 </div>
             </div>
@@ -153,7 +153,7 @@
             </div>
 
             <div id="third-party-fields" style="{{ request('route_type') !== 'third_party' ? 'display:none' : '' }}">
-                <p class="mb-3 text-xs text-ink-500">For a shipment this business arranges entirely between two other countries — neither side is Nigeria.</p>
+                <p class="mb-3 text-xs text-ink-500">Cross-Trade (Third-Country Shipping) — for a shipment this business arranges entirely between two other countries, neither side is Nigeria.</p>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Origin country</label>
