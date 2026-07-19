@@ -158,6 +158,9 @@
             <p class="mb-1 text-sm font-semibold text-ink-900">Quote</p>
             <p class="mb-4 text-sm text-ink-500">
                 {{ $result['service_type_name'] }} · {{ $result['origin_label'] ?? '—' }} → {{ $result['destination_label'] ?? '—' }} · {{ rtrim(rtrim(number_format($result['weight_kg'], 2), '0'), '.') }} kg
+                @if ($result['billed_weight_kg'] && $result['billed_weight_kg'] != $result['weight_kg'])
+                    <span class="text-ink-900">(billed as {{ rtrim(rtrim(number_format($result['billed_weight_kg'], 2), '0'), '.') }} kg)</span>
+                @endif
             </p>
             <dl class="mb-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
                 <div>

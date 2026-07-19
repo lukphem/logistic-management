@@ -3721,3 +3721,46 @@ No migration needed — this is a calculation fix, not a schema change.
 Any tariff with `min_weight` genuinely different from `max_weight` will
 price differently after this fix — narrower bands (like the original
 0.5/0.5 test case) are unaffected.
+
+## Increment 74 — Weight Always Rounds Up to the Tariff's Own Increment
+
+A shipment is now always billed in whole `additional_weight` increments
+— 0.6kg bills as 1kg on a 0.5kg increment, 1.6–1.9kg both bill as 2kg —
+never a fraction of one. No new setting needed: this reuses each
+tariff's own `additional_weight` field directly, so different service
+types/weight bands can already round differently without any extra
+configuration.
+
+```
+billed_weight = ceil(actual_weight / additional_weight) × additional_weight
+```
+
+**Which tariff band a shipment matches is still decided by the real,
+unrounded weight** — rounding only happens *after* that match, purely
+for the charge calculation. A 19.9kg shipment doesn't get bumped into
+the wrong band just because its bill rounds up to 20kg.
+
+**Floating-point safety**: a tiny epsilon is subtracted before
+`ceil()`, guarding against binary floating-point imprecision (e.g.
+`1.0 / 0.1` landing on `9.999999999999998` rather than exactly `10`)
+rounding a weight that's genuinely an exact multiple up to one
+unnecessary extra increment — a real overcharge risk for financial
+math, worth guarding against explicitly rather than assuming PHP's
+float division always lands cleanly.
+
+The billed weight is returned from `PricingEngine::quote()` as
+`billed_weight_kg` (a new key, separate from `Shipment.chargeable_weight_kg`
+— an existing, currently-unbuilt column intended for actual-vs-volumetric
+weight, a different concept, kept deliberately distinct to avoid
+confusing the two). Shown on the Rate Checker's result line whenever it
+differs from the actual entered weight — e.g. "1.06 kg (billed as 2 kg)".
+
+### Files
+
+```
+app/Services/PricingEngine.php   (chargeable-weight rounding before the overage calculation, epsilon guard, billed_weight_kg returned)
+app/Http/Controllers/Web/RateCheckerController.php   (passes billed_weight_kg through)
+resources/views/rate-checker/index.blade.php   (shows billed weight when it differs from actual)
+```
+
+No migration needed — calculation and display only.

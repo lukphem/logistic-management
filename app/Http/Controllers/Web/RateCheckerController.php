@@ -72,6 +72,7 @@ class RateCheckerController extends Controller
                     ...$breakdown,
                     'transit_days' => $quote['transit_days'],
                     'shipping_type' => $quote['shipping_type'],
+                    'billed_weight_kg' => $quote['billed_weight_kg'] ?? null,
                     'zone_name' => $zone?->name,
                     // Echoed back so the quote is self-contained — what
                     // was actually asked for, next to what it costs.

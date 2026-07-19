@@ -18,10 +18,15 @@ class PricingEngine
      * ServiceType, dispatches to whichever billing model it's assigned
      * to (see ServiceType::billing_model / Setting::BILLING_MODELS), and
      * returns:
-     *   base_amount   float
-     *   transit_days  ?int
-     *   shipping_type 'domestic'|'international'
-     *   zone_id       int
+     *   base_amount      float
+     *   transit_days     ?int
+     *   shipping_type    'domestic'|'international'
+     *   zone_id          int
+     *   billed_weight_kg ?float — the actual weight rounded up to the
+     *                     matched tariff's own additional_weight
+     *                     increment (Standard Billing only; a future
+     *                     non-weight-based model just wouldn't set
+     *                     this key)
      *
      * Throws PricingUnavailableException — never returns a guessed or
      * zero price — whenever the service type has no model assigned, the
@@ -110,14 +115,32 @@ class PricingEngine
         // (continuing past max_weight too, for the "heavier than every
         // configured band" fallback above), one additional_charge per
         // additional_weight increment.
-        $overageWeight = max(0, $weight - (float) $tariff->min_weight);
+        //
+        // The actual weight is rounded UP to the tariff's own
+        // additional_weight increment before this math runs — a
+        // shipment is always billed in whole increments (0.6kg bills as
+        // 1kg on a 0.5kg increment, 1.6–1.9kg both bill as 2kg), never a
+        // fraction of one. This only affects the charge calculation —
+        // which tariff band the shipment matched above was decided by
+        // the real, unrounded weight, so a shipment doesn't jump into
+        // the wrong band just from rounding.
         $additionalWeightUnit = max(0.01, (float) $tariff->additional_weight);
+        // A tiny epsilon before ceil() guards against binary
+        // floating-point imprecision (e.g. 1.0 / 0.1 landing on
+        // 9.999999999999998 instead of exactly 10) rounding a weight
+        // that's genuinely an exact multiple up to one extra,
+        // unnecessary increment — a real overcharge risk for financial
+        // math, not a theoretical one.
+        $chargeableWeight = ceil(($weight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
+
+        $overageWeight = max(0, $chargeableWeight - (float) $tariff->min_weight);
         $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
 
         $baseAmount = (float) $zonePrice->charge + ($increments * (float) $zonePrice->additional_charge);
 
         return [
             'base_amount' => round($baseAmount, 2),
+            'billed_weight_kg' => $chargeableWeight,
             'transit_days' => $zonePrice->transit_days,
             'shipping_type' => $shippingType,
             'zone_id' => $zone->id,
