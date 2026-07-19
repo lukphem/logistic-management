@@ -43,8 +43,8 @@ class ZoneMappingController extends Controller
             ->orderBy('state_b_id')
             ->paginate(20, ['*'], 'domestic_page');
 
-        $internationalMappings = ZoneCountryMapping::with(['country.countryRegion', 'zone'])
-            ->orderBy('country_id')
+        $internationalMappings = ZoneCountryMapping::with(['countryA', 'countryB.countryRegion', 'zone'])
+            ->orderBy('country_b_id')
             ->paginate(20, ['*'], 'international_page');
 
         return view('zone-mappings.index', [
@@ -184,10 +184,16 @@ class ZoneMappingController extends Controller
      */
     public function generateInternational(): RedirectResponse
     {
+        $nigeria = Country::where('code', 'NG')->first();
+
+        if (! $nigeria) {
+            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+        }
+
         $created = 0;
 
         foreach (Country::where('code', '!=', 'NG')->get() as $country) {
-            $mapping = ZoneCountryMapping::firstOrCreate(['country_id' => $country->id]);
+            $mapping = ZoneCountryMapping::firstOrCreate(['country_a_id' => $nigeria->id, 'country_b_id' => $country->id]);
             $created += $mapping->wasRecentlyCreated ? 1 : 0;
         }
 
@@ -348,7 +354,7 @@ class ZoneMappingController extends Controller
     public function exportInternational(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $rows = ZoneCountryMapping::with(['country', 'zone'])
-            ->orderBy('country_id')
+            ->orderBy('country_b_id')
             ->get()
             ->map(fn ($m) => [$m->country->code, $m->zone?->code]);
 
@@ -358,6 +364,12 @@ class ZoneMappingController extends Controller
     public function importInternational(Request $request): RedirectResponse
     {
         $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $nigeria = Country::where('code', 'NG')->first();
+
+        if (! $nigeria) {
+            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+        }
 
         $rows = $this->csv->parse($request->file('file'));
         $count = 0;
@@ -376,7 +388,7 @@ class ZoneMappingController extends Controller
                 : null;
 
             ZoneCountryMapping::updateOrCreate(
-                ['country_id' => $country->id],
+                ['country_a_id' => $nigeria->id, 'country_b_id' => $country->id],
                 ['zone_id' => $zone?->id]
             );
             $count++;

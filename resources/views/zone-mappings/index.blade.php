@@ -12,6 +12,19 @@
         </div>
     @endif
 
+    <div class="mb-5 flex gap-2 border-b border-line">
+        <button type="button" id="tab-btn-international" onclick="showZoneTab('international')"
+                class="border-b-2 border-[var(--brand-primary)] px-1 pb-3 text-sm font-semibold text-ink-900">
+            International
+        </button>
+        <button type="button" id="tab-btn-domestic" onclick="showZoneTab('domestic')"
+                class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
+            Domestic
+        </button>
+    </div>
+
+    <div id="tab-domestic" style="display:none">
+
     {{-- Domestic Mapping --}}
     <div class="mb-5 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-ink-900">Domestic Mapping</h2>
@@ -160,8 +173,12 @@
 
     <div class="mt-5">{{ $domesticMappings->links() }}</div>
 
+    </div>{{-- /#tab-domestic --}}
+
+    <div id="tab-international">
+
     {{-- International Mapping --}}
-    <div class="mb-5 mt-10 flex items-center justify-between">
+    <div class="mb-5 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-ink-900">International Mapping</h2>
         <form method="POST" action="{{ route('zone-mappings.generate-international') }}">
             @csrf
@@ -261,7 +278,8 @@
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
-                    <th class="px-5 py-3 font-medium">Country</th>
+                    <th class="px-5 py-3 font-medium">Country A</th>
+                    <th class="px-5 py-3 font-medium">Country B</th>
                     <th class="px-5 py-3 font-medium">Continent</th>
                     <th class="px-5 py-3 font-medium">Region</th>
                     <th class="px-5 py-3 font-medium">Zone</th>
@@ -270,9 +288,10 @@
             <tbody>
                 @forelse ($internationalMappings as $mapping)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
-                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->country->name }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ $mapping->country->continent ?? '—' }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ $mapping->country->countryRegion?->name ?? '—' }}</td>
+                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->countryA->name }}</td>
+                        <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->countryB->name }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $mapping->countryB->continent ?? '—' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $mapping->countryB->countryRegion?->name ?? '—' }}</td>
                         <td class="px-5 py-3">
                             <form method="POST" action="{{ route('zone-mappings.update-country-zone', $mapping) }}">
                                 @csrf @method('PATCH')
@@ -287,12 +306,33 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No countries generated yet — click "Generate international countries" above.</td></tr>
+                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No countries generated yet — click "Generate international countries" above.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
     <div class="mt-5">{{ $internationalMappings->links() }}</div>
+
+    </div>{{-- /#tab-international --}}
+
+    <script>
+        function showZoneTab(tab) {
+            document.getElementById('tab-domestic').style.display = tab === 'domestic' ? '' : 'none';
+            document.getElementById('tab-international').style.display = tab === 'international' ? '' : 'none';
+
+            document.getElementById('tab-btn-domestic').classList.toggle('border-[var(--brand-primary)]', tab === 'domestic');
+            document.getElementById('tab-btn-domestic').classList.toggle('text-ink-900', tab === 'domestic');
+            document.getElementById('tab-btn-domestic').classList.toggle('font-semibold', tab === 'domestic');
+            document.getElementById('tab-btn-domestic').classList.toggle('border-transparent', tab !== 'domestic');
+            document.getElementById('tab-btn-domestic').classList.toggle('text-ink-500', tab !== 'domestic');
+
+            document.getElementById('tab-btn-international').classList.toggle('border-[var(--brand-primary)]', tab === 'international');
+            document.getElementById('tab-btn-international').classList.toggle('text-ink-900', tab === 'international');
+            document.getElementById('tab-btn-international').classList.toggle('font-semibold', tab === 'international');
+            document.getElementById('tab-btn-international').classList.toggle('border-transparent', tab !== 'international');
+            document.getElementById('tab-btn-international').classList.toggle('text-ink-500', tab !== 'international');
+        }
+    </script>
 
 </x-layouts.app>

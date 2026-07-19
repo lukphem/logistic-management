@@ -3334,3 +3334,53 @@ routes/web.php
 php artisan migrate
 php artisan db:seed --class=LocationSeeder
 ```
+
+## Increment 65 — Country A/Country B Pair Structure + Tabbed Layout
+
+Two corrections to the Zone Mapping screen.
+
+### International mapping now shows a real Country A / Country B pair
+
+`zone_country_mappings.country_id` renamed to `country_b_id`, with a new
+`country_a_id` added alongside it — matching domestic `ZoneMapping`'s
+`state_a_id`/`state_b_id` shape exactly, same two-column display in the
+table (Country A | Country B) instead of a single implicit "Country"
+column.
+
+**The underlying business logic is unchanged and still correct**:
+`country_a_id` is always Nigeria's id for every row (backfilled by the
+migration), since this business always ships *from* Nigeria — that's
+not a genuinely free pair the way two domestic states are. Adding the
+column explicitly (rather than leaving Nigeria implicit) gives the same
+visual/structural shape as domestic and leaves room to relax that
+assumption later without another migration, without pretending today's
+data is anything other than Nigeria-vs-one-other-country.
+
+`ZoneCountryMapping::country()` kept as a convenience alias for
+`countryB()`, since "the country this mapping is really about" is still
+country B in every existing usage — `PricingEngine`'s lookup, CSV
+export/import, and the bulk-rule tool all needed no logic changes,
+only the renamed column reference.
+
+### Domestic and International are now tabs, International first
+
+Previously two sections stacked on one long page, Domestic above
+International. Now two tabs — **International shown first/by
+default**, Domestic second — both sections' data still loads in one
+page request, the tab switch is pure client-side show/hide, no reload.
+
+### Files
+
+```
+database/migrations/2026_02_04_000001_add_country_a_id_to_zone_country_mappings_table.php
+app/Models/ZoneCountryMapping.php   (countryA()/countryB(), country() kept as alias)
+app/Http/Controllers/Web/ZoneMappingController.php   (every country_id reference updated to country_a_id/country_b_id)
+app/Services/PricingEngine.php   (lookup uses country_b_id)
+resources/views/zone-mappings/index.blade.php   (Country A/B columns, tabbed layout)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

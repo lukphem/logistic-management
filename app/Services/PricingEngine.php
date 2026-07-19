@@ -155,7 +155,7 @@ class PricingEngine
         }
 
         if ($foreignCountryId) {
-            $mapping = ZoneCountryMapping::where('country_id', $foreignCountryId)->first();
+            $mapping = ZoneCountryMapping::where('country_b_id', $foreignCountryId)->first();
 
             if ($mapping?->zone_id) {
                 return [Zone::find($mapping->zone_id), 'international'];
