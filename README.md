@@ -3615,3 +3615,66 @@ php artisan migrate
 
 You can now add "Acknowledgement" (or any other percentage-based
 service) yourself under Setups → Billing → Additional Services.
+
+## Increment 72 — "Acknowledgement": Percentage of a Real Reverse Shipment
+
+A third charge type, genuinely different in kind from the first two: an
+option can now be priced as a **percentage of a separately-calculated
+reverse shipment's rate** — for something like "Acknowledgement," where
+a signed document goes back to origin, and pricing that fairly means
+actually running it through the pricing engine as its own small
+shipment, not treating it as a cut of the outbound freight.
+
+### How it works
+
+Each option can independently be **Flat amount**, **Percentage of
+freight** (Increment 71), or now **Percentage of a reverse shipment**.
+The third type reveals two extra fields — a **Service Type** and a
+**Weight** — specific to *that reverse leg*, not the outbound shipment.
+
+`AdditionalServiceOption::resolveReverseShipmentAmount()` builds a
+reverse quote context (same route as the outbound shipment, but this
+option's own configured service type and weight), runs it through the
+**real** `PricingEngine`, and takes the option's percentage of that
+result's `base_amount` — not the outbound shipment's freight at all.
+Degrades to 0 rather than throwing if the reverse leg can't be priced
+(no tariff configured for that weight/service type yet) — the same
+graceful-degradation posture already used for a missing onforwarding
+classification; an incomplete reverse-rate setup shouldn't block
+pricing the outbound shipment itself.
+
+`ShipmentPricingService` now depends on `PricingEngine` (constructor
+injection — no circular dependency, `PricingEngine` has no constructor
+of its own, and nothing manually instantiates `ShipmentPricingService`
+anywhere, so every existing call site kept working automatically with
+zero changes).
+
+### Packaging — unchanged logic, easier naming
+
+No calculation changes for Packaging — still flat/percentage-of-freight
+as built in Increment 71. The Service Name field on Additional Services
+now offers common names (**Packaging**, **Acknowledgement**, Fragile
+Handling, Gift Wrapping, Signature on Delivery) as a browser
+autocomplete suggestion list, reducing typos and near-duplicate service
+names — free text is still accepted for anything not on the list.
+
+### Files
+
+```
+database/migrations/2026_02_08_000001_add_reverse_shipment_fields_to_additional_service_options_table.php
+app/Models/AdditionalServiceOption.php   (third charge type, reverseServiceType() relation, resolveReverseShipmentAmount())
+app/Services/ShipmentPricingService.php   (PricingEngine injected, routes by charge_type)
+app/Http/Controllers/Web/AdditionalServiceController.php   (reverse fields in validation/create/update, serviceTypes passed to the form)
+resources/views/additional-services/form.blade.php   (conditional reverse-shipment fields, name suggestions datalist)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Add "Acknowledgement" under Setups → Billing → Additional Services,
+give it an option, set Charge type to **Percentage of a reverse
+shipment**, pick which Service Type and Weight the reverse document
+should be priced at, and set the percentage.

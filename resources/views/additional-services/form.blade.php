@@ -6,7 +6,7 @@
         </div>
     @endif
 
-    <form method="POST" action="{{ $additionalService->exists ? route('additional-services.update', $additionalService) : route('additional-services.store') }}" class="max-w-xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+    <form method="POST" action="{{ $additionalService->exists ? route('additional-services.update', $additionalService) : route('additional-services.store') }}" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         @csrf
         @if ($additionalService->exists) @method('PUT') @endif
 
@@ -22,8 +22,16 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Service name <x-required /></label>
-            <input type="text" name="name" value="{{ old('name', $additionalService->name) }}" placeholder="e.g. Packaging"
+            <input type="text" name="name" list="service-name-suggestions" value="{{ old('name', $additionalService->name) }}" placeholder="e.g. Packaging"
                    class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            <datalist id="service-name-suggestions">
+                <option value="Packaging">
+                <option value="Acknowledgement">
+                <option value="Fragile Handling">
+                <option value="Gift Wrapping">
+                <option value="Signature on Delivery">
+            </datalist>
+            <p class="mt-1 text-xs text-ink-500">Common names are suggested as you type — feel free to enter your own.</p>
         </div>
 
         <div>
@@ -46,40 +54,65 @@
                         'id' => $option->id,
                         'name' => $option->name,
                         'charge_type' => $option->charge_type,
+                        'reverse_service_type_id' => $option->reverse_service_type_id,
+                        'reverse_weight_kg' => $option->reverse_weight_kg,
                         'price' => $option->price,
                     ]])->all();
                 }
 
                 if (empty($rowsToShow)) {
-                    $rowsToShow = [0 => ['id' => null, 'name' => '', 'charge_type' => 'flat', 'price' => '']];
+                    $rowsToShow = [0 => ['id' => null, 'name' => '', 'charge_type' => 'flat', 'reverse_service_type_id' => '', 'reverse_weight_kg' => '', 'price' => '']];
                 }
             @endphp
 
-            <div id="option-rows" class="space-y-2" data-next-index="{{ max(array_keys($rowsToShow)) + 1 }}">
+            <div id="option-rows" class="space-y-3" data-next-index="{{ max(array_keys($rowsToShow)) + 1 }}">
                 @foreach ($rowsToShow as $i => $row)
-                    <div class="option-row grid grid-cols-2 gap-2 sm:grid-cols-[2fr_1.2fr_1fr_auto] sm:items-end">
-                        @if (! empty($row['id']))
-                            <input type="hidden" name="options[{{ $i }}][id]" value="{{ $row['id'] }}">
-                        @endif
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Name</label>
-                            <input type="text" name="options[{{ $i }}][name]" value="{{ $row['name'] ?? '' }}" placeholder="e.g. Small Box"
-                                   class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @php $isReverse = ($row['charge_type'] ?? 'flat') === 'percentage_of_reverse_shipment'; @endphp
+                    <div class="option-row rounded-lg border border-line p-3">
+                        <div class="grid grid-cols-2 gap-2 sm:grid-cols-[2fr_1.4fr_1fr_auto] sm:items-end">
+                            @if (! empty($row['id']))
+                                <input type="hidden" name="options[{{ $i }}][id]" value="{{ $row['id'] }}">
+                            @endif
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Name</label>
+                                <input type="text" name="options[{{ $i }}][name]" value="{{ $row['name'] ?? '' }}" placeholder="e.g. Small Box"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Charge type</label>
+                                <select name="options[{{ $i }}][charge_type]" class="charge-type-select w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    @foreach (\App\Models\AdditionalServiceOption::CHARGE_TYPES as $key => $label)
+                                        <option value="{{ $key }}" @selected(($row['charge_type'] ?? 'flat') === $key)>{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="price-label mb-1 block text-xs font-medium text-ink-900">{{ $isReverse ? 'Percentage (%)' : (($row['charge_type'] ?? 'flat') === 'percentage' ? 'Percentage (%)' : 'Price') }}</label>
+                                <input type="number" step="0.01" min="0" name="options[{{ $i }}][price]" value="{{ $row['price'] ?? '' }}"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <button type="button" class="remove-option-row rounded-md px-2 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
                         </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-ink-900">Charge type</label>
-                            <select name="options[{{ $i }}][charge_type]" class="charge-type-select w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                @foreach (\App\Models\AdditionalServiceOption::CHARGE_TYPES as $key => $label)
-                                    <option value="{{ $key }}" @selected(($row['charge_type'] ?? 'flat') === $key)>{{ $label }}</option>
-                                @endforeach
-                            </select>
+
+                        <div class="reverse-fields mt-2 grid grid-cols-2 gap-2" style="{{ $isReverse ? '' : 'display:none' }}">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Reverse shipment's service type</label>
+                                <select name="options[{{ $i }}][reverse_service_type_id]" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="">— Select —</option>
+                                    @foreach ($serviceTypes as $serviceType)
+                                        <option value="{{ $serviceType->id }}" @selected((string) ($row['reverse_service_type_id'] ?? '') === (string) $serviceType->id)>{{ $serviceType->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Reverse shipment's weight (kg)</label>
+                                <input type="number" step="0.01" min="0.01" name="options[{{ $i }}][reverse_weight_kg]" value="{{ $row['reverse_weight_kg'] ?? '' }}" placeholder="e.g. 0.5"
+                                       class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
                         </div>
-                        <div>
-                            <label class="price-label mb-1 block text-xs font-medium text-ink-900">{{ ($row['charge_type'] ?? 'flat') === 'percentage' ? 'Percentage (%)' : 'Price' }}</label>
-                            <input type="number" step="0.01" min="0" name="options[{{ $i }}][price]" value="{{ $row['price'] ?? '' }}"
-                                   class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        </div>
-                        <button type="button" class="remove-option-row rounded-md px-2 py-2 text-sm font-medium text-status-exception hover:bg-status-exception/10">Remove</button>
+                        <p class="reverse-fields-note mt-1 text-xs text-ink-500" style="{{ $isReverse ? '' : 'display:none' }}">
+                            Prices this as its own small shipment on the same route, using this service type and weight, then charges the percentage above of THAT rate — not a cut of the outbound freight.
+                        </p>
                     </div>
                 @endforeach
             </div>
@@ -112,17 +145,26 @@
             }
 
             /**
-             * "Price" reads as "Percentage (%)" when Charge type is set
-             * to percentage, so the field's meaning is clear without
-             * needing to check the dropdown separately.
+             * "Price" reads as "Percentage (%)" for either percentage
+             * charge type, and the reverse-shipment fields (service
+             * type + weight) only show for the reverse type — kept in
+             * sync with whichever option is chosen, on every row,
+             * including ones added after page load.
              */
             function wireChargeTypeLabel(row) {
                 const select = row.querySelector('.charge-type-select');
                 const label = row.querySelector('.price-label');
+                const reverseFields = row.querySelector('.reverse-fields');
+                const reverseNote = row.querySelector('.reverse-fields-note');
 
-                select.addEventListener('change', function () {
-                    label.textContent = select.value === 'percentage' ? 'Percentage (%)' : 'Price';
-                });
+                function sync() {
+                    const isReverse = select.value === 'percentage_of_reverse_shipment';
+                    label.textContent = (select.value === 'percentage' || isReverse) ? 'Percentage (%)' : 'Price';
+                    reverseFields.style.display = isReverse ? '' : 'none';
+                    reverseNote.style.display = isReverse ? '' : 'none';
+                }
+
+                select.addEventListener('change', sync);
             }
 
             container.querySelectorAll('.option-row').forEach(function (row) {
@@ -147,6 +189,8 @@
                     select.selectedIndex = 0;
                 });
                 row.querySelector('.price-label').textContent = 'Price';
+                row.querySelector('.reverse-fields').style.display = 'none';
+                row.querySelector('.reverse-fields-note').style.display = 'none';
 
                 wireRemove(row);
                 wireChargeTypeLabel(row);

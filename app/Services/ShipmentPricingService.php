@@ -6,6 +6,10 @@ use App\Models\ClientBillingProfile;
 
 class ShipmentPricingService
 {
+    public function __construct(private PricingEngine $pricingEngine)
+    {
+    }
+
     /**
      * Returns the full pricing breakdown for a shipment quote.
      *
@@ -71,18 +75,19 @@ class ShipmentPricingService
     }
 
     /**
-     * Optional add-ons (packaging, fragile handling, etc.) — pass
-     * whichever AdditionalServiceOption IDs were selected via
-     * $context['additional_service_option_ids']. Each option can have
-     * multiple priced variants (Packaging: Small/Medium/Large Box), and
-     * each variant can be a flat amount or a percentage of the
-     * shipment's base freight (e.g. an "Acknowledgement" option priced
-     * at 2.5% of freight) — resolveAmount() handles either, so this
-     * sums by OPTION, not by service, and can't be a plain DB sum() the
-     * way it could when every option was a flat amount. Same treatment
-     * as insurance and onforwarding: a real extra service, not part of
-     * the negotiated freight rate, so never discounted but still
-     * taxable.
+     * Optional add-ons (packaging, fragile handling, "Acknowledgement",
+     * etc.) — pass whichever AdditionalServiceOption IDs were selected
+     * via $context['additional_service_option_ids']. Each option can
+     * have multiple priced variants (Packaging: Small/Medium/Large Box),
+     * and each variant resolves differently depending on its
+     * charge_type: a flat amount, a percentage of this shipment's
+     * freight, or (for something like "Acknowledgement" — a document
+     * sent back to origin) a percentage of a SEPARATE reverse
+     * shipment's rate, priced through the real pricing engine using
+     * that option's own configured service type and weight. Same
+     * treatment as insurance and onforwarding either way: a real extra
+     * service, not part of the negotiated freight rate, so never
+     * discounted but still taxable.
      */
     private function calculateAdditionalServices(array $context, float $baseAmount): float
     {
@@ -94,7 +99,9 @@ class ShipmentPricingService
 
         return \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)
             ->get()
-            ->sum(fn ($option) => $option->resolveAmount($baseAmount));
+            ->sum(fn ($option) => $option->charge_type === 'percentage_of_reverse_shipment'
+                ? $option->resolveReverseShipmentAmount($this->pricingEngine, $context)
+                : $option->resolveAmount($baseAmount));
     }
 
     private function calculateInsurance(array $context): float

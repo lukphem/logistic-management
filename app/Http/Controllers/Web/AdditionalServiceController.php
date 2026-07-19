@@ -21,7 +21,11 @@ class AdditionalServiceController extends Controller
 
     public function create(): View
     {
-        return view('additional-services.form', ['additionalService' => new AdditionalService(), 'options' => collect()]);
+        return view('additional-services.form', [
+            'additionalService' => new AdditionalService(),
+            'options' => collect(),
+            'serviceTypes' => \App\Models\ServiceType::where('is_active', true)->orderBy('name')->get(),
+        ]);
     }
 
     /**
@@ -46,10 +50,14 @@ class AdditionalServiceController extends Controller
                 continue;
             }
 
+            $chargeType = $option['charge_type'] ?? 'flat';
+
             AdditionalServiceOption::create([
                 'additional_service_id' => $service->id,
                 'name' => $option['name'],
-                'charge_type' => $option['charge_type'] ?? 'flat',
+                'charge_type' => $chargeType,
+                'reverse_service_type_id' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
+                'reverse_weight_kg' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                 'price' => $option['price'],
                 'is_active' => true,
             ]);
@@ -64,6 +72,7 @@ class AdditionalServiceController extends Controller
         return view('additional-services.form', [
             'additionalService' => $additionalService,
             'options' => $additionalService->options()->orderBy('name')->get(),
+            'serviceTypes' => \App\Models\ServiceType::where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -101,6 +110,8 @@ class AdditionalServiceController extends Controller
                 AdditionalServiceOption::where('id', $option['id'])->where('additional_service_id', $additionalService->id)->update([
                     'name' => $option['name'],
                     'charge_type' => $option['charge_type'] ?? 'flat',
+                    'reverse_service_type_id' => ($option['charge_type'] ?? 'flat') === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
+                    'reverse_weight_kg' => ($option['charge_type'] ?? 'flat') === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                     'price' => $option['price'],
                 ]);
                 $saved++;
@@ -108,10 +119,14 @@ class AdditionalServiceController extends Controller
             }
 
             if ($hasPrice && ! empty($option['name'])) {
+                $chargeType = $option['charge_type'] ?? 'flat';
+
                 $new = AdditionalServiceOption::create([
                     'additional_service_id' => $additionalService->id,
                     'name' => $option['name'],
-                    'charge_type' => $option['charge_type'] ?? 'flat',
+                    'charge_type' => $chargeType,
+                    'reverse_service_type_id' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
+                    'reverse_weight_kg' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                     'price' => $option['price'],
                     'is_active' => true,
                 ]);
@@ -139,7 +154,9 @@ class AdditionalServiceController extends Controller
             'options' => 'nullable|array',
             'options.*.id' => 'nullable|integer|exists:additional_service_options,id',
             'options.*.name' => 'nullable|string|max:255',
-            'options.*.charge_type' => 'nullable|in:flat,percentage',
+            'options.*.charge_type' => 'nullable|in:flat,percentage,percentage_of_reverse_shipment',
+            'options.*.reverse_service_type_id' => 'nullable|exists:service_types,id',
+            'options.*.reverse_weight_kg' => 'nullable|numeric|min:0.01',
             'options.*.price' => 'nullable|numeric|min:0',
         ]);
 
