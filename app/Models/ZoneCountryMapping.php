@@ -29,4 +29,9 @@ class ZoneCountryMapping extends Model
     {
         return $this->countryB();
     }
+
+    public function zone(): BelongsTo
+    {
+        return $this->belongsTo(Zone::class);
+    }
 }

@@ -3384,3 +3384,24 @@ resources/views/zone-mappings/index.blade.php   (Country A/B columns, tabbed lay
 ```powershell
 php artisan migrate
 ```
+
+## Increment 66 — Bug Fix: Missing `zone()` Relation on ZoneCountryMapping
+
+Real bug from Increment 65: when `ZoneCountryMapping` was rewritten to
+add `countryA()`/`countryB()`, the existing `zone()` relation was
+dropped by mistake — every place that eager-loads or accesses
+`$mapping->zone` (the International Mapping table, the bulk-rule tool,
+CSV export) threw `RelationNotFoundException`.
+
+Restored. This happened specifically because the model was reconstructed
+as a whole file rather than edited with a targeted change — `Country.php`,
+touched in the same increment via a small targeted edit instead, kept
+its existing relations intact with no issue.
+
+### Files
+
+```
+app/Models/ZoneCountryMapping.php   (zone() relation restored)
+```
+
+No migration needed.
