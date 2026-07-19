@@ -49,6 +49,7 @@ class AdditionalServiceController extends Controller
             AdditionalServiceOption::create([
                 'additional_service_id' => $service->id,
                 'name' => $option['name'],
+                'charge_type' => $option['charge_type'] ?? 'flat',
                 'price' => $option['price'],
                 'is_active' => true,
             ]);
@@ -99,6 +100,7 @@ class AdditionalServiceController extends Controller
 
                 AdditionalServiceOption::where('id', $option['id'])->where('additional_service_id', $additionalService->id)->update([
                     'name' => $option['name'],
+                    'charge_type' => $option['charge_type'] ?? 'flat',
                     'price' => $option['price'],
                 ]);
                 $saved++;
@@ -109,6 +111,7 @@ class AdditionalServiceController extends Controller
                 $new = AdditionalServiceOption::create([
                     'additional_service_id' => $additionalService->id,
                     'name' => $option['name'],
+                    'charge_type' => $option['charge_type'] ?? 'flat',
                     'price' => $option['price'],
                     'is_active' => true,
                 ]);
@@ -136,6 +139,7 @@ class AdditionalServiceController extends Controller
             'options' => 'nullable|array',
             'options.*.id' => 'nullable|integer|exists:additional_service_options,id',
             'options.*.name' => 'nullable|string|max:255',
+            'options.*.charge_type' => 'nullable|in:flat,percentage',
             'options.*.price' => 'nullable|numeric|min:0',
         ]);
 

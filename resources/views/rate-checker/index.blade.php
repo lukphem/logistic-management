@@ -131,7 +131,7 @@
                                 <select name="additional_service_option_ids[]" class="rounded-md border border-line px-2 py-1.5 text-sm outline-none focus:border-[var(--brand-primary)]">
                                     <option value="">None</option>
                                     @foreach ($service->options as $option)
-                                        <option value="{{ $option->id }}" @selected($selectedForThisService?->id === $option->id)>{{ $option->name }} (+{{ number_format($option->price, 2) }})</option>
+                                        <option value="{{ $option->id }}" @selected($selectedForThisService?->id === $option->id)>{{ $option->name }} (+{{ $option->displayPrice() }})</option>
                                     @endforeach
                                 </select>
                             </div>

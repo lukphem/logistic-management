@@ -3557,3 +3557,61 @@ resources/views/standard-billing/form.blade.php   (data attributes on Service Ty
 No migration, no controller changes — the zone list stays unfiltered
 server-side deliberately, since the applicable subset depends on a
 choice made within the same form.
+
+## Increment 71 — Additional Service Options Can Now Be Percentage-Based
+
+Every option under Additional Services (Packaging, etc.) was a flat
+amount only. Now each option independently chooses **Flat amount** or
+**Percentage of freight** — so something like "Acknowledgement" can be
+priced at, say, 2.5% of the shipment's base freight instead of a fixed
+Naira figure.
+
+### How the percentage resolves
+
+`AdditionalServiceOption::resolveAmount(float $baseAmount)` — a flat
+option returns its `price` directly; a percentage option returns
+`price% of $baseAmount`. The base is the shipment's **base freight
+amount** specifically (the same figure VAT is calculated from), not the
+running total — an additional service isn't meant to compound on top of
+other additional services or the discount, same non-compounding
+principle already used for insurance and onforwarding.
+
+`ShipmentPricingService::calculateAdditionalServices()` changed from a
+plain `sum('price')` database query to resolving each selected option
+in PHP via `resolveAmount()`, since a percentage option can't be summed
+directly — it needs the base amount to resolve against.
+
+### Where it shows up
+
+- **Additional Services form**: each option row gets a **Charge type**
+  selector (Flat amount / Percentage of freight), with the "Price"
+  label switching to "Percentage (%)" live when Percentage is chosen —
+  works correctly for rows added via "+ Add option" too, not just the
+  ones on page load
+- **Rate Checker**: the per-service option dropdown now shows
+  `AdditionalServiceOption::displayPrice()` — "2.5% of freight" for a
+  percentage option, a plain Naira figure for a flat one — instead of
+  always formatting `price` as currency
+
+Existing options default to `charge_type = 'flat'`, preserving current
+behavior exactly for anything already configured.
+
+### Files
+
+```
+database/migrations/2026_02_07_000001_add_charge_type_to_additional_service_options_table.php
+app/Models/AdditionalServiceOption.php   (charge_type, CHARGE_TYPES, resolveAmount(), displayPrice())
+app/Services/ShipmentPricingService.php   (calculateAdditionalServices() resolves per-option instead of DB sum)
+app/Http/Controllers/Web/AdditionalServiceController.php   (charge_type validation and create/update)
+resources/views/additional-services/form.blade.php   (Charge type selector, live label switch)
+resources/views/rate-checker/index.blade.php   (displayPrice() instead of raw price formatting)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+You can now add "Acknowledgement" (or any other percentage-based
+service) yourself under Setups → Billing → Additional Services.
