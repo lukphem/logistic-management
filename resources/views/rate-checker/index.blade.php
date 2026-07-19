@@ -23,34 +23,36 @@
 
         <div id="model-fields" class="hidden space-y-4">
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Route type</label>
-                <div class="flex gap-3">
-                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                        <input type="radio" name="route_type" value="domestic" id="route-domestic"
-                               @checked(request('route_type', 'domestic') === 'domestic')
-                               onchange="showRateCheckerRouteFields('domestic');">
-                        Domestic
-                    </label>
-                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                        <input type="radio" name="route_type" value="international" id="route-international"
-                               @checked(request('route_type') === 'international')
-                               onchange="showRateCheckerRouteFields('international');">
-                        International
-                    </label>
-                </div>
-            </div>
-
-            <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
-                <select id="service-type" name="service_type_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                <select id="service-type" name="service_type_id" onchange="syncFieldsForServiceType();" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     <option value="">Select a service type</option>
-                    @foreach ($serviceTypes as $serviceType)
-                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
-                    @endforeach
+                    <optgroup label="Domestic">
+                        @foreach ($serviceTypes->where('route_type', 'domestic') as $serviceType)
+                            <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
+                        @endforeach
+                    </optgroup>
+                    <optgroup label="International">
+                        @foreach ($serviceTypes->where('route_type', 'international') as $serviceType)
+                            <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}{{ $serviceType->trade_direction === 'cross_trade' ? ' (Cross-Trade)' : '' }}</option>
+                        @endforeach
+                    </optgroup>
                 </select>
+                <p class="mt-1 text-xs text-ink-500">Which fields appear below depends on this service type — domestic, international, or cross-trade.</p>
             </div>
 
-            <div id="domestic-fields" class="space-y-4" style="{{ request('route_type') === 'international' ? 'display:none' : '' }}">
+            @php
+                $selectedServiceType = request('service_type_id') ? \App\Models\ServiceType::find(request('service_type_id')) : null;
+                $tradeDirection = $selectedServiceType?->trade_direction ?? 'export';
+                // Which side Nigeria is on determines which field names
+                // carry the Nigeria state/city vs the foreign country —
+                // export: Nigeria is origin, country is destination.
+                // import: Nigeria is destination, country is origin.
+                $nigeriaStateField = $tradeDirection === 'import' ? 'destination_state_id' : 'origin_state_id';
+                $nigeriaCityField = $tradeDirection === 'import' ? 'destination_city_id' : 'origin_city_id';
+                $foreignCountryField = $tradeDirection === 'import' ? 'origin_country_id' : 'destination_country_id';
+            @endphp
+
+            <div id="domestic-fields" class="space-y-4" style="{{ $selectedServiceType?->route_type === 'international' ? 'display:none' : '' }}">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Origin state</label>
@@ -101,19 +103,7 @@
                 <p class="text-xs text-ink-500">District is only needed to preview an onforwarding surcharge tied to a specific district rather than the whole city.</p>
             </div>
 
-            @php
-                $selectedServiceType = request('service_type_id') ? \App\Models\ServiceType::find(request('service_type_id')) : null;
-                $tradeDirection = $selectedServiceType?->trade_direction ?? 'export';
-                // Which side Nigeria is on determines which field names
-                // carry the Nigeria state/city vs the foreign country —
-                // export: Nigeria is origin, country is destination.
-                // import: Nigeria is destination, country is origin.
-                $nigeriaStateField = $tradeDirection === 'import' ? 'destination_state_id' : 'origin_state_id';
-                $nigeriaCityField = $tradeDirection === 'import' ? 'destination_city_id' : 'origin_city_id';
-                $foreignCountryField = $tradeDirection === 'import' ? 'origin_country_id' : 'destination_country_id';
-            @endphp
-
-            <div id="international-fields" style="{{ request('route_type') !== 'international' ? 'display:none' : '' }}">
+            <div id="international-fields" style="{{ $selectedServiceType?->route_type !== 'international' ? 'display:none' : '' }}">
                 <p id="trade-direction-label" class="mb-3 text-xs font-medium text-ink-900">
                     {{ match ($tradeDirection) { 'import' => 'Import — Nigeria is the destination', 'cross_trade' => 'Cross-Trade (Third-Country Shipping) — neither side is Nigeria', default => 'Export — Nigeria is the origin' } }}
                 </p>
@@ -292,12 +282,9 @@
 
         function filterServiceTypes() {
             const chosenModel = billingModelSelect.value;
-            const chosenRoute = document.querySelector('input[name="route_type"]:checked')?.value || 'domestic';
 
             serviceTypeOptions.forEach(function (option) {
-                const modelMatches = chosenModel === '' || option.dataset.billingModel === chosenModel;
-                const routeMatches = option.dataset.routeType === '' || option.dataset.routeType === chosenRoute;
-                option.hidden = !(modelMatches && routeMatches);
+                option.hidden = chosenModel !== '' && option.dataset.billingModel !== chosenModel;
             });
 
             if (serviceTypeSelect.selectedOptions[0]?.hidden) {
@@ -306,16 +293,22 @@
         }
 
         /**
-         * Shows the fields for the chosen route type and DISABLES every
-         * input inside the other section — display:none alone doesn't
+         * Shows the fields matching the SELECTED SERVICE TYPE's own
+         * route_type — domestic or international — and DISABLES every
+         * input inside the other section. display:none alone doesn't
          * stop a hidden field from being submitted, and the sections
          * can genuinely share field names (the international section's
          * two sub-views below do too). Disabled fields are excluded
          * from submission entirely, which is what actually prevents a
          * stale value from a hidden section overwriting the visible
-         * one's.
+         * one's. There's no separate Route Type control — the service
+         * type chosen IS the route type, since every service type is
+         * already restricted to exactly one.
          */
-        function showRateCheckerRouteFields(type) {
+        function syncFieldsForServiceType() {
+            const selected = serviceTypeSelect.selectedOptions[0];
+            const type = selected?.dataset.routeType || 'domestic';
+
             const sections = {
                 domestic: document.getElementById('domestic-fields'),
                 international: document.getElementById('international-fields'),
@@ -390,9 +383,7 @@
                 : (isImport ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin');
         }
 
-        serviceTypeSelect.addEventListener('change', updateTradeDirection);
-
-        showRateCheckerRouteFields(document.querySelector('input[name="route_type"]:checked')?.value || 'domestic');
+        syncFieldsForServiceType();
         syncModelSection(); // restores the right section on reload, e.g. after "Check rate"
 
         (function () {

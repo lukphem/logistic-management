@@ -4103,3 +4103,41 @@ resources/views/rate-checker/index.blade.php   (third radio removed, internation
 ```powershell
 php artisan migrate
 ```
+
+## Increment 80 — Rate Checker: Service Type Alone Determines Everything
+
+Removed the separate "Route type" radio (Domestic/International)
+entirely — it was a redundant extra step, since every service type is
+already restricted to exactly one route type. Service Type is now the
+primary selector: **pick a service type, and the correct fields appear
+automatically** based on that service type's own configuration.
+
+### What changed
+
+- **Service Type dropdown** is now grouped into `<optgroup>`s —
+  Domestic and International — so it's still visually clear which is
+  which without needing a separate control to pick between them.
+  International entries also show "(Cross-Trade)" inline when
+  applicable.
+- `filterServiceTypes()` now only filters by Billing Model — the
+  route-type filtering it used to do against a radio button's value
+  is gone, since there's no radio to check against anymore.
+- `showRateCheckerRouteFields(type)` → `syncFieldsForServiceType()` —
+  reads `route_type` directly from the *selected service type's own*
+  data attribute instead of a separate control's value, and is wired
+  to the Service Type dropdown's own `onchange` rather than a
+  radio group. Still does the same disable-inactive-fields work as
+  before (Increment 79's fix), just triggered differently.
+- The `@php` block computing the selected service type and its
+  field-name mapping moved earlier in the file, since both the
+  domestic and international sections now need it (previously only
+  international did).
+
+### Files
+
+```
+resources/views/rate-checker/index.blade.php   (Route Type radio removed, Service Type grouped and made the primary selector, syncFieldsForServiceType() replaces showRateCheckerRouteFields())
+```
+
+No migration, no controller changes — this is entirely a Rate Checker
+UI simplification on top of Increment 79's data model.
