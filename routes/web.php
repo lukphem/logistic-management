@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\AdditionalServiceController;
 use App\Http\Controllers\Web\CityController;
 use App\Http\Controllers\Web\ClientBillingController;
 use App\Http\Controllers\Web\CountryController;
+use App\Http\Controllers\Web\CountryRegionController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DistrictController;
 use App\Http\Controllers\Web\HubController;
@@ -59,6 +60,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/countries', [CountryController::class, 'index'])->name('countries.index');
         Route::get('/states', [StateController::class, 'index'])->name('states.index');
         Route::get('/territories', [TerritoryController::class, 'index'])->name('territories.index');
+        Route::get('/country-regions', [CountryRegionController::class, 'index'])->name('country-regions.index');
         Route::get('/routes', [RouteController::class, 'index'])->name('routes.index');
         Route::get('/cities', [CityController::class, 'index'])->name('cities.index');
         Route::get('/districts', [DistrictController::class, 'index'])->name('districts.index');
@@ -82,6 +84,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/states', [StateController::class, 'store'])->name('states.store');
         Route::get('/territories/create', [TerritoryController::class, 'create'])->name('territories.create');
         Route::post('/territories', [TerritoryController::class, 'store'])->name('territories.store');
+        Route::get('/country-regions/create', [CountryRegionController::class, 'create'])->name('country-regions.create');
+        Route::post('/country-regions', [CountryRegionController::class, 'store'])->name('country-regions.store');
         Route::get('/routes/create', [RouteController::class, 'create'])->name('routes.create');
         Route::post('/routes', [RouteController::class, 'store'])->name('routes.store');
         Route::get('/cities/create', [CityController::class, 'create'])->name('cities.create');
@@ -106,6 +110,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/states/{state}', [StateController::class, 'update'])->name('states.update');
         Route::get('/territories/{territory}/edit', [TerritoryController::class, 'edit'])->name('territories.edit');
         Route::put('/territories/{territory}', [TerritoryController::class, 'update'])->name('territories.update');
+        Route::get('/country-regions/{countryRegion}/edit', [CountryRegionController::class, 'edit'])->name('country-regions.edit');
+        Route::put('/country-regions/{countryRegion}', [CountryRegionController::class, 'update'])->name('country-regions.update');
         Route::get('/routes/{route}/edit', [RouteController::class, 'edit'])->name('routes.edit');
         Route::put('/routes/{route}', [RouteController::class, 'update'])->name('routes.update');
         Route::get('/cities/{city}/edit', [CityController::class, 'edit'])->name('cities.edit');
@@ -134,6 +140,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/countries/{country}', [CountryController::class, 'destroy'])->name('countries.destroy');
         Route::delete('/states/{state}', [StateController::class, 'destroy'])->name('states.destroy');
         Route::delete('/territories/{territory}', [TerritoryController::class, 'destroy'])->name('territories.destroy');
+        Route::delete('/country-regions/{countryRegion}', [CountryRegionController::class, 'destroy'])->name('country-regions.destroy');
         Route::delete('/routes/{route}', [RouteController::class, 'destroy'])->name('routes.destroy');
         Route::delete('/cities/{city}', [CityController::class, 'destroy'])->name('cities.destroy');
         Route::delete('/districts/{district}', [DistrictController::class, 'destroy'])->name('districts.destroy');
@@ -153,6 +160,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:rates:update')->group(function () {
         Route::post('/zone-mappings/generate-domestic', [ZoneMappingController::class, 'generateDomestic'])->name('zone-mappings.generate-domestic');
         Route::post('/zone-mappings/apply-domestic-rule', [ZoneMappingController::class, 'applyDomesticRule'])->name('zone-mappings.apply-domestic-rule');
+        Route::post('/zone-mappings/apply-international-rule', [ZoneMappingController::class, 'applyInternationalRule'])->name('zone-mappings.apply-international-rule');
         Route::post('/zone-mappings/generate-international', [ZoneMappingController::class, 'generateInternational'])->name('zone-mappings.generate-international');
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
         Route::patch('/zone-country-mappings/{zoneCountryMapping}/zone', [ZoneMappingController::class, 'updateCountryZone'])->name('zone-mappings.update-country-zone');

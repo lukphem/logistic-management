@@ -173,11 +173,97 @@
 
     <x-csv-actions :export-route="route('zone-mappings.export-international')" :import-route="route('zone-mappings.import-international')" label="International Mapping" />
 
+    <details class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm">
+        <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-ink-900">Apply a rule to every country</summary>
+        <div class="border-t border-line p-5">
+            <p class="mb-4 text-xs text-ink-500">
+                Sets a zone for every country at once, comparing each one against Nigeria specifically (the fixed
+                origin side for international shipments) — <strong>overwrites every existing assignment</strong>,
+                including manual ones. Regions are managed under
+                <a href="{{ route('country-regions.index') }}" class="text-[var(--brand-primary)] hover:underline">Setups → Location → Country Regions</a>
+                — yours to name however makes sense, standard geography or otherwise.
+            </p>
+
+            <form method="POST" action="{{ route('zone-mappings.apply-international-rule') }}" onsubmit="return confirm('This overwrites the zone on every country, including any already set manually. Continue?')">
+                @csrf
+                <div class="mb-4">
+                    <span class="mb-2 block text-sm font-medium text-ink-900">Grouping method</span>
+                    <div class="flex gap-3">
+                        <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <input type="radio" name="grouping_method" value="continent" id="method-continent" class="rounded-full border-line"
+                                   onchange="document.getElementById('continent-only-fields').style.display=''; document.getElementById('continent-region-fields').style.display='none';">
+                            Continent only
+                        </label>
+                        <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <input type="radio" name="grouping_method" value="continent_region" id="method-continent-region" checked class="rounded-full border-line"
+                                   onchange="document.getElementById('continent-only-fields').style.display='none'; document.getElementById('continent-region-fields').style.display='';">
+                            Continent + Region <span class="text-xs text-ink-500">(recommended)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="continent-only-fields" style="display:none" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Same continent as Nigeria</span>
+                        <select name="zone_same_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Different continent</span>
+                        <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div id="continent-region-fields" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Same region as Nigeria</span>
+                        <select name="zone_same_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Same continent, different region</span>
+                        <select name="zone_same_continent_different_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Different continent</span>
+                        <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                        Apply to all countries
+                    </button>
+                </div>
+            </form>
+        </div>
+    </details>
+
     <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">Country</th>
+                    <th class="px-5 py-3 font-medium">Continent</th>
+                    <th class="px-5 py-3 font-medium">Region</th>
                     <th class="px-5 py-3 font-medium">Zone</th>
                 </tr>
             </thead>
@@ -185,6 +271,8 @@
                 @forelse ($internationalMappings as $mapping)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->country->name }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $mapping->country->continent ?? '—' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $mapping->country->countryRegion?->name ?? '—' }}</td>
                         <td class="px-5 py-3">
                             <form method="POST" action="{{ route('zone-mappings.update-country-zone', $mapping) }}">
                                 @csrf @method('PATCH')
@@ -199,7 +287,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="2" class="px-5 py-8 text-center text-sm text-ink-500">No countries generated yet — click "Generate international countries" above.</td></tr>
+                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No countries generated yet — click "Generate international countries" above.</td></tr>
                 @endforelse
             </tbody>
         </table>

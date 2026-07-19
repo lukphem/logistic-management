@@ -3255,3 +3255,82 @@ database/seeders/LocationSeeder.php
 ```powershell
 php artisan db:seed --class=LocationSeeder
 ```
+
+## Increment 64 — International Zone Mapping Gets a Real Grouping Rule
+
+Extends the domestic bulk-rule tool (Increment 62) to international
+mapping — Continent and a new staff-defined `CountryRegion` entity,
+with a selectable grouping method (Continent-only, or Continent+Region
+as the recommended default), mirroring exactly the "same
+territory/airport" logic already used domestically.
+
+### A near-miss worth documenting
+
+Partway through this build, `app/Models/Region.php` and a `regions`
+table **already existed** — for grouping Hubs and Users in the internal
+access-scope hierarchy (Increment 13), a completely different concept
+from geographic country groupings. The new entity was almost built
+under that same name, which would have silently broken the existing
+Hub-region feature. Caught before anything was committed; the original
+`Region` model was restored from git (confirmed via `git diff` showing
+zero changes), and the new concept was built under a distinct name —
+`CountryRegion` / `country_regions` — with no collision anywhere.
+
+### What's new
+
+- **`countries.continent`** — a fixed, plain field (Africa, Asia,
+  Europe, North America, South America, Oceania, Antarctica), not an
+  entity — same treatment as any other fixed classification in this
+  app
+- **`CountryRegion`** (`country_regions` table) — staff-managed, exactly
+  like Territory for states. Yours to name however makes sense:
+  standard geography ("West Africa") or a proximity framing ("Bordering
+  Nigeria") — same mechanism either way, since it's just a name you
+  choose
+- **Countries CRUD** gains Continent and Region fields (create/edit
+  form, index columns, CSV export/import) — so both can be bulk-set via
+  spreadsheet without touching 178 countries one at a time in the UI
+- **`LocationSeeder`** pre-fills continent + a starting 19-region
+  breakdown (UN M49-ish) for **all 178 seeded countries — verified
+  complete, zero gaps, zero extras** against the actual country list.
+  Explicitly a starting point, not a fixed answer — rename or regroup
+  any of it from the Country Regions screen
+- **`ZoneMappingController::applyInternationalRule()`** — the
+  international counterpart to `applyDomesticRule()`. Every comparison
+  is against **Nigeria specifically** (the fixed origin side for
+  international shipments), not two arbitrary countries the way the
+  domestic rule compares two arbitrary states:
+  - **Continent only** (2-tier): same continent as Nigeria, or not
+  - **Continent + Region** (3-tier, **recommended default**): same
+    region as Nigeria / same continent but different region / different
+    continent entirely
+- International Mapping table now shows Continent and Region per
+  country, same transparency purpose as the domestic table's
+  Territory/Airport columns from Increment 61
+
+Same destructive/bulk posture as the domestic rule tool: overwrites
+every existing international assignment, confirmed before running.
+
+### Files
+
+```
+database/migrations/2026_02_03_000001_add_continent_and_country_region_to_countries_table.php
+app/Models/CountryRegion.php
+app/Models/Country.php   (continent, countryRegion() relation, CONTINENTS constant)
+app/Http/Controllers/Web/CountryRegionController.php
+app/Http/Controllers/Web/CountryController.php   (continent/region fields, CSV)
+app/Http/Controllers/Web/ZoneMappingController.php   (applyInternationalRule())
+database/seeders/LocationSeeder.php   (assignContinentsAndRegions())
+resources/views/country-regions/   (index + form)
+resources/views/countries/index.blade.php, form.blade.php
+resources/views/zone-mappings/index.blade.php   (international rule form + continent/region columns)
+resources/views/components/layouts/app.blade.php   (Country Regions nav item)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+php artisan db:seed --class=LocationSeeder
+```

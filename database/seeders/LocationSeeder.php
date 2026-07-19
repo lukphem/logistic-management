@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\City;
 use App\Models\Country;
+use App\Models\CountryRegion;
 use App\Models\State;
 use Illuminate\Database\Seeder;
 
@@ -28,6 +29,8 @@ class LocationSeeder extends Seeder
         foreach ($countries as $data) {
             Country::firstOrCreate(['code' => $data['code']], ['name' => $data['name']]);
         }
+
+        $this->assignContinentsAndRegions();
 
         $nigeria = Country::where('code', 'NG')->first();
 
@@ -197,5 +200,119 @@ class LocationSeeder extends Seeder
             'Yobe' => ['code' => 'YO', 'cities' => ['Damaturu' => 'DAM', 'Potiskum' => 'POT', 'Gashua' => 'GAS', 'Nguru' => 'NGU']],
             'Zamfara' => ['code' => 'ZA', 'cities' => ['Gusau' => 'GUS', 'Kaura Namoda' => 'KAU', 'Talata Mafara' => 'TAL']],
         ];
+    }
+
+    /**
+     * A starting point, not a fixed answer — staff can rename or
+     * regroup any of this from Setups → Location → Country Regions
+     * (rename a region, or reassign a country to a different one from
+     * its edit page). Region breakdown roughly follows the UN M49
+     * sub-region scheme, merged down to 19 groups; transcontinental
+     * countries (Turkey, Armenia, Azerbaijan, Georgia) are grouped under
+     * Western Asia here, a common convention for logistics purposes.
+     */
+    private function assignContinentsAndRegions(): void
+    {
+        $data = [
+            // code => [continent, region]
+            'DZ' => ['Africa', 'Northern Africa'], 'EG' => ['Africa', 'Northern Africa'], 'LY' => ['Africa', 'Northern Africa'],
+            'MA' => ['Africa', 'Northern Africa'], 'SD' => ['Africa', 'Northern Africa'], 'TN' => ['Africa', 'Northern Africa'],
+
+            'BJ' => ['Africa', 'Western Africa'], 'BF' => ['Africa', 'Western Africa'], 'CV' => ['Africa', 'Western Africa'],
+            'CI' => ['Africa', 'Western Africa'], 'GM' => ['Africa', 'Western Africa'], 'GH' => ['Africa', 'Western Africa'],
+            'GN' => ['Africa', 'Western Africa'], 'GW' => ['Africa', 'Western Africa'], 'LR' => ['Africa', 'Western Africa'],
+            'ML' => ['Africa', 'Western Africa'], 'MR' => ['Africa', 'Western Africa'], 'NE' => ['Africa', 'Western Africa'],
+            'NG' => ['Africa', 'Western Africa'], 'SN' => ['Africa', 'Western Africa'], 'SL' => ['Africa', 'Western Africa'],
+            'TG' => ['Africa', 'Western Africa'],
+
+            'AO' => ['Africa', 'Middle Africa'], 'CM' => ['Africa', 'Middle Africa'], 'CF' => ['Africa', 'Middle Africa'],
+            'TD' => ['Africa', 'Middle Africa'], 'CG' => ['Africa', 'Middle Africa'], 'CD' => ['Africa', 'Middle Africa'],
+            'GQ' => ['Africa', 'Middle Africa'], 'GA' => ['Africa', 'Middle Africa'],
+
+            'BI' => ['Africa', 'Eastern Africa'], 'KM' => ['Africa', 'Eastern Africa'], 'DJ' => ['Africa', 'Eastern Africa'],
+            'ER' => ['Africa', 'Eastern Africa'], 'ET' => ['Africa', 'Eastern Africa'], 'KE' => ['Africa', 'Eastern Africa'],
+            'MG' => ['Africa', 'Eastern Africa'], 'MW' => ['Africa', 'Eastern Africa'], 'MU' => ['Africa', 'Eastern Africa'],
+            'MZ' => ['Africa', 'Eastern Africa'], 'RW' => ['Africa', 'Eastern Africa'], 'SO' => ['Africa', 'Eastern Africa'],
+            'SS' => ['Africa', 'Eastern Africa'], 'TZ' => ['Africa', 'Eastern Africa'], 'UG' => ['Africa', 'Eastern Africa'],
+            'ZM' => ['Africa', 'Eastern Africa'], 'ZW' => ['Africa', 'Eastern Africa'],
+
+            'BW' => ['Africa', 'Southern Africa'], 'SZ' => ['Africa', 'Southern Africa'], 'LS' => ['Africa', 'Southern Africa'],
+            'NA' => ['Africa', 'Southern Africa'], 'ZA' => ['Africa', 'Southern Africa'],
+
+            'DK' => ['Europe', 'Northern Europe'], 'EE' => ['Europe', 'Northern Europe'], 'FI' => ['Europe', 'Northern Europe'],
+            'IS' => ['Europe', 'Northern Europe'], 'IE' => ['Europe', 'Northern Europe'], 'LV' => ['Europe', 'Northern Europe'],
+            'LT' => ['Europe', 'Northern Europe'], 'NO' => ['Europe', 'Northern Europe'], 'SE' => ['Europe', 'Northern Europe'],
+            'GB' => ['Europe', 'Northern Europe'],
+
+            'AT' => ['Europe', 'Western Europe'], 'BE' => ['Europe', 'Western Europe'], 'FR' => ['Europe', 'Western Europe'],
+            'DE' => ['Europe', 'Western Europe'], 'LI' => ['Europe', 'Western Europe'], 'LU' => ['Europe', 'Western Europe'],
+            'MC' => ['Europe', 'Western Europe'], 'NL' => ['Europe', 'Western Europe'], 'CH' => ['Europe', 'Western Europe'],
+
+            'AD' => ['Europe', 'Southern Europe'], 'HR' => ['Europe', 'Southern Europe'], 'CY' => ['Europe', 'Southern Europe'],
+            'GR' => ['Europe', 'Southern Europe'], 'IT' => ['Europe', 'Southern Europe'], 'MT' => ['Europe', 'Southern Europe'],
+            'PT' => ['Europe', 'Southern Europe'], 'ES' => ['Europe', 'Southern Europe'], 'SI' => ['Europe', 'Southern Europe'],
+
+            'AL' => ['Europe', 'Eastern Europe'], 'BY' => ['Europe', 'Eastern Europe'], 'BA' => ['Europe', 'Eastern Europe'],
+            'BG' => ['Europe', 'Eastern Europe'], 'CZ' => ['Europe', 'Eastern Europe'], 'HU' => ['Europe', 'Eastern Europe'],
+            'MD' => ['Europe', 'Eastern Europe'], 'ME' => ['Europe', 'Eastern Europe'], 'MK' => ['Europe', 'Eastern Europe'],
+            'PL' => ['Europe', 'Eastern Europe'], 'RO' => ['Europe', 'Eastern Europe'], 'RU' => ['Europe', 'Eastern Europe'],
+            'RS' => ['Europe', 'Eastern Europe'], 'SK' => ['Europe', 'Eastern Europe'], 'UA' => ['Europe', 'Eastern Europe'],
+
+            'BH' => ['Asia', 'Western Asia'], 'IQ' => ['Asia', 'Western Asia'], 'IL' => ['Asia', 'Western Asia'],
+            'JO' => ['Asia', 'Western Asia'], 'KW' => ['Asia', 'Western Asia'], 'LB' => ['Asia', 'Western Asia'],
+            'OM' => ['Asia', 'Western Asia'], 'QA' => ['Asia', 'Western Asia'], 'SA' => ['Asia', 'Western Asia'],
+            'SY' => ['Asia', 'Western Asia'], 'AE' => ['Asia', 'Western Asia'], 'YE' => ['Asia', 'Western Asia'],
+            'TR' => ['Asia', 'Western Asia'], 'AM' => ['Asia', 'Western Asia'], 'AZ' => ['Asia', 'Western Asia'],
+            'GE' => ['Asia', 'Western Asia'], 'IR' => ['Asia', 'Western Asia'],
+
+            'KZ' => ['Asia', 'Central Asia'], 'KG' => ['Asia', 'Central Asia'], 'TJ' => ['Asia', 'Central Asia'],
+            'TM' => ['Asia', 'Central Asia'], 'UZ' => ['Asia', 'Central Asia'],
+
+            'AF' => ['Asia', 'Southern Asia'], 'BD' => ['Asia', 'Southern Asia'], 'BT' => ['Asia', 'Southern Asia'],
+            'IN' => ['Asia', 'Southern Asia'], 'MV' => ['Asia', 'Southern Asia'], 'NP' => ['Asia', 'Southern Asia'],
+            'PK' => ['Asia', 'Southern Asia'], 'LK' => ['Asia', 'Southern Asia'],
+
+            'CN' => ['Asia', 'Eastern Asia'], 'JP' => ['Asia', 'Eastern Asia'], 'KP' => ['Asia', 'Eastern Asia'],
+            'KR' => ['Asia', 'Eastern Asia'], 'MN' => ['Asia', 'Eastern Asia'], 'TW' => ['Asia', 'Eastern Asia'],
+
+            'BN' => ['Asia', 'South-Eastern Asia'], 'KH' => ['Asia', 'South-Eastern Asia'], 'ID' => ['Asia', 'South-Eastern Asia'],
+            'LA' => ['Asia', 'South-Eastern Asia'], 'MY' => ['Asia', 'South-Eastern Asia'], 'MM' => ['Asia', 'South-Eastern Asia'],
+            'PH' => ['Asia', 'South-Eastern Asia'], 'SG' => ['Asia', 'South-Eastern Asia'], 'TH' => ['Asia', 'South-Eastern Asia'],
+            'VN' => ['Asia', 'South-Eastern Asia'],
+
+            'CA' => ['North America', 'Northern America'], 'US' => ['North America', 'Northern America'],
+            'MX' => ['North America', 'Central America'],
+            'BZ' => ['North America', 'Central America'], 'CR' => ['North America', 'Central America'],
+            'SV' => ['North America', 'Central America'], 'GT' => ['North America', 'Central America'],
+            'HN' => ['North America', 'Central America'], 'NI' => ['North America', 'Central America'],
+            'PA' => ['North America', 'Central America'],
+
+            'BS' => ['North America', 'Caribbean'], 'BB' => ['North America', 'Caribbean'], 'CU' => ['North America', 'Caribbean'],
+            'DM' => ['North America', 'Caribbean'], 'DO' => ['North America', 'Caribbean'], 'GD' => ['North America', 'Caribbean'],
+            'HT' => ['North America', 'Caribbean'], 'JM' => ['North America', 'Caribbean'], 'TT' => ['North America', 'Caribbean'],
+
+            'AR' => ['South America', 'South America'], 'BO' => ['South America', 'South America'],
+            'BR' => ['South America', 'South America'], 'CL' => ['South America', 'South America'],
+            'CO' => ['South America', 'South America'], 'EC' => ['South America', 'South America'],
+            'GY' => ['South America', 'South America'], 'PY' => ['South America', 'South America'],
+            'PE' => ['South America', 'South America'], 'SR' => ['South America', 'South America'],
+            'UY' => ['South America', 'South America'], 'VE' => ['South America', 'South America'],
+
+            'AU' => ['Oceania', 'Oceania'], 'FJ' => ['Oceania', 'Oceania'], 'KI' => ['Oceania', 'Oceania'],
+            'NZ' => ['Oceania', 'Oceania'], 'PG' => ['Oceania', 'Oceania'], 'VU' => ['Oceania', 'Oceania'],
+        ];
+
+        $regionCache = [];
+
+        foreach ($data as $code => [$continent, $regionName]) {
+            if (! isset($regionCache[$regionName])) {
+                $regionCache[$regionName] = CountryRegion::firstOrCreate(['name' => $regionName]);
+            }
+
+            Country::where('code', $code)->update([
+                'continent' => $continent,
+                'country_region_id' => $regionCache[$regionName]->id,
+            ]);
+        }
     }
 }

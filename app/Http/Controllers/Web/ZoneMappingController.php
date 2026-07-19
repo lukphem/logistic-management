@@ -43,7 +43,7 @@ class ZoneMappingController extends Controller
             ->orderBy('state_b_id')
             ->paginate(20, ['*'], 'domestic_page');
 
-        $internationalMappings = ZoneCountryMapping::with(['country', 'zone'])
+        $internationalMappings = ZoneCountryMapping::with(['country.countryRegion', 'zone'])
             ->orderBy('country_id')
             ->paginate(20, ['*'], 'international_page');
 
@@ -192,6 +192,77 @@ class ZoneMappingController extends Controller
         }
 
         return redirect()->route('zone-mappings.index')->with('status', "International countries generated ({$created} new).");
+    }
+
+    /**
+     * The international counterpart to applyDomesticRule() — every
+     * comparison is against NIGERIA specifically (always the fixed
+     * origin side for international shipments in this system, unlike
+     * the domestic rule which compares two arbitrary states).
+     *
+     * Two selectable grouping methods:
+     *   'continent'        — 2-tier: same continent as Nigeria, or not.
+     *   'continent_region'  — 3-tier (default/recommended): same Country
+     *                          Region as Nigeria, same continent but a
+     *                          different region, or a different
+     *                          continent entirely. Country Region is
+     *                          staff-defined (Setups → Location →
+     *                          Country Regions), so this also covers a
+     *                          proximity-based framing ("Bordering
+     *                          Nigeria") if that's how regions end up
+     *                          named — same mechanism either way.
+     *
+     * Same destructive/bulk posture as applyDomesticRule(): overwrites
+     * every existing international mapping, confirmed before running.
+     */
+    public function applyInternationalRule(Request $request): RedirectResponse
+    {
+        $nigeria = Country::where('code', 'NG')->first();
+
+        if (! $nigeria) {
+            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+        }
+
+        $method = $request->input('grouping_method', 'continent_region');
+
+        if ($method === 'continent') {
+            $validated = $request->validate([
+                'zone_same_continent' => 'required|exists:zones,id',
+                'zone_different_continent' => 'required|exists:zones,id',
+            ]);
+        } else {
+            $validated = $request->validate([
+                'zone_same_region' => 'required|exists:zones,id',
+                'zone_same_continent_different_region' => 'required|exists:zones,id',
+                'zone_different_continent' => 'required|exists:zones,id',
+            ]);
+        }
+
+        $updated = 0;
+
+        ZoneCountryMapping::with('country')->chunkById(100, function ($mappings) use (&$updated, $method, $validated, $nigeria) {
+            foreach ($mappings as $mapping) {
+                $country = $mapping->country;
+                $sameContinent = $country->continent && $country->continent === $nigeria->continent;
+
+                if ($method === 'continent') {
+                    $zoneId = $sameContinent ? $validated['zone_same_continent'] : $validated['zone_different_continent'];
+                } else {
+                    $sameRegion = $country->country_region_id && $country->country_region_id === $nigeria->country_region_id;
+
+                    $zoneId = match (true) {
+                        $sameRegion => $validated['zone_same_region'],
+                        $sameContinent => $validated['zone_same_continent_different_region'],
+                        default => $validated['zone_different_continent'],
+                    };
+                }
+
+                $mapping->update(['zone_id' => $zoneId]);
+                $updated++;
+            }
+        });
+
+        return redirect()->route('zone-mappings.index')->with('status', "Rule applied to {$updated} international mappings.");
     }
 
     public function updateZone(Request $request, ZoneMapping $zoneMapping): RedirectResponse
