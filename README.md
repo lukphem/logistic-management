@@ -3193,3 +3193,36 @@ resources/views/zone-mappings/index.blade.php   (Same territory + Airport column
 
 No migration needed — this increment only changes what gets generated
 and displayed, not the schema.
+
+## Increment 62 — Bulk Rule Application on the Domestic Mapping Screen
+
+A collapsible "Apply a rule to every pair" section at the top of the
+Domestic Mapping table — pick which Zone applies to each of the four
+conditions (Same state / Same territory / Different territory with the
+airport condition met / Different territory without), including
+choosing whether the airport condition needs **both** states to have
+one or **either** one is enough, then apply it to every existing
+domestic pair in one action.
+
+The airport condition being a per-application choice (not hardcoded)
+directly addresses an ambiguity in how the rule should work — rather
+than guessing which interpretation was intended, both are supported and
+selected explicitly each time the rule is applied.
+
+**Deliberately destructive, deliberately bulk.** This overwrites every
+domestic pair's zone, including ones already set manually — a reset,
+not a routine action. The submit button confirms before running.
+Individual rows can still be adjusted afterward with the same inline
+picker as always; this doesn't replace that; it just gives a fast way
+to reset the whole table to a consistent rule before fine-tuning
+specific pairs.
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php   (applyDomesticRule(), tierForCustomRule())
+resources/views/zone-mappings/index.blade.php   (rule form)
+routes/web.php
+```
+
+No migration needed.

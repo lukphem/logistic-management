@@ -152,6 +152,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     });
     Route::middleware('can:rates:update')->group(function () {
         Route::post('/zone-mappings/generate-domestic', [ZoneMappingController::class, 'generateDomestic'])->name('zone-mappings.generate-domestic');
+        Route::post('/zone-mappings/apply-domestic-rule', [ZoneMappingController::class, 'applyDomesticRule'])->name('zone-mappings.apply-domestic-rule');
         Route::post('/zone-mappings/generate-international', [ZoneMappingController::class, 'generateInternational'])->name('zone-mappings.generate-international');
         Route::patch('/zone-mappings/{zoneMapping}/zone', [ZoneMappingController::class, 'updateZone'])->name('zone-mappings.update-zone');
         Route::patch('/zone-country-mappings/{zoneCountryMapping}/zone', [ZoneMappingController::class, 'updateCountryZone'])->name('zone-mappings.update-country-zone');

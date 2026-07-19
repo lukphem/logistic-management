@@ -25,6 +25,75 @@
 
     <x-csv-actions :export-route="route('zone-mappings.export-domestic')" :import-route="route('zone-mappings.import-domestic')" label="Domestic Mapping" />
 
+    <details class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm">
+        <summary class="cursor-pointer px-5 py-3 text-sm font-semibold text-ink-900">Apply a rule to every pair</summary>
+        <div class="border-t border-line p-5">
+            <p class="mb-4 text-xs text-ink-500">
+                Sets a zone for every domestic pair at once based on the conditions below — <strong>overwrites every
+                existing assignment</strong>, including manual ones. Use it as a reset, then adjust individual rows
+                afterward with the picker in the table below if any need to differ from the rule.
+            </p>
+
+            <form method="POST" action="{{ route('zone-mappings.apply-domestic-rule') }}" onsubmit="return confirm('This overwrites the zone on every domestic pair, including any already set manually. Continue?')">
+                @csrf
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Same state</span>
+                        <select name="zone_same_state" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}" @selected($zone->code === 'Z1')>{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Same territory</span>
+                        <select name="zone_same_territory" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}" @selected($zone->code === 'Z2')>{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Different territory, airport condition met</span>
+                        <select name="zone_airport_condition_met" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}" @selected($zone->code === 'Z3')>{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
+                        <span class="text-sm text-ink-900">Different territory, airport condition not met</span>
+                        <select name="zone_airport_condition_not_met" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                            @foreach ($zones as $zone)
+                                <option value="{{ $zone->id }}" @selected($zone->code === 'Z4')>{{ $zone->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <span class="mb-2 block text-sm font-medium text-ink-900">Airport condition</span>
+                    <div class="flex gap-3">
+                        <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <input type="radio" name="airport_condition" value="both" checked class="rounded-full border-line">
+                            Both states need an airport
+                        </label>
+                        <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <input type="radio" name="airport_condition" value="either" class="rounded-full border-line">
+                            Either state having one is enough
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                        Apply to all domestic pairs
+                    </button>
+                </div>
+            </form>
+        </div>
+    </details>
+
     <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
         <table class="w-full text-left text-sm">
             <thead>

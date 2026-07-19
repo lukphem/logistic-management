@@ -111,6 +111,74 @@ class ZoneMappingController extends Controller
     }
 
     /**
+     * A bulk version of determineDefaultZoneTier() — instead of the
+     * fixed rule only ever applying to brand-new pairs at generation
+     * time, this lets staff pick which Zone applies to each of the four
+     * conditions (same state / same territory / different territory
+     * with the airport condition met / different territory without),
+     * including choosing whether the airport condition needs BOTH
+     * states to have one or just EITHER, and then applies that rule to
+     * EVERY existing domestic pair at once — overwriting whatever zone
+     * was there before, including manual overrides. This is
+     * deliberately destructive and bulk; the confirm dialog on the
+     * button is the only guard, so use it as a reset, not a routine
+     * action. Individual rows can still be adjusted afterward via the
+     * inline picker exactly as before.
+     */
+    public function applyDomesticRule(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'zone_same_state' => 'required|exists:zones,id',
+            'zone_same_territory' => 'required|exists:zones,id',
+            'zone_airport_condition_met' => 'required|exists:zones,id',
+            'zone_airport_condition_not_met' => 'required|exists:zones,id',
+            'airport_condition' => 'required|in:both,either',
+        ]);
+
+        $zoneByTier = [
+            1 => $validated['zone_same_state'],
+            2 => $validated['zone_same_territory'],
+            3 => $validated['zone_airport_condition_met'],
+            4 => $validated['zone_airport_condition_not_met'],
+        ];
+
+        $updated = 0;
+
+        ZoneMapping::with(['stateA', 'stateB'])->chunkById(200, function ($mappings) use (&$updated, $zoneByTier, $validated) {
+            foreach ($mappings as $mapping) {
+                $tier = $this->tierForCustomRule($mapping->stateA, $mapping->stateB, $validated['airport_condition']);
+                $mapping->update(['zone_id' => $zoneByTier[$tier]]);
+                $updated++;
+            }
+        });
+
+        return redirect()->route('zone-mappings.index')->with('status', "Rule applied to {$updated} domestic mappings.");
+    }
+
+    /**
+     * Same shape as ZoneMapping::determineDefaultZoneTier(), except the
+     * airport condition is a parameter here rather than hardcoded to
+     * "both" — 'either' means only one of the two states needs an
+     * airport for the condition to count as met.
+     */
+    private function tierForCustomRule(State $stateA, State $stateB, string $airportCondition): int
+    {
+        if ($stateA->id === $stateB->id) {
+            return 1;
+        }
+
+        if ($stateA->territory_id && $stateA->territory_id === $stateB->territory_id) {
+            return 2;
+        }
+
+        $airportMet = $airportCondition === 'both'
+            ? ($stateA->has_airport && $stateB->has_airport)
+            : ($stateA->has_airport || $stateB->has_airport);
+
+        return $airportMet ? 3 : 4;
+    }
+
+    /**
      * Same idempotency guarantee as generateDomestic — safe to re-run
      * after adding a new country.
      */
