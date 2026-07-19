@@ -3405,3 +3405,49 @@ app/Models/ZoneCountryMapping.php   (zone() relation restored)
 ```
 
 No migration needed.
+
+## Increment 67 — A Zone Can Now Apply to Both Domestic and International
+
+`zones.type` was a single field (domestic XOR international) — a zone
+could never be both, even though nothing about a zone's own definition
+actually requires that split. Replaced with two independent booleans,
+`applies_domestic` and `applies_international`, so a zone can be
+domestic-only, international-only, or both.
+
+At least one must be checked — enforced in `ZoneController`'s
+validation (a custom `after()` rule), not a database constraint, since
+a check constraint isn't worth the SQLite/MySQL portability cost for
+this.
+
+The A–F tier picker is unchanged in spirit — still shown only when a
+zone applies domestically, now driven by `applies_domestic` being
+checked rather than `type === 'domestic'`. A zone that's both domestic
+and international can still carry a tier for its domestic side.
+
+`Zone::typeLabel()` → `Zone::applicabilityLabel()`, returning "Domestic",
+"International", or "Domestic + International". CSV export/import
+updated to two `yes`/`no` columns instead of one `type` column.
+
+Careful attention paid this time to not repeat Increment 65's mistake —
+`Zone.php` was rewritten as a whole file (same higher-risk pattern that
+caused the dropped `zone()` relation), so it was diffed against the
+original afterward specifically to confirm `hub()`, `zoneMappings()`,
+`tierLabel()`, `tierPurpose()`, and `ensureDefaultZones()` all survived
+untouched — confirmed clean before committing.
+
+### Files
+
+```
+database/migrations/2026_02_05_000001_replace_zone_type_with_applies_flags.php
+app/Models/Zone.php   (applies_domestic/applies_international, applicabilityLabel())
+app/Http/Controllers/Web/ZoneController.php   (validation, CSV export/import)
+resources/views/zones/form.blade.php   (two checkboxes instead of one radio group)
+resources/views/zones/index.blade.php   (Applies to column)
+app/Models/Country.php   (stale Zone::TYPES comment reference fixed)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

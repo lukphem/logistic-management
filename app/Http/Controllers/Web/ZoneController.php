@@ -62,10 +62,10 @@ class ZoneController extends Controller
     public function export(): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $rows = Zone::orderBy('name')->get()->map(fn ($z) => [
-            $z->name, $z->code, $z->type, $z->tier, $z->coverage_description,
+            $z->name, $z->code, $z->applies_domestic ? 'yes' : 'no', $z->applies_international ? 'yes' : 'no', $z->tier, $z->coverage_description,
         ]);
 
-        return $this->csv->download('zones.csv', ['name', 'code', 'type', 'tier', 'coverage_description'], $rows);
+        return $this->csv->download('zones.csv', ['name', 'code', 'applies_domestic', 'applies_international', 'tier', 'coverage_description'], $rows);
     }
 
     public function import(Request $request): RedirectResponse
@@ -77,10 +77,11 @@ class ZoneController extends Controller
         $skipped = 0;
 
         foreach ($rows as $row) {
-            $type = strtolower(trim($row['type'] ?? 'domestic'));
+            $appliesDomestic = in_array(strtolower(trim($row['applies_domestic'] ?? '')), ['yes', 'true', '1']);
+            $appliesInternational = in_array(strtolower(trim($row['applies_international'] ?? '')), ['yes', 'true', '1']);
             $tier = strtoupper(trim($row['tier'] ?? ''));
 
-            if (empty($row['code']) || empty($row['name']) || ! array_key_exists($type, Zone::TYPES)) {
+            if (empty($row['code']) || empty($row['name']) || (! $appliesDomestic && ! $appliesInternational)) {
                 $skipped++;
                 continue;
             }
@@ -89,15 +90,16 @@ class ZoneController extends Controller
                 ['code' => strtoupper(trim($row['code']))],
                 [
                     'name' => trim($row['name']),
-                    'type' => $type,
-                    'tier' => ($type === 'domestic' && array_key_exists($tier, Zone::TIERS)) ? $tier : null,
+                    'applies_domestic' => $appliesDomestic,
+                    'applies_international' => $appliesInternational,
+                    'tier' => ($appliesDomestic && array_key_exists($tier, Zone::TIERS)) ? $tier : null,
                     'coverage_description' => $row['coverage_description'] ?? '',
                 ]
             );
             $count++;
         }
 
-        return back()->with('status', "Imported {$count} zones" . ($skipped ? ", skipped {$skipped} (missing name/code or invalid type)." : '.'));
+        return back()->with('status', "Imported {$count} zones" . ($skipped ? ", skipped {$skipped} (missing name/code, or neither domestic nor international checked)." : '.'));
     }
 
     private function validated(Request $request): array
@@ -106,12 +108,21 @@ class ZoneController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:zones,code,' . $request->route('zone')?->id,
             'hub_id' => 'nullable|exists:hubs,id',
-            'type' => 'required|in:' . implode(',', array_keys(\App\Models\Zone::TYPES)),
+            'applies_domestic' => 'sometimes|boolean',
+            'applies_international' => 'sometimes|boolean',
             'tier' => 'nullable|in:' . implode(',', array_keys(\App\Models\Zone::TIERS)),
             'coverage_description' => 'required|string|max:255',
         ]);
 
+        $validator->after(function ($validator) use ($request) {
+            if (! $request->boolean('applies_domestic') && ! $request->boolean('applies_international')) {
+                $validator->errors()->add('applies_domestic', 'A zone must apply to at least Domestic or International.');
+            }
+        });
+
         $data = $validator->validate();
+        $data['applies_domestic'] = $request->boolean('applies_domestic');
+        $data['applies_international'] = $request->boolean('applies_international');
 
         // Blank "— None —" option submits as an empty string, not null —
         // see the fuller explanation in UserController's matching fix.
@@ -122,11 +133,11 @@ class ZoneController extends Controller
             $data['tier'] = null;
         }
 
-        // Tier is a domestic-only refinement — an international zone
-        // grouped by region has no A–F tariff tier, so clear it
-        // regardless of what was posted (the form hides the tier field
-        // for international zones, but don't rely on that alone).
-        if ($data['type'] === 'international') {
+        // Tier is a domestic-only refinement — a zone with no domestic
+        // applicability has no A–F tariff tier, so clear it regardless
+        // of what was posted (the form hides the tier field when
+        // Domestic isn't checked, but don't rely on that alone).
+        if (! $data['applies_domestic']) {
             $data['tier'] = null;
         }
 

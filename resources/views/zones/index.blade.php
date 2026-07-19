@@ -21,7 +21,7 @@
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Code</th>
-                    <th class="px-5 py-3 font-medium">Type</th>
+                    <th class="px-5 py-3 font-medium">Applies to</th>
                     <th class="px-5 py-3 font-medium">Tier</th>
                     <th class="px-5 py-3 font-medium">Hub</th>
                     <th class="px-5 py-3"></th>
@@ -33,8 +33,8 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $zone->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $zone->code }}</td>
                         <td class="px-5 py-3">
-                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $zone->type === 'international' ? 'bg-status-transit/10 text-status-transit' : 'bg-ink-500/10 text-ink-500' }}">
-                                {{ $zone->typeLabel() }}
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $zone->applies_domestic && $zone->applies_international ? 'bg-status-delivered/10 text-status-delivered' : ($zone->applies_international ? 'bg-status-transit/10 text-status-transit' : 'bg-ink-500/10 text-ink-500') }}">
+                                {{ $zone->applicabilityLabel() }}
                             </span>
                         </td>
                         <td class="px-5 py-3">

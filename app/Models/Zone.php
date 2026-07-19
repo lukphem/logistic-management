@@ -7,19 +7,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Zone extends Model
 {
-    protected $fillable = ['name', 'code', 'type', 'tier', 'coverage_description', 'hub_id', 'geofence'];
+    protected $fillable = ['name', 'code', 'applies_domestic', 'applies_international', 'tier', 'coverage_description', 'hub_id', 'geofence'];
 
-    protected $casts = ['geofence' => 'array'];
+    protected $casts = [
+        'geofence' => 'array',
+        'applies_domestic' => 'boolean',
+        'applies_international' => 'boolean',
+    ];
 
     /**
-     * The A–F courier-industry tier model — only meaningful for
-     * DOMESTIC zones (a "Zone C" doesn't describe an international
-     * grouping the way "West Africa" does). `type` (domestic/
-     * international) is the required, primary classification when
-     * creating a zone; `tier` is an optional refinement only offered in
-     * the UI when type = domestic. Reference data only — Zone itself
-     * never holds a price; whichever billing model actually prices a
-     * zone (being rebuilt one model at a time) owns that.
+     * The A–F courier-industry tier model — only meaningful for zones
+     * that apply domestically (a "Zone C" doesn't describe an
+     * international grouping the way "West Africa" does). Offered in
+     * the UI whenever applies_domestic is checked, regardless of
+     * whether applies_international is ALSO checked — a zone can be
+     * both, and still have a domestic tier for its domestic side.
+     * Reference data only — Zone itself never holds a price; whichever
+     * billing model actually prices a zone owns that.
      */
     public const TIERS = [
         'A' => ['label' => 'Zone A', 'coverage' => 'Same city / Local delivery', 'purpose' => 'Lowest tariff'],
@@ -28,11 +32,6 @@ class Zone extends Model
         'D' => ['label' => 'Zone D', 'coverage' => 'Regional destinations', 'purpose' => 'Higher tariff'],
         'E' => ['label' => 'Zone E', 'coverage' => 'Long-distance/interstate', 'purpose' => 'Premium tariff'],
         'F' => ['label' => 'Zone F', 'coverage' => 'Remote or hard-to-reach areas', 'purpose' => 'Highest tariff, possible surcharge'],
-    ];
-
-    public const TYPES = [
-        'domestic' => 'Domestic',
-        'international' => 'International',
     ];
 
     public function hub(): BelongsTo
@@ -58,9 +57,18 @@ class Zone extends Model
         return self::TIERS[$this->tier]['purpose'] ?? null;
     }
 
-    public function typeLabel(): string
+    /**
+     * "Domestic", "International", or "Domestic + International" — for
+     * display wherever the old typeLabel() used to be shown.
+     */
+    public function applicabilityLabel(): string
     {
-        return self::TYPES[$this->type] ?? ucfirst($this->type);
+        return match (true) {
+            $this->applies_domestic && $this->applies_international => 'Domestic + International',
+            $this->applies_domestic => 'Domestic',
+            $this->applies_international => 'International',
+            default => 'Not set',
+        };
     }
 
     /**
@@ -88,7 +96,7 @@ class Zone extends Model
                 ['name' => $definition['name']],
                 [
                     'code' => $definition['code'],
-                    'type' => 'domestic',
+                    'applies_domestic' => true,
                     'coverage_description' => $definition['coverage'],
                 ]
             );

@@ -12,7 +12,7 @@ class Country extends Model
 
     /**
      * Fixed, universally-agreed classification — not staff-managed data,
-     * so this is a plain constant list, same treatment as Zone::TYPES.
+     * so this is a plain constant list, same treatment as Zone::TIERS.
      */
     public const CONTINENTS = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania', 'Antarctica'];
 

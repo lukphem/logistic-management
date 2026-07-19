@@ -27,24 +27,27 @@
         </div>
 
         <div>
-            <label class="mb-1 block text-sm font-medium text-ink-900">Type <x-required /></label>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Applies to <x-required /></label>
             <div class="flex gap-3">
-                @foreach (\App\Models\Zone::TYPES as $key => $label)
-                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                        <input type="radio" id="type-{{ $key }}" name="type" value="{{ $key }}"
-                               @checked(old('type', $zone->type ?? 'domestic') === $key)
-                               onchange="document.getElementById('tier-field').style.display = this.value === 'domestic' ? '' : 'none';">
-                        {{ $label }}
-                    </label>
-                @endforeach
+                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                    <input type="checkbox" id="applies-domestic" name="applies_domestic" value="1"
+                           @checked(old('applies_domestic', $zone->exists ? $zone->applies_domestic : true))
+                           onchange="document.getElementById('tier-field').style.display = this.checked ? '' : 'none';" class="rounded border-line">
+                    Domestic
+                </label>
+                <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                    <input type="checkbox" name="applies_international" value="1"
+                           @checked(old('applies_international', $zone->applies_international ?? false)) class="rounded border-line">
+                    International
+                </label>
             </div>
             <p class="mt-1 text-xs text-ink-500">
-                International zones are grouped by region (e.g. West Africa, Europe) rather than by tier — the tier
-                picker below only applies to domestic zones.
+                A zone can apply to both — e.g. a broad zone reused across domestic and international mapping. At
+                least one must be checked. The tier picker below only applies to the domestic side.
             </p>
         </div>
 
-        <div id="tier-field" style="{{ old('type', $zone->type ?? 'domestic') === 'domestic' ? '' : 'display:none' }}">
+        <div id="tier-field" style="{{ old('applies_domestic', $zone->exists ? $zone->applies_domestic : true) ? '' : 'display:none' }}">
             <label class="mb-1 block text-sm font-medium text-ink-900">Tier <span class="text-xs font-normal text-ink-500">(optional)</span></label>
             <select id="tier" name="tier" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">No tier set</option>
