@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Hub;
 use App\Models\Zone;
 use App\Services\CsvService;
 use Illuminate\Http\RedirectResponse;
@@ -19,16 +18,14 @@ class ZoneController extends Controller
 
     public function index(): View
     {
-        $zones = Zone::with('hub')->orderBy('name')->paginate(15);
+        $zones = Zone::orderBy('name')->paginate(15);
 
         return view('zones.index', compact('zones'));
     }
 
     public function create(): View
     {
-        $hubs = Hub::orderBy('name')->get();
-
-        return view('zones.form', ['zone' => new Zone(), 'hubs' => $hubs]);
+        return view('zones.form', ['zone' => new Zone()]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -40,9 +37,7 @@ class ZoneController extends Controller
 
     public function edit(Zone $zone): View
     {
-        $hubs = Hub::orderBy('name')->get();
-
-        return view('zones.form', compact('zone', 'hubs'));
+        return view('zones.form', compact('zone'));
     }
 
     public function update(Request $request, Zone $zone): RedirectResponse
@@ -102,33 +97,30 @@ class ZoneController extends Controller
         return back()->with('status', "Imported {$count} zones" . ($skipped ? ", skipped {$skipped} (missing name/code, or neither domestic nor international checked)." : '.'));
     }
 
+    /**
+     * The form submits a single 'applies_to' choice (domestic /
+     * international / both) rather than two independent checkboxes —
+     * clearer as one explicit decision than two boxes that happen to
+     * combine. Still stored as the two underlying booleans, so nothing
+     * downstream (PricingEngine, the Zone Mapping pickers) needs to
+     * know about 'applies_to' at all.
+     */
     private function validated(Request $request): array
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:zones,code,' . $request->route('zone')?->id,
-            'hub_id' => 'nullable|exists:hubs,id',
-            'applies_domestic' => 'sometimes|boolean',
-            'applies_international' => 'sometimes|boolean',
+            'applies_to' => 'required|in:domestic,international,both',
             'tier' => 'nullable|in:' . implode(',', array_keys(\App\Models\Zone::TIERS)),
             'coverage_description' => 'required|string|max:255',
         ]);
 
-        $validator->after(function ($validator) use ($request) {
-            if (! $request->boolean('applies_domestic') && ! $request->boolean('applies_international')) {
-                $validator->errors()->add('applies_domestic', 'A zone must apply to at least Domestic or International.');
-            }
-        });
-
         $data = $validator->validate();
-        $data['applies_domestic'] = $request->boolean('applies_domestic');
-        $data['applies_international'] = $request->boolean('applies_international');
 
-        // Blank "— None —" option submits as an empty string, not null —
-        // see the fuller explanation in UserController's matching fix.
-        if (($data['hub_id'] ?? null) === '') {
-            $data['hub_id'] = null;
-        }
+        $data['applies_domestic'] = in_array($data['applies_to'], ['domestic', 'both']);
+        $data['applies_international'] = in_array($data['applies_to'], ['international', 'both']);
+        unset($data['applies_to']);
+
         if (($data['tier'] ?? null) === '') {
             $data['tier'] = null;
         }
@@ -136,7 +128,8 @@ class ZoneController extends Controller
         // Tier is a domestic-only refinement — a zone with no domestic
         // applicability has no A–F tariff tier, so clear it regardless
         // of what was posted (the form hides the tier field when
-        // Domestic isn't checked, but don't rely on that alone).
+        // Domestic isn't part of the selection, but don't rely on that
+        // alone).
         if (! $data['applies_domestic']) {
             $data['tier'] = null;
         }

@@ -3,11 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Zone extends Model
 {
-    protected $fillable = ['name', 'code', 'applies_domestic', 'applies_international', 'tier', 'coverage_description', 'hub_id', 'geofence'];
+    protected $fillable = ['name', 'code', 'applies_domestic', 'applies_international', 'tier', 'coverage_description', 'geofence'];
 
     protected $casts = [
         'geofence' => 'array',
@@ -33,11 +32,6 @@ class Zone extends Model
         'E' => ['label' => 'Zone E', 'coverage' => 'Long-distance/interstate', 'purpose' => 'Premium tariff'],
         'F' => ['label' => 'Zone F', 'coverage' => 'Remote or hard-to-reach areas', 'purpose' => 'Highest tariff, possible surcharge'],
     ];
-
-    public function hub(): BelongsTo
-    {
-        return $this->belongsTo(Hub::class);
-    }
 
     /**
      * Every state-pair route assigned to this zone — see ZoneMapping.

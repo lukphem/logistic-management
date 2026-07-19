@@ -23,7 +23,6 @@
                     <th class="px-5 py-3 font-medium">Code</th>
                     <th class="px-5 py-3 font-medium">Applies to</th>
                     <th class="px-5 py-3 font-medium">Tier</th>
-                    <th class="px-5 py-3 font-medium">Hub</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
@@ -46,7 +45,6 @@
                                 <span class="text-ink-500">—</span>
                             @endif
                         </td>
-                        <td class="px-5 py-3 text-ink-500">{{ $zone->hub?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('zones.edit', $zone) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                             <form method="POST" action="{{ route('zones.destroy', $zone) }}" class="inline" onsubmit="return confirm('Remove this zone?')">
@@ -56,7 +54,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No zones configured yet.</td></tr>
+                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No zones configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

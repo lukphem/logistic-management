@@ -3451,3 +3451,41 @@ app/Models/Country.php   (stale Zone::TYPES comment reference fixed)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 68 — "Both" as an Explicit Option, Hub Removed From Zones
+
+Two corrections to Increment 67.
+
+### "Both" is now a real, explicit choice
+
+The two independent checkboxes technically supported "both" (check
+both), but that wasn't what was actually wanted — an explicit third
+option. **Applies to** is now one radio choice: Domestic /
+International / Both. Still stored as the same two underlying booleans
+(`applies_domestic`/`applies_international`) — "Both" just sets both to
+true in one selection — so nothing downstream (`PricingEngine`, the
+Zone Mapping pickers) needed to change at all, only the form and the
+validation that maps the single choice onto the two columns.
+
+### Hub removed from Zones entirely
+
+Confirmed unused anywhere else in the app before removing (every
+reference to `zone->hub`/`hub_id` checked first) — this was scaffolded
+early on but never actually used to link a zone to a specific hub.
+Column dropped, relation removed, form field and index column gone.
+
+### Files
+
+```
+database/migrations/2026_02_06_000001_drop_hub_id_from_zones_table.php
+app/Models/Zone.php   (hub() relation and hub_id removed)
+app/Http/Controllers/Web/ZoneController.php   (applies_to single choice mapped to the two booleans; hub_id gone from validation/create/edit)
+resources/views/zones/form.blade.php   (three-way radio; Hub field removed)
+resources/views/zones/index.blade.php   (Hub column removed)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
