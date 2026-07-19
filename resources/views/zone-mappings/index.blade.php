@@ -21,6 +21,10 @@
                 class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
             Domestic
         </button>
+        <button type="button" id="tab-btn-third-party" onclick="showZoneTab('third-party')"
+                class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
+            Third-Party
+        </button>
     </div>
 
     <div id="tab-domestic" style="display:none">
@@ -316,22 +320,103 @@
 
     </div>{{-- /#tab-international --}}
 
+    <div id="tab-third-party" style="display:none">
+        <p class="mb-4 text-sm text-ink-500">
+            For shipments this business arranges entirely between two OTHER countries — neither side is Nigeria (e.g.
+            US to Congo, via a third-party arrangement). Added one route at a time, not bulk-generated — this is
+            expected to stay a short, deliberately-curated list, not an exhaustive matrix.
+        </p>
+
+        <div class="mb-8 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
+            <h2 class="mb-3 text-sm font-semibold text-ink-900">Add a route</h2>
+            <form method="POST" action="{{ route('zone-mappings.third-party.store') }}" class="flex flex-wrap items-end gap-3">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Country A</label>
+                    <select name="country_a_id" class="w-40 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        @foreach ($countries as $country)
+                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Country B</label>
+                    <select name="country_b_id" class="w-40 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        @foreach ($countries as $country)
+                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Zone</label>
+                    <select name="zone_id" class="w-40 rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Unassigned</option>
+                        @foreach ($internationalZones as $zone)
+                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                    Save route
+                </button>
+            </form>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
+            <table class="w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                        <th class="px-5 py-3 font-medium">Country A</th>
+                        <th class="px-5 py-3 font-medium">Country B</th>
+                        <th class="px-5 py-3 font-medium">Zone</th>
+                        <th class="px-5 py-3"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($thirdPartyMappings as $mapping)
+                        <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
+                            <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->countryA->name }}</td>
+                            <td class="px-5 py-3 font-medium text-ink-900">{{ $mapping->countryB->name }}</td>
+                            <td class="px-5 py-3">
+                                <form method="POST" action="{{ route('zone-mappings.third-party.update-zone', $mapping) }}">
+                                    @csrf @method('PATCH')
+                                    <select name="zone_id" onchange="this.form.submit()"
+                                            class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Unassigned</option>
+                                        @foreach ($internationalZones as $zone)
+                                            <option value="{{ $zone->id }}" @selected($mapping->zone_id === $zone->id)>{{ $zone->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </form>
+                            </td>
+                            <td class="px-5 py-3 text-right">
+                                <form method="POST" action="{{ route('zone-mappings.third-party.destroy', $mapping) }}" onsubmit="return confirm('Remove this route?')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No third-party routes added yet.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>{{-- /#tab-third-party --}}
+
+
     <script>
         function showZoneTab(tab) {
-            document.getElementById('tab-domestic').style.display = tab === 'domestic' ? '' : 'none';
-            document.getElementById('tab-international').style.display = tab === 'international' ? '' : 'none';
+            ['domestic', 'international', 'third-party'].forEach(function (name) {
+                document.getElementById('tab-' + name).style.display = tab === name ? '' : 'none';
 
-            document.getElementById('tab-btn-domestic').classList.toggle('border-[var(--brand-primary)]', tab === 'domestic');
-            document.getElementById('tab-btn-domestic').classList.toggle('text-ink-900', tab === 'domestic');
-            document.getElementById('tab-btn-domestic').classList.toggle('font-semibold', tab === 'domestic');
-            document.getElementById('tab-btn-domestic').classList.toggle('border-transparent', tab !== 'domestic');
-            document.getElementById('tab-btn-domestic').classList.toggle('text-ink-500', tab !== 'domestic');
-
-            document.getElementById('tab-btn-international').classList.toggle('border-[var(--brand-primary)]', tab === 'international');
-            document.getElementById('tab-btn-international').classList.toggle('text-ink-900', tab === 'international');
-            document.getElementById('tab-btn-international').classList.toggle('font-semibold', tab === 'international');
-            document.getElementById('tab-btn-international').classList.toggle('border-transparent', tab !== 'international');
-            document.getElementById('tab-btn-international').classList.toggle('text-ink-500', tab !== 'international');
+                const btn = document.getElementById('tab-btn-' + name);
+                btn.classList.toggle('border-[var(--brand-primary)]', tab === name);
+                btn.classList.toggle('text-ink-900', tab === name);
+                btn.classList.toggle('font-semibold', tab === name);
+                btn.classList.toggle('border-transparent', tab !== name);
+                btn.classList.toggle('text-ink-500', tab !== name);
+            });
         }
     </script>
 

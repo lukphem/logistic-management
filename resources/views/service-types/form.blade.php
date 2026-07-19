@@ -42,8 +42,9 @@
             <select id="route_type" name="route_type" onchange="document.getElementById('trade-direction-field').style.display = this.value === 'international' ? '' : 'none';" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="domestic" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'domestic')>Domestic</option>
                 <option value="international" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'international')>International</option>
+                <option value="third_party" @selected(old('route_type', $serviceType->route_type ?? 'domestic') === 'third_party')>Third-Party (neither side is Nigeria)</option>
             </select>
-            <p class="mt-1 text-xs text-ink-500">Every service type is exactly one or the other — e.g. an "International Express" service that should never show up for a domestic booking.</p>
+            <p class="mt-1 text-xs text-ink-500">Every service type is exactly one of the three — e.g. an "International Express" service that should never show up for a domestic booking. Third-Party is for arrangements between two other countries.</p>
         </div>
 
         <div id="trade-direction-field" style="{{ old('route_type', $serviceType->route_type ?? 'domestic') === 'international' ? '' : 'display:none' }}">

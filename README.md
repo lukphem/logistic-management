@@ -3896,3 +3896,94 @@ php artisan migrate
 Set Trade direction on any existing International service types —
 they'll need one explicitly now (Export or Import) before the checker
 can determine which side of the route Nigeria is on for them.
+
+## Increment 77 — Third-Party Routes: Neither Side Is Nigeria
+
+For shipments this business arranges entirely between two OTHER
+countries via a third-party arrangement (e.g. US to Congo) — a case the
+system genuinely couldn't handle before. Traced through the code first:
+the existing logic would have silently mispriced this, matching on
+whichever side looked "foreign" to `ZoneCountryMapping` (which is
+permanently anchored to Nigeria as one side of every row) and pricing
+it as if Nigeria were actually involved. Not an edge case that failed
+loudly — one that would have failed silently and wrong.
+
+### A separate table, not a relaxation of the existing one
+
+New `third_party_country_mappings` (`country_a_id`, `country_b_id`,
+`zone_id`) — same bidirectional-pair shape as domestic `ZoneMapping`
+(normalized, lower id first, unique constraint), but kept in its own
+table rather than relaxing `ZoneCountryMapping`'s `country_a_id`: that
+table's Country A is *always* Nigeria by design (the International
+Mapping screen displays it that way, Increment 65), and mixing in
+genuinely-arbitrary pairs would have broken that invariant.
+
+**Manually added, not bulk-generated.** With ~178 countries,
+pre-generating every possible pair would mean tens of thousands of rows
+for what's an occasional arrangement, not a routine one. A new
+**Third-Party** tab on the Zone Mapping page (alongside Domestic and
+International) gets a simple "add a route" form — Country A, Country B,
+Zone — and a list, added to one real route at a time as they come up.
+
+### PricingEngine checks for this case first
+
+`resolveZoneAndType()` now detects a genuine third-party route (both
+origin and destination given as countries, *neither* is Nigeria) before
+falling through to the existing Nigeria-anchored logic — the check that
+would otherwise have silently produced wrong pricing. No route
+configured for a specific pair → a clear
+`PricingUnavailableException`, same "never guess" principle as
+everywhere else in this engine.
+
+### Service Type, Standard Billing, and the Rate Checker all extended to match
+
+- `service_types.route_type` gains `third_party` as a third value
+  (alongside domestic/international) — Import/Export (`trade_direction`)
+  stays irrelevant for it, same as domestic, since neither side is
+  Nigeria
+- `shipments.shipping_type` gains `third_party` too, for the same
+  auto-derived reporting purpose as domestic/international
+- **Standard Billing** gained a third tab — a third-party service type
+  needs its own tariffs configured somewhere, or `PricingEngine` would
+  throw "no tariff configured" even after everything else works
+  correctly
+- **Rate Checker** gained a third "Third-Party" route type radio, with
+  Origin Country / Destination Country fields (both excluding Nigeria)
+
+### A real, related bug caught and fixed while building this
+
+Hidden fields sharing a `name` attribute across the Domestic/
+International/Third-Party sections would **all be submitted together**
+— `display:none` doesn't remove a field from form submission, only
+`disabled` does. This was a genuine latent risk between Domestic and
+International too (the international section's foreign-country field
+is dynamically renamed to `origin_country_id`/`destination_country_id`
+depending on trade direction — exactly the names Third-Party uses
+statically), just not yet triggered before a third section existed.
+`showRateCheckerRouteFields()` now disables every field in inactive
+sections, not just hides them, fixing this for all three sections at
+once.
+
+### Files
+
+```
+database/migrations/2026_02_11_000001_create_third_party_country_mappings_table.php
+database/migrations/2026_02_11_000002_add_third_party_to_shipments_shipping_type.php
+database/migrations/2026_02_11_000003_add_third_party_to_service_types_route_type.php
+app/Models/ThirdPartyCountryMapping.php
+app/Services/PricingEngine.php   (third-party detection before the Nigeria-anchored fallback)
+app/Http/Controllers/Web/ServiceTypeController.php   (third_party route_type)
+app/Http/Controllers/Web/ZoneMappingController.php   (storeThirdParty/updateThirdPartyZone/destroyThirdParty)
+app/Http/Controllers/Web/StandardBillingController.php   (third tariff list/tab)
+resources/views/service-types/form.blade.php, index.blade.php
+resources/views/zone-mappings/index.blade.php   (third tab, generic tab-switching)
+resources/views/standard-billing/index.blade.php, form.blade.php   (third tab, label fixes)
+resources/views/rate-checker/index.blade.php   (third route type, proper field disabling fix)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

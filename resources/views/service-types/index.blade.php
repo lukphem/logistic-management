@@ -36,7 +36,7 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $serviceType->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $serviceType->code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ \App\Models\Setting::BILLING_MODELS[$serviceType->billing_model] ?? '—' }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ ucfirst($serviceType->route_type) }}{{ $serviceType->trade_direction ? ' ('.ucfirst($serviceType->trade_direction).')' : '' }}</td>
+                        <td class="px-5 py-3 text-ink-500">{{ $serviceType->route_type === 'third_party' ? 'Third-Party' : ucfirst($serviceType->route_type) }}{{ $serviceType->trade_direction ? ' ('.ucfirst($serviceType->trade_direction).')' : '' }}</td>
                         <td class="px-5 py-3">
                             @if ($serviceType->is_active)
                                 <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-2.5 py-0.5 text-xs font-medium text-status-delivered">Active</span>

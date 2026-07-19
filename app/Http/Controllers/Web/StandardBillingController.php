@@ -27,8 +27,9 @@ class StandardBillingController extends Controller
 
         $domesticTariffs = $baseQuery('domestic')->paginate(15, ['*'], 'domestic_page');
         $internationalTariffs = $baseQuery('international')->paginate(15, ['*'], 'international_page');
+        $thirdPartyTariffs = $baseQuery('third_party')->paginate(15, ['*'], 'third_party_page');
 
-        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs'));
+        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs', 'thirdPartyTariffs'));
     }
 
     public function create(Request $request): View

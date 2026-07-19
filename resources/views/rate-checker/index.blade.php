@@ -28,14 +28,20 @@
                     <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                         <input type="radio" name="route_type" value="domestic" id="route-domestic"
                                @checked(request('route_type', 'domestic') === 'domestic')
-                               onchange="document.getElementById('domestic-fields').style.display=''; document.getElementById('international-fields').style.display='none'; filterServiceTypes();">
+                               onchange="showRateCheckerRouteFields('domestic');">
                         Domestic
                     </label>
                     <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                         <input type="radio" name="route_type" value="international" id="route-international"
                                @checked(request('route_type') === 'international')
-                               onchange="document.getElementById('domestic-fields').style.display='none'; document.getElementById('international-fields').style.display=''; filterServiceTypes();">
+                               onchange="showRateCheckerRouteFields('international');">
                         International
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="route_type" value="third_party" id="route-third-party"
+                               @checked(request('route_type') === 'third_party')
+                               onchange="showRateCheckerRouteFields('third_party');">
+                        Third-Party
                     </label>
                 </div>
             </div>
@@ -144,6 +150,30 @@
                     </div>
                 </div>
                 <p class="mt-2 text-xs text-ink-500">Nigeria city is only needed to preview an onforwarding surcharge tied to a specific city.</p>
+            </div>
+
+            <div id="third-party-fields" style="{{ request('route_type') !== 'third_party' ? 'display:none' : '' }}">
+                <p class="mb-3 text-xs text-ink-500">For a shipment this business arranges entirely between two other countries — neither side is Nigeria.</p>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin country</label>
+                        <select name="origin_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a country</option>
+                            @foreach ($countries as $country)
+                                <option value="{{ $country->id }}" @selected(request('route_type') === 'third_party' && request('origin_country_id') == $country->id)>{{ $country->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
+                        <select name="destination_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a country</option>
+                            @foreach ($countries as $country)
+                                <option value="{{ $country->id }}" @selected(request('route_type') === 'third_party' && request('destination_country_id') == $country->id)>{{ $country->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <div>
@@ -280,6 +310,36 @@
         }
 
         /**
+         * Shows the fields for the chosen route type and DISABLES every
+         * input inside the other two sections — display:none alone
+         * doesn't stop a hidden field from being submitted, and two
+         * sections can genuinely share a field name (the international
+         * section's foreign-country field is dynamically renamed to
+         * origin_country_id/destination_country_id depending on trade
+         * direction, exactly the same names the third-party section
+         * uses statically). Disabled fields are excluded from
+         * submission entirely, which is what actually prevents a stale
+         * value from a hidden section overwriting the visible one's.
+         */
+        function showRateCheckerRouteFields(type) {
+            const sections = {
+                domestic: document.getElementById('domestic-fields'),
+                international: document.getElementById('international-fields'),
+                third_party: document.getElementById('third-party-fields'),
+            };
+
+            Object.keys(sections).forEach(function (key) {
+                const visible = key === type;
+                sections[key].style.display = visible ? '' : 'none';
+                sections[key].querySelectorAll('input, select').forEach(function (el) {
+                    el.disabled = !visible;
+                });
+            });
+
+            filterServiceTypes();
+        }
+
+        /**
          * A service type's trade_direction decides which side of the
          * route Nigeria is on — export: Nigeria origin, foreign country
          * destination; import: Nigeria destination, foreign country
@@ -307,6 +367,7 @@
         serviceTypeSelect.addEventListener('change', updateTradeDirection);
         updateTradeDirection();
 
+        showRateCheckerRouteFields(document.querySelector('input[name="route_type"]:checked')?.value || 'domestic');
         syncModelSection(); // restores the right section on reload, e.g. after "Check rate"
 
         (function () {

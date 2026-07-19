@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Country;
 use App\Models\State;
+use App\Models\ThirdPartyCountryMapping;
 use App\Models\Zone;
 use App\Models\ZoneCountryMapping;
 use App\Models\ZoneMapping;
@@ -47,11 +48,19 @@ class ZoneMappingController extends Controller
             ->orderBy('country_b_id')
             ->paginate(20, ['*'], 'international_page');
 
+        // Not paginated — deliberately a short, manually-curated list
+        // (see the migration's comment), not a bulk-generated set.
+        $thirdPartyMappings = ThirdPartyCountryMapping::with(['countryA', 'countryB', 'zone'])
+            ->orderBy('country_a_id')
+            ->get();
+
         return view('zone-mappings.index', [
             'domesticMappings' => $domesticMappings,
             'internationalMappings' => $internationalMappings,
+            'thirdPartyMappings' => $thirdPartyMappings,
             'domesticZones' => Zone::where('applies_domestic', true)->orderBy('name')->get(),
             'internationalZones' => Zone::where('applies_international', true)->orderBy('name')->get(),
+            'countries' => Country::orderBy('name')->get(),
         ]);
     }
 
@@ -298,6 +307,56 @@ class ZoneMappingController extends Controller
         $zoneCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
         return back()->with('status', 'Zone updated.');
+    }
+
+    /**
+     * Adds one third-party route — Country A, Country B, Zone. No bulk
+     * generation, no bulk rule; each route is added deliberately, one
+     * at a time, matching how occasionally this actually comes up.
+     * A duplicate pair (in either order, thanks to the model's
+     * normalization) updates the existing row's zone instead of
+     * erroring — the unique constraint would otherwise reject it.
+     */
+    public function storeThirdParty(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'country_a_id' => 'required|exists:countries,id|different:country_b_id',
+            'country_b_id' => 'required|exists:countries,id',
+            'zone_id' => 'nullable|exists:zones,id',
+        ]);
+
+        $data = $validator->validate();
+
+        [$a, $b] = $data['country_a_id'] <= $data['country_b_id']
+            ? [$data['country_a_id'], $data['country_b_id']]
+            : [$data['country_b_id'], $data['country_a_id']];
+
+        ThirdPartyCountryMapping::updateOrCreate(
+            ['country_a_id' => $a, 'country_b_id' => $b],
+            ['zone_id' => $data['zone_id'] ?: null]
+        );
+
+        return back()->with('status', 'Third-party route saved.');
+    }
+
+    public function updateThirdPartyZone(Request $request, ThirdPartyCountryMapping $thirdPartyCountryMapping): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'zone_id' => 'nullable|exists:zones,id',
+        ]);
+
+        $data = $validator->validate();
+
+        $thirdPartyCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
+
+        return back()->with('status', 'Zone updated.');
+    }
+
+    public function destroyThirdParty(ThirdPartyCountryMapping $thirdPartyCountryMapping): RedirectResponse
+    {
+        $thirdPartyCountryMapping->delete();
+
+        return back()->with('status', 'Third-party route removed.');
     }
 
     /**

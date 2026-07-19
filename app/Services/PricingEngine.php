@@ -7,6 +7,7 @@ use App\Models\Country;
 use App\Models\ServiceType;
 use App\Models\StandardBillingTariff;
 use App\Models\TariffZonePrice;
+use App\Models\ThirdPartyCountryMapping;
 use App\Models\Zone;
 use App\Models\ZoneCountryMapping;
 use App\Models\ZoneMapping;
@@ -176,12 +177,33 @@ class PricingEngine
         }
 
         $domesticCountryId = Country::where('code', 'NG')->value('id');
+        $originCountryId = $context['origin_country_id'] ?? null;
+        $destinationCountryId = $context['destination_country_id'] ?? null;
+
+        // A genuine third-party route: both sides are given as
+        // countries, and NEITHER is Nigeria — e.g. US to Congo, a
+        // shipment this business arranges without touching Nigeria at
+        // all. Checked before the Nigeria-anchored logic below, since
+        // that logic would otherwise match on whichever side happens to
+        // look "foreign" and silently price this as if Nigeria were
+        // involved, which it isn't.
+        if ($originCountryId && $destinationCountryId
+            && $originCountryId != $domesticCountryId && $destinationCountryId != $domesticCountryId) {
+            $zone = ThirdPartyCountryMapping::resolveZone($originCountryId, $destinationCountryId);
+
+            if ($zone) {
+                return [$zone, 'third_party'];
+            }
+
+            throw new PricingUnavailableException('No route configured for this country pair yet (Billing → Zone Mapping → Third-Party).');
+        }
+
         $foreignCountryId = null;
 
-        if (! empty($context['destination_country_id']) && $context['destination_country_id'] != $domesticCountryId) {
-            $foreignCountryId = $context['destination_country_id'];
-        } elseif (! empty($context['origin_country_id']) && $context['origin_country_id'] != $domesticCountryId) {
-            $foreignCountryId = $context['origin_country_id'];
+        if (! empty($destinationCountryId) && $destinationCountryId != $domesticCountryId) {
+            $foreignCountryId = $destinationCountryId;
+        } elseif (! empty($originCountryId) && $originCountryId != $domesticCountryId) {
+            $foreignCountryId = $originCountryId;
         }
 
         if ($foreignCountryId) {
