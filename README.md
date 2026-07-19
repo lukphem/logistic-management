@@ -3489,3 +3489,37 @@ resources/views/zones/index.blade.php   (Hub column removed)
 ```powershell
 php artisan migrate
 ```
+
+## Increment 69 — Zone Pickers Now Filtered by Applicability
+
+Closes the gap found while re-tracing the pricing calculation:
+`Zone.applies_domestic`/`applies_international` were stored but never
+enforced anywhere — every zone picker on the Zone Mapping screen showed
+every zone unfiltered, so an "International only" zone could be
+assigned to a domestic state pair with nothing catching it.
+
+`ZoneMappingController::index()` now passes two separate lists —
+`domesticZones` (`where('applies_domestic', true)`) and
+`internationalZones` (`where('applies_international', true)`) — instead
+of one shared unfiltered list. Every zone-picker `<select>` on the page
+updated to use the correct one for its tab: the per-row pickers in both
+mapping tables, and all the dropdowns in both bulk-rule tools (4 in the
+domestic rule, 5 in the international rule).
+
+A zone marked "Both" (Increment 68) still appears in both pickers, as
+it should — this only removes zones that genuinely don't apply to a
+given context, not zones that apply to more than one.
+
+**Scope note:** this only covers the Zone Mapping screen's pickers,
+which is what was specifically flagged. Standard Billing's own
+zone-price picker (a different context — pricing a tariff, not
+classifying a route) wasn't touched.
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php   (domesticZones/internationalZones instead of one unfiltered list)
+resources/views/zone-mappings/index.blade.php   (every zone-picker select uses the correct filtered list for its tab)
+```
+
+No migration needed.

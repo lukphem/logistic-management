@@ -53,7 +53,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Same state</span>
                         <select name="zone_same_state" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($domesticZones as $zone)
                                 <option value="{{ $zone->id }}" @selected($zone->code === 'Z1')>{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -61,7 +61,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Same territory</span>
                         <select name="zone_same_territory" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($domesticZones as $zone)
                                 <option value="{{ $zone->id }}" @selected($zone->code === 'Z2')>{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -69,7 +69,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Different territory, airport condition met</span>
                         <select name="zone_airport_condition_met" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($domesticZones as $zone)
                                 <option value="{{ $zone->id }}" @selected($zone->code === 'Z3')>{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -77,7 +77,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Different territory, airport condition not met</span>
                         <select name="zone_airport_condition_not_met" required class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($domesticZones as $zone)
                                 <option value="{{ $zone->id }}" @selected($zone->code === 'Z4')>{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -157,7 +157,7 @@
                                 <select name="zone_id" onchange="this.form.submit()"
                                         class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
                                     <option value="">Unassigned</option>
-                                    @foreach ($zones as $zone)
+                                    @foreach ($domesticZones as $zone)
                                         <option value="{{ $zone->id }}" @selected($mapping->zone_id === $zone->id)>{{ $zone->name }}</option>
                                     @endforeach
                                 </select>
@@ -223,7 +223,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Same continent as Nigeria</span>
                         <select name="zone_same_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($internationalZones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -231,7 +231,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Different continent</span>
                         <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($internationalZones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -242,7 +242,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Same region as Nigeria</span>
                         <select name="zone_same_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($internationalZones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -250,7 +250,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Same continent, different region</span>
                         <select name="zone_same_continent_different_region" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($internationalZones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -258,7 +258,7 @@
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
                         <span class="text-sm text-ink-900">Different continent</span>
                         <select name="zone_different_continent" class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
-                            @foreach ($zones as $zone)
+                            @foreach ($internationalZones as $zone)
                                 <option value="{{ $zone->id }}">{{ $zone->name }}</option>
                             @endforeach
                         </select>
@@ -298,7 +298,7 @@
                                 <select name="zone_id" onchange="this.form.submit()"
                                         class="rounded-md border border-line bg-surface-0 px-2 py-1.5 text-sm text-ink-900 outline-none focus:border-[var(--brand-primary)]">
                                     <option value="">Unassigned</option>
-                                    @foreach ($zones as $zone)
+                                    @foreach ($internationalZones as $zone)
                                         <option value="{{ $zone->id }}" @selected($mapping->zone_id === $zone->id)>{{ $zone->name }}</option>
                                     @endforeach
                                 </select>

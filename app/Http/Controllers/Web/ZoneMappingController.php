@@ -50,7 +50,8 @@ class ZoneMappingController extends Controller
         return view('zone-mappings.index', [
             'domesticMappings' => $domesticMappings,
             'internationalMappings' => $internationalMappings,
-            'zones' => Zone::orderBy('name')->get(),
+            'domesticZones' => Zone::where('applies_domestic', true)->orderBy('name')->get(),
+            'internationalZones' => Zone::where('applies_international', true)->orderBy('name')->get(),
         ]);
     }
 
