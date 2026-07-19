@@ -4030,3 +4030,76 @@ routes/web.php
 
 No migration needed — this increment is entirely controller/view logic
 and display labels on top of Increment 77's schema.
+
+## Increment 79 — Cross-Trade Restructured: Genuinely Nested Under International
+
+Corrects Increment 78: Cross-Trade was a third `route_type` value, a
+sibling to Domestic and International — per explicit direction, it's
+now a third `trade_direction` value (alongside Import/Export) instead,
+since `trade_direction` was already exclusively an international-only
+field. This makes Cross-Trade genuinely *nested under* International
+rather than sitting beside it, both in the data model and every screen
+built on top of it.
+
+### Migration: preserves existing data through the restructure
+
+Any service type already set to `route_type='third_party'` is migrated
+to `route_type='international'`, `trade_direction='cross_trade'` —
+which service types were actually set to it isn't silently lost.
+`route_type` then shrinks back to just domestic/international.
+
+### Every screen restructured to match
+
+- **Service Type form**: Route type back to 2 options; Trade direction
+  (shown only for International) is now a 3-way radio — Export /
+  Import / Cross-Trade
+- **Zone Mapping**: Cross-Trade is no longer a third top-level tab —
+  the International tab now has an internal sub-toggle, **Nigeria
+  Routes** / **Cross-Trade**, with all the bulk-generate and bulk-rule
+  tooling from Increment 78 moved inside it, unchanged in behavior
+- **Standard Billing**: the separate Cross-Trade tab is gone entirely —
+  since Cross-Trade service types now have `route_type='international'`,
+  their tariffs already appear under the existing International tab
+  automatically, mixed in with regular Nigeria-anchored ones
+- **Rate Checker**: the third route-type radio is gone; the
+  International section now has two sub-views — directional fields
+  (Import/Export, as before) or Origin/Destination Country
+  (Cross-Trade) — switched by `updateTradeDirection()` based on the
+  selected service type
+
+### A real ordering bug caught while rebuilding this
+
+`showRateCheckerRouteFields()` re-enables every field within a section
+when making it visible — including, now, *both* of International's
+sub-views at once, which would silently undo the more specific
+disabling `updateTradeDirection()` sets between them. Fixed by having
+`updateTradeDirection()` always run *after* the top-level toggle, not
+before, so the final state is always correct regardless of call order
+elsewhere.
+
+### What needed zero changes
+
+`PricingEngine`'s zone resolution and `RateCheckerController`'s
+origin/destination label logic already worked correctly for this
+restructuring without any changes — neither ever inspected
+`service_type.route_type` directly; both work purely from which fields
+are actually present in the submitted context. Confirmed by tracing
+both before assuming a change was needed.
+
+### Files
+
+```
+database/migrations/2026_02_12_000001_move_cross_trade_under_trade_direction.php
+app/Http/Controllers/Web/ServiceTypeController.php   (route_type back to 2 values, trade_direction gains cross_trade)
+app/Http/Controllers/Web/StandardBillingController.php   (third tariff query removed)
+resources/views/service-types/form.blade.php, index.blade.php
+resources/views/zone-mappings/index.blade.php   (Cross-Trade moved inside International as a sub-tab)
+resources/views/standard-billing/index.blade.php, form.blade.php   (third tab removed)
+resources/views/rate-checker/index.blade.php   (third radio removed, international section gets two sub-views, ordering bug fixed)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

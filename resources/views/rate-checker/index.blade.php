@@ -37,12 +37,6 @@
                                onchange="showRateCheckerRouteFields('international');">
                         International
                     </label>
-                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                        <input type="radio" name="route_type" value="third_party" id="route-third-party"
-                               @checked(request('route_type') === 'third_party')
-                               onchange="showRateCheckerRouteFields('third_party');">
-                        Cross-Trade
-                    </label>
                 </div>
             </div>
 
@@ -121,57 +115,59 @@
 
             <div id="international-fields" style="{{ request('route_type') !== 'international' ? 'display:none' : '' }}">
                 <p id="trade-direction-label" class="mb-3 text-xs font-medium text-ink-900">
-                    {{ $tradeDirection === 'import' ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin' }}
+                    {{ match ($tradeDirection) { 'import' => 'Import — Nigeria is the destination', 'cross_trade' => 'Cross-Trade (Third-Country Shipping) — neither side is Nigeria', default => 'Export — Nigeria is the origin' } }}
                 </p>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div>
-                        <label id="intl-nigeria-state-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria state ({{ $tradeDirection === 'import' ? 'destination' : 'origin' }})</label>
-                        <select id="intl-nigeria-state" name="{{ $nigeriaStateField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select a state</option>
-                            @foreach ($states as $state)
-                                <option value="{{ $state->id }}" @selected(request($nigeriaStateField) == $state->id)>{{ $state->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label id="intl-nigeria-city-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria city <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                        <select id="intl-nigeria-city" name="{{ $nigeriaCityField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select a city</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label id="intl-foreign-country-label" class="mb-1 block text-sm font-medium text-ink-900">Foreign country ({{ $tradeDirection === 'import' ? 'origin' : 'destination' }})</label>
-                        <select id="intl-foreign-country" name="{{ $foreignCountryField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select a country</option>
-                            @foreach ($countries as $country)
-                                <option value="{{ $country->id }}" @selected(request($foreignCountryField) == $country->id)>{{ $country->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <p class="mt-2 text-xs text-ink-500">Nigeria city is only needed to preview an onforwarding surcharge tied to a specific city.</p>
-            </div>
 
-            <div id="third-party-fields" style="{{ request('route_type') !== 'third_party' ? 'display:none' : '' }}">
-                <p class="mb-3 text-xs text-ink-500">Cross-Trade (Third-Country Shipping) — for a shipment this business arranges entirely between two other countries, neither side is Nigeria.</p>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin country</label>
-                        <select name="origin_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select a country</option>
-                            @foreach ($countries as $country)
-                                <option value="{{ $country->id }}" @selected(request('route_type') === 'third_party' && request('origin_country_id') == $country->id)>{{ $country->name }}</option>
-                            @endforeach
-                        </select>
+                <div id="intl-directional-fields" style="{{ $tradeDirection === 'cross_trade' ? 'display:none' : '' }}">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <label id="intl-nigeria-state-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria state ({{ $tradeDirection === 'import' ? 'destination' : 'origin' }})</label>
+                            <select id="intl-nigeria-state" name="{{ $nigeriaStateField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">Select a state</option>
+                                @foreach ($states as $state)
+                                    <option value="{{ $state->id }}" @selected(request($nigeriaStateField) == $state->id)>{{ $state->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label id="intl-nigeria-city-label" class="mb-1 block text-sm font-medium text-ink-900">Nigeria city <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                            <select id="intl-nigeria-city" name="{{ $nigeriaCityField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">Select a city</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="intl-foreign-country-label" class="mb-1 block text-sm font-medium text-ink-900">Foreign country ({{ $tradeDirection === 'import' ? 'origin' : 'destination' }})</label>
+                            <select id="intl-foreign-country" name="{{ $foreignCountryField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">Select a country</option>
+                                @foreach ($countries as $country)
+                                    <option value="{{ $country->id }}" @selected(request($foreignCountryField) == $country->id)>{{ $country->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
-                        <select name="destination_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select a country</option>
-                            @foreach ($countries as $country)
-                                <option value="{{ $country->id }}" @selected(request('route_type') === 'third_party' && request('destination_country_id') == $country->id)>{{ $country->name }}</option>
-                            @endforeach
-                        </select>
+                    <p class="mt-2 text-xs text-ink-500">Nigeria city is only needed to preview an onforwarding surcharge tied to a specific city.</p>
+                </div>
+
+                <div id="intl-crosstrade-fields" style="{{ $tradeDirection === 'cross_trade' ? '' : 'display:none' }}">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Origin country</label>
+                            <select id="ctp-origin-country" name="origin_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">Select a country</option>
+                                @foreach ($countries as $country)
+                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && request('origin_country_id') == $country->id)>{{ $country->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Destination country</label>
+                            <select id="ctp-destination-country" name="destination_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                <option value="">Select a country</option>
+                                @foreach ($countries as $country)
+                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && request('destination_country_id') == $country->id)>{{ $country->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -311,21 +307,18 @@
 
         /**
          * Shows the fields for the chosen route type and DISABLES every
-         * input inside the other two sections — display:none alone
-         * doesn't stop a hidden field from being submitted, and two
-         * sections can genuinely share a field name (the international
-         * section's foreign-country field is dynamically renamed to
-         * origin_country_id/destination_country_id depending on trade
-         * direction, exactly the same names the third-party section
-         * uses statically). Disabled fields are excluded from
-         * submission entirely, which is what actually prevents a stale
-         * value from a hidden section overwriting the visible one's.
+         * input inside the other section — display:none alone doesn't
+         * stop a hidden field from being submitted, and the sections
+         * can genuinely share field names (the international section's
+         * two sub-views below do too). Disabled fields are excluded
+         * from submission entirely, which is what actually prevents a
+         * stale value from a hidden section overwriting the visible
+         * one's.
          */
         function showRateCheckerRouteFields(type) {
             const sections = {
                 domestic: document.getElementById('domestic-fields'),
                 international: document.getElementById('international-fields'),
-                third_party: document.getElementById('third-party-fields'),
             };
 
             Object.keys(sections).forEach(function (key) {
@@ -336,6 +329,14 @@
                 });
             });
 
+            // Re-enabling the whole international section above also
+            // re-enables BOTH its sub-views — updateTradeDirection()
+            // must run after, to narrow that back down to just the one
+            // sub-view that actually matches the selected service type.
+            if (type === 'international') {
+                updateTradeDirection();
+            }
+
             filterServiceTypes();
         }
 
@@ -343,29 +344,53 @@
          * A service type's trade_direction decides which side of the
          * route Nigeria is on — export: Nigeria origin, foreign country
          * destination; import: Nigeria destination, foreign country
-         * origin. Renaming the fields (rather than keeping two separate
-         * always-present pairs) means the same state/city/country
-         * inputs work for either direction with no duplicate markup.
+         * origin; cross_trade: neither side is Nigeria, a genuinely
+         * different pair of fields (Origin/Destination country) rather
+         * than a renamed version of the same ones. Renaming fields for
+         * import/export (rather than keeping separate always-present
+         * pairs) means the same state/city/country inputs work for
+         * either direction with no duplicate markup; cross_trade swaps
+         * to its own two fields entirely, disabling the directional
+         * ones so the two sub-views can never both submit values.
          */
         function updateTradeDirection() {
             const selected = serviceTypeSelect.selectedOptions[0];
-            const isImport = (selected?.dataset.tradeDirection || 'export') === 'import';
+            const direction = selected?.dataset.tradeDirection || 'export';
+            const isCrossTrade = direction === 'cross_trade';
+            const isImport = direction === 'import';
 
-            const stateSelect = document.getElementById('intl-nigeria-state');
-            const citySelect = document.getElementById('intl-nigeria-city');
-            const countrySelect = document.getElementById('intl-foreign-country');
+            const directionalFields = document.getElementById('intl-directional-fields');
+            const crossTradeFields = document.getElementById('intl-crosstrade-fields');
 
-            stateSelect.name = isImport ? 'destination_state_id' : 'origin_state_id';
-            citySelect.name = isImport ? 'destination_city_id' : 'origin_city_id';
-            countrySelect.name = isImport ? 'origin_country_id' : 'destination_country_id';
+            directionalFields.style.display = isCrossTrade ? 'none' : '';
+            crossTradeFields.style.display = isCrossTrade ? '' : 'none';
 
-            document.getElementById('trade-direction-label').textContent = isImport ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin';
-            document.getElementById('intl-nigeria-state-label').textContent = 'Nigeria state (' + (isImport ? 'destination' : 'origin') + ')';
-            document.getElementById('intl-foreign-country-label').textContent = 'Foreign country (' + (isImport ? 'origin' : 'destination') + ')';
+            directionalFields.querySelectorAll('input, select').forEach(function (el) {
+                el.disabled = isCrossTrade;
+            });
+            crossTradeFields.querySelectorAll('input, select').forEach(function (el) {
+                el.disabled = !isCrossTrade;
+            });
+
+            if (! isCrossTrade) {
+                const stateSelect = document.getElementById('intl-nigeria-state');
+                const citySelect = document.getElementById('intl-nigeria-city');
+                const countrySelect = document.getElementById('intl-foreign-country');
+
+                stateSelect.name = isImport ? 'destination_state_id' : 'origin_state_id';
+                citySelect.name = isImport ? 'destination_city_id' : 'origin_city_id';
+                countrySelect.name = isImport ? 'origin_country_id' : 'destination_country_id';
+
+                document.getElementById('intl-nigeria-state-label').textContent = 'Nigeria state (' + (isImport ? 'destination' : 'origin') + ')';
+                document.getElementById('intl-foreign-country-label').textContent = 'Foreign country (' + (isImport ? 'origin' : 'destination') + ')';
+            }
+
+            document.getElementById('trade-direction-label').textContent = isCrossTrade
+                ? 'Cross-Trade (Third-Country Shipping) — neither side is Nigeria'
+                : (isImport ? 'Import — Nigeria is the destination' : 'Export — Nigeria is the origin');
         }
 
         serviceTypeSelect.addEventListener('change', updateTradeDirection);
-        updateTradeDirection();
 
         showRateCheckerRouteFields(document.querySelector('input[name="route_type"]:checked')?.value || 'domestic');
         syncModelSection(); // restores the right section on reload, e.g. after "Check rate"

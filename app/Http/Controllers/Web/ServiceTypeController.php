@@ -55,8 +55,8 @@ class ServiceTypeController extends Controller
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:service_types,code,' . $ignoreId,
             'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
-            'route_type' => 'required|in:domestic,international,third_party',
-            'trade_direction' => 'required_if:route_type,international|nullable|in:import,export',
+            'route_type' => 'required|in:domestic,international',
+            'trade_direction' => 'required_if:route_type,international|nullable|in:import,export,cross_trade',
             'is_active' => 'sometimes|boolean',
         ]);
 

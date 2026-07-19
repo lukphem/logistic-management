@@ -21,10 +21,6 @@
                 class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
             Domestic
         </button>
-        <button type="button" id="tab-btn-third-party" onclick="showZoneTab('third-party')"
-                class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
-            Cross-Trade
-        </button>
     </div>
 
     <div id="tab-domestic" style="display:none">
@@ -181,6 +177,19 @@
 
     <div id="tab-international">
 
+    <div class="mb-5 flex gap-2">
+        <button type="button" id="intl-subtab-btn-nigeria" onclick="showInternationalSubTab('nigeria')"
+                class="rounded-full bg-[var(--brand-primary)]/10 px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)]">
+            Nigeria Routes
+        </button>
+        <button type="button" id="intl-subtab-btn-crosstrade" onclick="showInternationalSubTab('crosstrade')"
+                class="rounded-full px-3 py-1.5 text-xs font-medium text-ink-500 hover:bg-surface-50">
+            Cross-Trade (Third-Country Shipping)
+        </button>
+    </div>
+
+    <div id="intl-sub-nigeria">
+
     {{-- International Mapping --}}
     <div class="mb-5 flex items-center justify-between">
         <h2 class="text-sm font-semibold text-ink-900">International Mapping</h2>
@@ -318,9 +327,9 @@
 
     <div class="mt-5">{{ $internationalMappings->links() }}</div>
 
-    </div>{{-- /#tab-international --}}
+    </div>{{-- /#intl-sub-nigeria --}}
 
-    <div id="tab-third-party" style="display:none">
+    <div id="intl-sub-crosstrade" style="display:none">
         <p class="mb-4 text-sm text-ink-500">
             <strong>Cross-Trade (Third-Country Shipping)</strong> — for shipments this business arranges entirely
             between two OTHER countries, neither side is Nigeria (e.g. US to Congo, via a third-party arrangement).
@@ -511,12 +520,14 @@
                 </tbody>
             </table>
         </div>
-    </div>{{-- /#tab-third-party --}}
+    </div>{{-- /#intl-sub-crosstrade --}}
+
+    </div>{{-- /#tab-international --}}
 
 
     <script>
         function showZoneTab(tab) {
-            ['domestic', 'international', 'third-party'].forEach(function (name) {
+            ['domestic', 'international'].forEach(function (name) {
                 document.getElementById('tab-' + name).style.display = tab === name ? '' : 'none';
 
                 const btn = document.getElementById('tab-btn-' + name);
@@ -525,6 +536,19 @@
                 btn.classList.toggle('font-semibold', tab === name);
                 btn.classList.toggle('border-transparent', tab !== name);
                 btn.classList.toggle('text-ink-500', tab !== name);
+            });
+        }
+
+        function showInternationalSubTab(sub) {
+            ['nigeria', 'crosstrade'].forEach(function (name) {
+                document.getElementById('intl-sub-' + name).style.display = sub === name ? '' : 'none';
+
+                const btn = document.getElementById('intl-subtab-btn-' + name);
+                btn.classList.toggle('bg-[var(--brand-primary)]/10', sub === name);
+                btn.classList.toggle('text-[var(--brand-primary)]', sub === name);
+                btn.classList.toggle('font-semibold', sub === name);
+                btn.classList.toggle('text-ink-500', sub !== name);
+                btn.classList.toggle('font-medium', sub !== name);
             });
         }
     </script>

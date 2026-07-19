@@ -8,16 +8,17 @@
 
     <p class="mb-4 text-sm text-ink-500">
         Weight-band tariffs, priced per zone. A shipment matches a tariff by service type and weight, then the
-        resolved zone (Billing → Zone Mapping) picks which price applies. Domestic, International, and Cross-Trade
-        are configured separately, since every service type is restricted to exactly one of the three.
+        resolved zone (Billing → Zone Mapping) picks which price applies. Domestic and International are configured
+        separately — Cross-Trade (Third-Country Shipping) service types are International too, so their tariffs
+        appear under that same tab, alongside regular Nigeria-anchored ones.
     </p>
 
     <x-csv-actions :export-route="route('standard-billing.export')" :import-route="route('standard-billing.import')" label="Standard Billing" />
     <p class="mb-5 -mt-3 text-xs text-ink-500">
         Covers every tariff and zone price together (8 columns, including service type and weight range) — one row per
         zone, sharing service type/weight range across rows. Import creates tariffs and prices that don't exist yet,
-        and updates ones that do. Covers Domestic, International, and Cross-Trade in one file. To bulk-add zones to
-        just one already-existing tariff instead, use the smaller Export/Import on that tariff's own edit page.
+        and updates ones that do. To bulk-add zones to just one already-existing tariff instead, use the smaller
+        Export/Import on that tariff's own edit page.
     </p>
 
     <div class="mb-5 flex gap-2 border-b border-line">
@@ -29,10 +30,6 @@
                 class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
             International
         </button>
-        <button type="button" id="tab-btn-third_party" onclick="showStandardBillingTab('third_party')"
-                class="border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-ink-500 hover:text-ink-900">
-            Cross-Trade
-        </button>
     </div>
 
     <div id="tab-domestic">
@@ -43,13 +40,9 @@
         @include('standard-billing._tariff-table', ['tariffs' => $internationalTariffs, 'addTariffRoute' => route('standard-billing.create', ['route_type' => 'international'])])
     </div>
 
-    <div id="tab-third_party" style="display:none">
-        @include('standard-billing._tariff-table', ['tariffs' => $thirdPartyTariffs, 'addTariffRoute' => route('standard-billing.create', ['route_type' => 'third_party'])])
-    </div>
-
     <script>
         function showStandardBillingTab(tab) {
-            ['domestic', 'international', 'third_party'].forEach(function (name) {
+            ['domestic', 'international'].forEach(function (name) {
                 document.getElementById('tab-' + name).style.display = tab === name ? '' : 'none';
 
                 const btn = document.getElementById('tab-btn-' + name);
@@ -62,13 +55,11 @@
         }
 
         // Restores the tab a redirect (e.g. after deleting a tariff)
-        // asked to land on, via ?tab=domestic|international|third_party
-        // in the URL.
+        // asked to land on, via ?tab=domestic|international in the URL.
         (function () {
             const params = new URLSearchParams(window.location.search);
-            const tab = params.get('tab');
-            if (tab === 'international' || tab === 'third_party') {
-                showStandardBillingTab(tab);
+            if (params.get('tab') === 'international') {
+                showStandardBillingTab('international');
             }
         })();
     </script>
