@@ -3226,3 +3226,32 @@ routes/web.php
 ```
 
 No migration needed.
+
+## Increment 63 — Major Cities Expanded Across All 36 States + FCT
+
+`LocationSeeder`'s Nigeria city list previously had only 1–3 cities per
+state (some states had just one). Expanded to 3–5 well-known
+cities/towns per state — capital plus other significant commercial or
+population centers — across all 36 states and FCT, using
+`firstOrCreate()` throughout so this is safe to re-run against an
+already-seeded database: only the newly added cities get created,
+nothing existing is touched or duplicated.
+
+Confirmed no uniqueness constraint exists on `short_code` (checked the
+actual migration directly) — a handful of short codes repeat across
+different states (e.g. "OGB" for both Bayelsa's Ogbia and Oyo's
+Ogbomoso), which is harmless: the real unique-ish identifier,
+`code`, is always state-prefixed (`NG-BY-OGB` vs `NG-OY-OGB`) via
+`City::booted()`, so there's no actual collision.
+
+### Files
+
+```
+database/seeders/LocationSeeder.php
+```
+
+### To apply locally
+
+```powershell
+php artisan db:seed --class=LocationSeeder
+```
