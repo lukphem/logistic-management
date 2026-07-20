@@ -4338,3 +4338,48 @@ php artisan migrate
 After migrating, set up Acknowledgement under Setups → Billing →
 Additional Services — it'll show up already, just needs its Service
 Type, weight, and percentage configured before it's active.
+
+## Increment 84 — Per-Service Quote Line Items, Weight & Dimensions on One Row
+
+Two additions to the Rate Checker.
+
+### Individual line items instead of one combined "Additional services" total
+
+The quote breakdown previously lumped every selected additional
+service into a single "Additional services" line. Now each shows
+separately — "Packaging fee," "Acknowledgement fee," or a custom
+service's own name + " fee" for anything else selected.
+
+`ShipmentPricingService::calculateAdditionalServices()` now returns a
+`breakdown` array (`{label, amount}` per selected option) alongside the
+vatable/non-vatable totals — labeled by the **parent service's name**,
+not the specific option chosen within it (so picking "Small Box" under
+Packaging still shows as "Packaging fee," not "Small Box fee").
+`priceShipment()` passes this through as `additional_services_breakdown`.
+
+Confirmed safe for the booking endpoints too: `$pricing` is spread
+directly into `Shipment::create()` in every booking controller, and
+since `additional_services_breakdown` isn't in `Shipment::$fillable`,
+Eloquent's mass-assignment protection silently ignores it — nothing
+breaks, nothing gets persisted (correct, since it's derived display
+data, not something needing its own column).
+
+### Weight & Dimensions combined into one row
+
+Weight, Length, Width, Height, and a **read-only Volumetric weight**
+field now sit together on a single row — previously Weight was its own
+field, Dimensions a separate row below it, with the live volumetric
+preview as plain text underneath rather than a field of its own. The
+live preview (Increment 82) now writes into that read-only field's
+`.value` directly, same calculation, just presented as a field
+alongside the others instead of a text hint below them.
+
+### Files
+
+```
+app/Services/ShipmentPricingService.php   (calculateAdditionalServices() returns a per-service breakdown)
+resources/views/rate-checker/index.blade.php   (per-service line items in the quote, Weight+Dimensions+Volumetric on one row)
+```
+
+No migration needed — display and breakdown changes only, on top of
+Increment 81's schema.

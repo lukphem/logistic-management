@@ -60,6 +60,7 @@ class ShipmentPricingService
             'surcharge_amount' => round($surchargeAmount, 2),
             'onforwarding_amount' => round($onforwardingAmount, 2),
             'additional_services_amount' => round($additionalServicesAmount, 2),
+            'additional_services_breakdown' => $additionalServices['breakdown'],
             'discount_amount' => $discountAmount,
             'insurance_amount' => round($insuranceAmount, 2),
             'vat_amount' => $vatAmount,
@@ -95,22 +96,26 @@ class ShipmentPricingService
      * discounted — but whether it's taxable now varies per option
      * (is_vatable), so this returns the two totals split apart rather
      * than one combined sum, letting the caller apply VAT only to the
-     * vatable portion.
+     * vatable portion. Also returns a per-service breakdown (labeled by
+     * the PARENT service's name — "Packaging fee", "Acknowledgement
+     * fee", or a custom service's own name — not the specific option
+     * chosen within it) for display on a quote.
      *
-     * @return array{vatable: float, non_vatable: float}
+     * @return array{vatable: float, non_vatable: float, breakdown: array<int, array{label: string, amount: float}>}
      */
     private function calculateAdditionalServices(array $context, float $baseAmount): array
     {
         $ids = $context['additional_service_option_ids'] ?? [];
 
         if (empty($ids)) {
-            return ['vatable' => 0.0, 'non_vatable' => 0.0];
+            return ['vatable' => 0.0, 'non_vatable' => 0.0, 'breakdown' => []];
         }
 
-        $options = \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)->get();
+        $options = \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)->with('service')->get();
 
         $vatable = 0.0;
         $nonVatable = 0.0;
+        $breakdown = [];
 
         foreach ($options as $option) {
             $amount = $option->charge_type === 'percentage_of_reverse_shipment'
@@ -122,9 +127,14 @@ class ShipmentPricingService
             } else {
                 $nonVatable += $amount;
             }
+
+            $breakdown[] = [
+                'label' => ($option->service->name ?? 'Service') . ' fee',
+                'amount' => round($amount, 2),
+            ];
         }
 
-        return ['vatable' => $vatable, 'non_vatable' => $nonVatable];
+        return ['vatable' => $vatable, 'non_vatable' => $nonVatable, 'breakdown' => $breakdown];
     }
 
     private function calculateInsurance(array $context): float

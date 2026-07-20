@@ -196,25 +196,35 @@
             </div>
 
             <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Weight (kg) <x-required /></label>
-                <input type="number" step="0.01" min="0" name="weight_kg" value="{{ request('weight_kg') }}"
-                       class="w-full max-w-[10rem] rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-            </div>
-
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Dimensions (cm) <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                <div class="flex max-w-md gap-3">
-                    <input type="number" step="0.1" min="0" id="dim-length" name="length_cm" value="{{ request('length_cm') }}" placeholder="Length"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    <input type="number" step="0.1" min="0" id="dim-width" name="width_cm" value="{{ request('width_cm') }}" placeholder="Width"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    <input type="number" step="0.1" min="0" id="dim-height" name="height_cm" value="{{ request('height_cm') }}" placeholder="Height"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Weight & dimensions</label>
+                <div class="flex flex-wrap items-end gap-3">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Weight (kg) <x-required /></label>
+                        <input type="number" step="0.01" min="0" name="weight_kg" value="{{ request('weight_kg') }}"
+                               class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Length (cm)</label>
+                        <input type="number" step="0.1" min="0" id="dim-length" name="length_cm" value="{{ request('length_cm') }}"
+                               class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Width (cm)</label>
+                        <input type="number" step="0.1" min="0" id="dim-width" name="width_cm" value="{{ request('width_cm') }}"
+                               class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Height (cm)</label>
+                        <input type="number" step="0.1" min="0" id="dim-height" name="height_cm" value="{{ request('height_cm') }}"
+                               class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Volumetric weight (kg)</label>
+                        <input type="text" id="volumetric-preview" value="" readonly tabindex="-1"
+                               class="w-24 rounded-md border border-line bg-surface-50 px-3 py-2 text-sm text-ink-500 outline-none">
+                    </div>
                 </div>
-                <p class="mt-1 text-xs text-ink-500">
-                    If given, priced by whichever is greater — actual weight above, or the volumetric weight these work out to.
-                    <span id="volumetric-preview"></span>
-                </p>
+                <p class="mt-1 text-xs text-ink-500">Dimensions are optional — if given, priced by whichever is greater, actual weight or the volumetric weight they work out to.</p>
             </div>
 
             @if ($additionalServices->isNotEmpty())
@@ -285,9 +295,9 @@
                 @if ($result['onforwarding_amount'] > 0)
                     <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($result['onforwarding_amount'], 2) }}</dd></div>
                 @endif
-                @if ($result['additional_services_amount'] > 0)
-                    <div class="flex justify-between"><dt class="text-ink-500">Additional services</dt><dd class="font-mono text-ink-900">{{ number_format($result['additional_services_amount'], 2) }}</dd></div>
-                @endif
+                @foreach ($result['additional_services_breakdown'] ?? [] as $line)
+                    <div class="flex justify-between"><dt class="text-ink-500">{{ $line['label'] }}</dt><dd class="font-mono text-ink-900">{{ number_format($line['amount'], 2) }}</dd></div>
+                @endforeach
                 @if ($result['discount_amount'] > 0)
                     <div class="flex justify-between"><dt class="text-ink-500">Discount</dt><dd class="font-mono text-status-delivered">−{{ number_format($result['discount_amount'], 2) }}</dd></div>
                 @endif
@@ -320,9 +330,9 @@
 
                 if (l > 0 && w > 0 && h > 0) {
                     const volumetric = (l * w * h) / divisor;
-                    preview.textContent = 'Volumetric weight: ' + volumetric.toFixed(2).replace(/\.?0+$/, '') + ' kg';
+                    preview.value = volumetric.toFixed(2).replace(/\.?0+$/, '');
                 } else {
-                    preview.textContent = '';
+                    preview.value = '';
                 }
             }
 
