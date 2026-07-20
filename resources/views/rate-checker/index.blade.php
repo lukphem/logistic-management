@@ -22,22 +22,55 @@
         </div>
 
         <div id="model-fields" class="hidden space-y-4">
+            @php
+                $selectedRouteType = request('route_type', 'domestic');
+                // No default here on purpose — Type must be actively
+                // chosen before Service Type reveals, matching the
+                // sequential Route -> Type -> Service Type flow.
+                $selectedTradeDirectionChoice = request('trade_direction');
+                $showServiceTypeSelector = $selectedRouteType === 'domestic' || ($selectedRouteType === 'international' && $selectedTradeDirectionChoice);
+            @endphp
+
             <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Route <x-required /></label>
+                <div class="flex gap-3">
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="route_type" value="domestic" @checked($selectedRouteType === 'domestic') onchange="onRouteTypeChange();">
+                        Domestic
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="route_type" value="international" @checked($selectedRouteType === 'international') onchange="onRouteTypeChange();">
+                        International
+                    </label>
+                </div>
+            </div>
+
+            <div id="trade-direction-selector" style="{{ $selectedRouteType === 'international' ? '' : 'display:none' }}">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Type <x-required /></label>
+                <div class="flex gap-3">
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="trade_direction" value="export" @checked($selectedTradeDirectionChoice === 'export') onchange="onTradeDirectionChoiceChange();">
+                        Export
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="trade_direction" value="import" @checked($selectedTradeDirectionChoice === 'import') onchange="onTradeDirectionChoiceChange();">
+                        Import
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-3 text-sm text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="trade_direction" value="cross_trade" @checked($selectedTradeDirectionChoice === 'cross_trade') onchange="onTradeDirectionChoiceChange();">
+                        Cross-Trade
+                    </label>
+                </div>
+            </div>
+
+            <div id="service-type-selector" style="{{ $showServiceTypeSelector ? '' : 'display:none' }}">
                 <label class="mb-1 block text-sm font-medium text-ink-900">Service type <x-required /></label>
                 <select id="service-type" name="service_type_id" onchange="syncFieldsForServiceType();" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     <option value="">Select a service type</option>
-                    <optgroup label="Domestic">
-                        @foreach ($serviceTypes->where('route_type', 'domestic') as $serviceType)
-                            <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}</option>
-                        @endforeach
-                    </optgroup>
-                    <optgroup label="International">
-                        @foreach ($serviceTypes->where('route_type', 'international') as $serviceType)
-                            <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}{{ $serviceType->trade_direction === 'cross_trade' ? ' (Cross-Trade)' : '' }}</option>
-                        @endforeach
-                    </optgroup>
+                    @foreach ($serviceTypes as $serviceType)
+                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}{{ $serviceType->trade_direction === 'cross_trade' ? ' (Cross-Trade)' : '' }}</option>
+                    @endforeach
                 </select>
-                <p class="mt-1 text-xs text-ink-500">Which fields appear below depends on this service type — domestic, international, or cross-trade.</p>
             </div>
 
             @php
@@ -171,14 +204,17 @@
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Dimensions (cm) <span class="text-xs font-normal text-ink-500">(optional)</span></label>
                 <div class="flex max-w-md gap-3">
-                    <input type="number" step="0.1" min="0" name="length_cm" value="{{ request('length_cm') }}" placeholder="Length"
+                    <input type="number" step="0.1" min="0" id="dim-length" name="length_cm" value="{{ request('length_cm') }}" placeholder="Length"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    <input type="number" step="0.1" min="0" name="width_cm" value="{{ request('width_cm') }}" placeholder="Width"
+                    <input type="number" step="0.1" min="0" id="dim-width" name="width_cm" value="{{ request('width_cm') }}" placeholder="Width"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    <input type="number" step="0.1" min="0" name="height_cm" value="{{ request('height_cm') }}" placeholder="Height"
+                    <input type="number" step="0.1" min="0" id="dim-height" name="height_cm" value="{{ request('height_cm') }}" placeholder="Height"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
-                <p class="mt-1 text-xs text-ink-500">If given, priced by whichever is greater — actual weight above, or the volumetric weight these work out to.</p>
+                <p class="mt-1 text-xs text-ink-500">
+                    If given, priced by whichever is greater — actual weight above, or the volumetric weight these work out to.
+                    <span id="volumetric-preview"></span>
+                </p>
             </div>
 
             @if ($additionalServices->isNotEmpty())
@@ -266,6 +302,37 @@
     @endif
 
     <script>
+        // Live preview only — the real calculation happens server-side
+        // in PricingEngine using the same divisor, this just saves a
+        // round trip to see roughly what a set of dimensions works out
+        // to before checking the actual rate.
+        (function () {
+            const divisor = @json((float) $volumetricDivisor);
+            const lengthInput = document.getElementById('dim-length');
+            const widthInput = document.getElementById('dim-width');
+            const heightInput = document.getElementById('dim-height');
+            const preview = document.getElementById('volumetric-preview');
+
+            function updatePreview() {
+                const l = parseFloat(lengthInput.value) || 0;
+                const w = parseFloat(widthInput.value) || 0;
+                const h = parseFloat(heightInput.value) || 0;
+
+                if (l > 0 && w > 0 && h > 0) {
+                    const volumetric = (l * w * h) / divisor;
+                    preview.textContent = 'Volumetric weight: ' + volumetric.toFixed(2).replace(/\.?0+$/, '') + ' kg';
+                } else {
+                    preview.textContent = '';
+                }
+            }
+
+            [lengthInput, widthInput, heightInput].forEach(function (input) {
+                input.addEventListener('input', updatePreview);
+            });
+
+            updatePreview();
+        })();
+
         const billingModelSelect = document.getElementById('billing-model');
         const modelFields = document.getElementById('model-fields');
         const modelNotImplemented = document.getElementById('model-not-implemented');
@@ -295,17 +362,60 @@
 
         const serviceTypeSelect = document.getElementById('service-type');
         const serviceTypeOptions = Array.from(serviceTypeSelect.options).slice(1);
+        const tradeDirectionSelector = document.getElementById('trade-direction-selector');
+        const serviceTypeSelector = document.getElementById('service-type-selector');
 
+        /**
+         * Service Type only ever shows options matching every choice
+         * made above it — Billing Model, Route, and (for International)
+         * Type — since a service type not matching all three couldn't
+         * actually be booked under this combination anyway.
+         */
         function filterServiceTypes() {
             const chosenModel = billingModelSelect.value;
+            const chosenRoute = document.querySelector('input[name="route_type"]:checked')?.value || 'domestic';
+            const chosenDirection = document.querySelector('input[name="trade_direction"]:checked')?.value;
 
             serviceTypeOptions.forEach(function (option) {
-                option.hidden = chosenModel !== '' && option.dataset.billingModel !== chosenModel;
+                const modelMatches = chosenModel === '' || option.dataset.billingModel === chosenModel;
+                const routeMatches = option.dataset.routeType === chosenRoute;
+                const directionMatches = chosenRoute !== 'international' || option.dataset.tradeDirection === chosenDirection;
+                option.hidden = !(modelMatches && routeMatches && directionMatches);
             });
 
             if (serviceTypeSelect.selectedOptions[0]?.hidden) {
                 serviceTypeSelect.value = '';
             }
+        }
+
+        /**
+         * Route decides whether Type even applies — Domestic reveals
+         * Service Type immediately, International reveals Type first
+         * and hides Service Type until one is actively chosen (no
+         * default pre-selected server-side either, see the top of
+         * this form).
+         */
+        function onRouteTypeChange() {
+            const isInternational = document.querySelector('input[name="route_type"]:checked')?.value === 'international';
+
+            tradeDirectionSelector.style.display = isInternational ? '' : 'none';
+
+            if (isInternational) {
+                document.querySelectorAll('input[name="trade_direction"]').forEach(function (radio) {
+                    radio.checked = false;
+                });
+                serviceTypeSelector.style.display = 'none';
+                serviceTypeSelect.value = '';
+            } else {
+                serviceTypeSelector.style.display = '';
+            }
+
+            syncFieldsForServiceType();
+        }
+
+        function onTradeDirectionChoiceChange() {
+            serviceTypeSelector.style.display = '';
+            filterServiceTypes();
         }
 
         /**
@@ -317,9 +427,7 @@
          * two sub-views below do too). Disabled fields are excluded
          * from submission entirely, which is what actually prevents a
          * stale value from a hidden section overwriting the visible
-         * one's. There's no separate Route Type control — the service
-         * type chosen IS the route type, since every service type is
-         * already restricted to exactly one.
+         * one's.
          */
         function syncFieldsForServiceType() {
             const selected = serviceTypeSelect.selectedOptions[0];

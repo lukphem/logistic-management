@@ -4218,3 +4218,53 @@ resources/views/rate-checker/index.blade.php   (Dimensions fields, full weight c
 ```powershell
 php artisan migrate
 ```
+
+## Increment 82 — Rate Checker: Sequential Route → Type → Service Type, Live Volumetric Preview
+
+Two additions.
+
+### Sequential selection flow
+
+Reworked from Increment 80's "Service Type alone determines
+everything" back to an explicit, sequential flow per direction:
+
+1. **Route** (Domestic / International) — always shown first
+2. **Type** (Export / Import / Cross-Trade) — only for International,
+   revealed once Route is picked, **no default pre-selected** — an
+   active choice is required before the next step appears
+3. **Service Type** — for Domestic, appears immediately after Route;
+   for International, stays hidden until Type is actively chosen.
+   Options are filtered to match all three choices made above
+
+`filterServiceTypes()` now filters by Billing Model, Route, and (for
+International) Type together — a service type not matching all three
+wouldn't be bookable under that combination anyway. `onRouteTypeChange()`
+and `onTradeDirectionChoiceChange()` handle revealing/hiding each
+subsequent step.
+
+**A real bug caught while building this**: a JS doc-comment referenced
+"the `@php` block above" in plain English — Blade's compiler doesn't
+know it's inside a JavaScript comment and would have tried to parse
+that literal text as an actual directive, breaking compilation.
+Caught by an `@php`/`@endphp` count mismatch (5 vs 4) during the
+routine balance check, not by chance — reworded to avoid the literal
+token entirely.
+
+### Live volumetric weight preview
+
+Company Settings' `volumetric_divisor` (Increment 81) is now passed to
+the Rate Checker and used by a small client-side script — typing
+Length/Width/Height shows "Volumetric weight: X kg" live, right next
+to the Dimensions fields, using the exact same formula and divisor
+`PricingEngine` uses server-side. Preview only, to save a round trip
+before checking the actual rate — the real number still comes from
+the server on submit.
+
+### Files
+
+```
+app/Http/Controllers/Web/RateCheckerController.php   (volumetricDivisor passed to the view)
+resources/views/rate-checker/index.blade.php   (sequential Route/Type/Service Type flow, live volumetric preview, Blade-directive-in-comment bug fixed)
+```
+
+No migration needed — builds entirely on Increment 81's schema.

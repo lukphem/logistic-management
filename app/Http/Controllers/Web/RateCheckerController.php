@@ -104,6 +104,7 @@ class RateCheckerController extends Controller
             'cities' => City::with('state')->orderBy('name')->get(),
             'districts' => District::with('city')->orderBy('name')->get(),
             'countries' => Country::where('code', '!=', 'NG')->orderBy('name')->get(),
+            'volumetricDivisor' => Setting::current()->volumetric_divisor,
             'additionalServices' => AdditionalService::where('is_active', true)
                 ->with(['options' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
                 ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),
