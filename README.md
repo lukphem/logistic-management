@@ -4268,3 +4268,73 @@ resources/views/rate-checker/index.blade.php   (sequential Route/Type/Service Ty
 ```
 
 No migration needed — builds entirely on Increment 81's schema.
+
+## Increment 83 — Packaging & Acknowledgement Become Protected Built-in Services
+
+Restructures Additional Services into two protected, always-present
+services with their own admin UI, alongside the existing free-form
+"custom" mechanism for anything else.
+
+### `AdditionalService.kind`: custom / packaging / acknowledgement
+
+Seeded once by the migration — matched by name first, so a business
+that already had a "Packaging" or "Acknowledgement" service gets it
+upgraded to protected status (options preserved untouched) rather than
+duplicated. Protected services (`isProtected()`) can't be renamed or
+deleted from the UI — every business using this system has both.
+
+- **Packaging** keeps the existing multi-option builder exactly as
+  built (Increments 60/71/72/78) — name/charge-type/amount per option,
+  Small/Medium/Large Box or whatever variants a business needs — just
+  with the service's own name locked.
+- **Acknowledgement** gets a dedicated, single-purpose form instead of
+  the generic multi-option builder: **Active** toggle, **Service Type**
+  for the return document, **Document weight**, **Percentage** of the
+  reverse shipment's rate, and **Taxable** toggle. Internally still one
+  `AdditionalServiceOption` with `charge_type =
+  percentage_of_reverse_shipment` (Increment 72) — the dedicated form
+  is a simpler front end onto the same mechanism, not a new one.
+
+  Worth flagging: the dedicated form still requires **Document weight**
+  even though it wasn't explicitly listed in the request — without it,
+  the reverse-shipment calculation silently prices to 0 (Increment
+  72's `resolveReverseShipmentAmount()` returns 0 without a weight).
+  Kept it since dropping it would quietly break the calculation; easy
+  to remove if a fixed default is actually preferred instead.
+
+### `AdditionalServiceOption.is_vatable`
+
+New boolean, default `true` — preserves current behavior for
+everything existing. Exposed on **every** option, not just
+Acknowledgement's dedicated form — Packaging and custom services can
+mark individual options non-vatable too, via a checkbox on each row in
+the existing generic form.
+
+`ShipmentPricingService::calculateAdditionalServices()` now returns a
+`{vatable, non_vatable}` breakdown instead of one combined sum, and
+`priceShipment()` only includes the vatable portion in the VAT base —
+the non-vatable portion still gets charged in full, just never taxed.
+
+### Files
+
+```
+database/migrations/2026_02_14_000001_add_kind_to_additional_services_table.php
+database/migrations/2026_02_14_000002_add_is_vatable_to_additional_service_options_table.php
+app/Models/AdditionalService.php   (kind, KINDS, isProtected())
+app/Models/AdditionalServiceOption.php   (is_vatable)
+app/Http/Controllers/Web/AdditionalServiceController.php   (routes acknowledgement to its own view/update path, protects name/deletion, is_vatable in generic create/update)
+app/Services/ShipmentPricingService.php   (vatable/non-vatable split, VAT applied only to the vatable portion)
+resources/views/additional-services/acknowledgement-form.blade.php   (new — dedicated single-purpose form)
+resources/views/additional-services/form.blade.php   (name locked for protected services, Taxable checkbox per option)
+resources/views/additional-services/index.blade.php   (Built-in badge, Remove hidden for protected services)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+After migrating, set up Acknowledgement under Setups → Billing →
+Additional Services — it'll show up already, just needs its Service
+Type, weight, and percentage configured before it's active.

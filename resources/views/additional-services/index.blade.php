@@ -32,7 +32,12 @@
             <tbody>
                 @forelse ($additionalServices as $service)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
-                        <td class="px-5 py-3 font-medium text-ink-900">{{ $service->name }}</td>
+                        <td class="px-5 py-3 font-medium text-ink-900">
+                            {{ $service->name }}
+                            @if ($service->isProtected())
+                                <span class="ml-2 inline-flex items-center rounded-full bg-ink-500/10 px-2 py-0.5 text-xs font-medium text-ink-500">Built-in</span>
+                            @endif
+                        </td>
                         <td class="px-5 py-3 text-ink-500">{{ $service->options_count }}</td>
                         <td class="px-5 py-3">
                             @if ($service->is_active)
@@ -42,11 +47,13 @@
                             @endif
                         </td>
                         <td class="px-5 py-3 text-right">
-                            <a href="{{ route('additional-services.edit', $service) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('additional-services.destroy', $service) }}" class="inline" onsubmit="return confirm('Remove this service and all its options?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
-                            </form>
+                            <a href="{{ route('additional-services.edit', $service) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">{{ $service->kind === 'acknowledgement' ? 'Configure' : 'Edit' }}</a>
+                            @unless ($service->isProtected())
+                                <form method="POST" action="{{ route('additional-services.destroy', $service) }}" class="inline" onsubmit="return confirm('Remove this service and all its options?')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
+                                </form>
+                            @endunless
                         </td>
                     </tr>
                 @empty

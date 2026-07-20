@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdditionalServiceOption extends Model
 {
-    protected $fillable = ['additional_service_id', 'name', 'charge_type', 'reverse_service_type_id', 'reverse_weight_kg', 'price', 'is_active'];
+    protected $fillable = ['additional_service_id', 'name', 'charge_type', 'reverse_service_type_id', 'reverse_weight_kg', 'price', 'is_vatable', 'is_active'];
 
     protected $casts = [
         'price' => 'float',
         'reverse_weight_kg' => 'float',
+        'is_vatable' => 'boolean',
         'is_active' => 'boolean',
     ];
 

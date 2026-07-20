@@ -59,6 +59,7 @@ class AdditionalServiceController extends Controller
                 'reverse_service_type_id' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
                 'reverse_weight_kg' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                 'price' => $option['price'],
+                'is_vatable' => array_key_exists('is_vatable', $option) ? (bool) $option['is_vatable'] : true,
                 'is_active' => true,
             ]);
             $saved++;
@@ -69,6 +70,14 @@ class AdditionalServiceController extends Controller
 
     public function edit(AdditionalService $additionalService): View
     {
+        if ($additionalService->kind === 'acknowledgement') {
+            return view('additional-services.acknowledgement-form', [
+                'additionalService' => $additionalService,
+                'option' => $additionalService->options()->first(),
+                'serviceTypes' => \App\Models\ServiceType::where('is_active', true)->orderBy('name')->get(),
+            ]);
+        }
+
         return view('additional-services.form', [
             'additionalService' => $additionalService,
             'options' => $additionalService->options()->orderBy('name')->get(),
@@ -83,13 +92,22 @@ class AdditionalServiceController extends Controller
      * filled creates a new one; an option removed client-side (via the
      * Remove button) never reaches the request at all and is deleted
      * here too, since it's no longer represented in the submission.
+     *
+     * Packaging and Acknowledgement (isProtected()) can't have their
+     * name changed here — Acknowledgement doesn't even reach this
+     * method (see updateAcknowledgement() below), and Packaging keeps
+     * this generic options builder, just with its name locked.
      */
     public function update(Request $request, AdditionalService $additionalService): RedirectResponse
     {
+        if ($additionalService->kind === 'acknowledgement') {
+            return $this->updateAcknowledgement($request, $additionalService);
+        }
+
         $data = $this->validated($request, $additionalService);
 
         $additionalService->update([
-            'name' => $data['name'],
+            'name' => $additionalService->isProtected() ? $additionalService->name : $data['name'],
             'is_active' => $request->boolean('is_active', true),
         ]);
 
@@ -113,6 +131,7 @@ class AdditionalServiceController extends Controller
                     'reverse_service_type_id' => ($option['charge_type'] ?? 'flat') === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
                     'reverse_weight_kg' => ($option['charge_type'] ?? 'flat') === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                     'price' => $option['price'],
+                    'is_vatable' => array_key_exists('is_vatable', $option) ? (bool) $option['is_vatable'] : true,
                 ]);
                 $saved++;
                 continue;
@@ -128,6 +147,7 @@ class AdditionalServiceController extends Controller
                     'reverse_service_type_id' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_service_type_id'] ?? null) : null,
                     'reverse_weight_kg' => $chargeType === 'percentage_of_reverse_shipment' ? ($option['reverse_weight_kg'] ?? null) : null,
                     'price' => $option['price'],
+                    'is_vatable' => array_key_exists('is_vatable', $option) ? (bool) $option['is_vatable'] : true,
                     'is_active' => true,
                 ]);
                 $submittedIds[] = $new->id;
@@ -142,9 +162,53 @@ class AdditionalServiceController extends Controller
 
     public function destroy(AdditionalService $additionalService): RedirectResponse
     {
+        if ($additionalService->isProtected()) {
+            return back()->withErrors(['additionalService' => "{$additionalService->name} is a built-in service and can't be removed — deactivate it instead if it shouldn't be offered right now."]);
+        }
+
         $additionalService->delete();
 
         return redirect()->route('additional-services.index')->with('status', 'Service removed.');
+    }
+
+    /**
+     * Acknowledgement is always exactly one configuration — Active,
+     * which Service Type prices the return document, what percentage
+     * of that reverse rate to charge, and whether the charge is
+     * taxable — not a multi-option builder the way Packaging or a
+     * custom service is. Internally still just one
+     * AdditionalServiceOption with charge_type =
+     * percentage_of_reverse_shipment, created on first save and updated
+     * from then on.
+     */
+    private function updateAcknowledgement(Request $request, AdditionalService $additionalService): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'is_active' => 'sometimes|boolean',
+            'reverse_service_type_id' => 'required|exists:service_types,id',
+            'reverse_weight_kg' => 'required|numeric|min:0.01',
+            'price' => 'required|numeric|min:0',
+            'is_vatable' => 'sometimes|boolean',
+        ]);
+
+        $data = $validator->validate();
+
+        $additionalService->update(['is_active' => $request->boolean('is_active', false)]);
+
+        AdditionalServiceOption::updateOrCreate(
+            ['additional_service_id' => $additionalService->id],
+            [
+                'name' => 'Standard',
+                'charge_type' => 'percentage_of_reverse_shipment',
+                'reverse_service_type_id' => $data['reverse_service_type_id'],
+                'reverse_weight_kg' => $data['reverse_weight_kg'],
+                'price' => $data['price'],
+                'is_vatable' => $request->boolean('is_vatable', true),
+                'is_active' => true,
+            ]
+        );
+
+        return redirect()->route('additional-services.edit', $additionalService)->with('status', 'Acknowledgement settings saved.');
     }
 
     private function validated(Request $request, ?AdditionalService $ignoring = null): array
@@ -158,6 +222,7 @@ class AdditionalServiceController extends Controller
             'options.*.reverse_service_type_id' => 'nullable|exists:service_types,id',
             'options.*.reverse_weight_kg' => 'nullable|numeric|min:0.01',
             'options.*.price' => 'nullable|numeric|min:0',
+            'options.*.is_vatable' => 'nullable|boolean',
         ]);
 
         return $validator->validate();

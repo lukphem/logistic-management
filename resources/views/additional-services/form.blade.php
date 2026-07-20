@@ -22,16 +22,21 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Service name <x-required /></label>
-            <input type="text" name="name" list="service-name-suggestions" value="{{ old('name', $additionalService->name) }}" placeholder="e.g. Packaging"
-                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-            <datalist id="service-name-suggestions">
-                <option value="Packaging">
-                <option value="Acknowledgement">
-                <option value="Fragile Handling">
-                <option value="Gift Wrapping">
-                <option value="Signature on Delivery">
-            </datalist>
-            <p class="mt-1 text-xs text-ink-500">Common names are suggested as you type — feel free to enter your own.</p>
+            @if ($additionalService->isProtected())
+                <input type="text" value="{{ $additionalService->name }}" disabled
+                       class="w-full rounded-md border border-line bg-surface-50 px-3 py-2 text-sm text-ink-500">
+                <input type="hidden" name="name" value="{{ $additionalService->name }}">
+                <p class="mt-1 text-xs text-ink-500">{{ $additionalService->name }} is a built-in service — its name can't be changed, but its options below can be configured freely.</p>
+            @else
+                <input type="text" name="name" list="service-name-suggestions" value="{{ old('name', $additionalService->name) }}" placeholder="e.g. Fragile Handling"
+                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <datalist id="service-name-suggestions">
+                    <option value="Fragile Handling">
+                    <option value="Gift Wrapping">
+                    <option value="Signature on Delivery">
+                </datalist>
+                <p class="mt-1 text-xs text-ink-500">Common names are suggested as you type — feel free to enter your own.</p>
+            @endif
         </div>
 
         <div>
@@ -57,11 +62,12 @@
                         'reverse_service_type_id' => $option->reverse_service_type_id,
                         'reverse_weight_kg' => $option->reverse_weight_kg,
                         'price' => $option->price,
+                        'is_vatable' => $option->is_vatable,
                     ]])->all();
                 }
 
                 if (empty($rowsToShow)) {
-                    $rowsToShow = [0 => ['id' => null, 'name' => '', 'charge_type' => 'flat', 'reverse_service_type_id' => '', 'reverse_weight_kg' => '', 'price' => '']];
+                    $rowsToShow = [0 => ['id' => null, 'name' => '', 'charge_type' => 'flat', 'reverse_service_type_id' => '', 'reverse_weight_kg' => '', 'price' => '', 'is_vatable' => true]];
                 }
             @endphp
 
@@ -113,6 +119,11 @@
                         <p class="reverse-fields-note mt-1 text-xs text-ink-500" style="{{ $isReverse ? '' : 'display:none' }}">
                             Prices this as its own small shipment on the same route, using this service type and weight, then charges the percentage above of THAT rate — not a cut of the outbound freight.
                         </p>
+
+                        <label class="mt-2 flex items-center gap-2 text-xs text-ink-900">
+                            <input type="checkbox" name="options[{{ $i }}][is_vatable]" value="1" @checked($row['is_vatable'] ?? true) class="rounded border-line">
+                            Taxable (included in VAT)
+                        </label>
                     </div>
                 @endforeach
             </div>
@@ -187,6 +198,10 @@
                 row.querySelectorAll('select').forEach(function (select) {
                     select.name = select.name.replace(/options\[\d+\]/, `options[${index}]`);
                     select.selectedIndex = 0;
+                });
+                row.querySelectorAll('input[type="checkbox"]').forEach(function (checkbox) {
+                    checkbox.name = checkbox.name.replace(/options\[\d+\]/, `options[${index}]`);
+                    checkbox.checked = true;
                 });
                 row.querySelector('.price-label').textContent = 'Price';
                 row.querySelector('.reverse-fields').style.display = 'none';

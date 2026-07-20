@@ -42,13 +42,18 @@ class ShipmentPricingService
         $discountedFreight = ($baseAmount + $surchargeAmount) - $discountAmount;
         $insuranceAmount = $this->calculateInsurance($context);
         $onforwardingAmount = $this->calculateOnforwarding($context);
-        $additionalServicesAmount = $this->calculateAdditionalServices($context, $baseAmount);
+        $additionalServices = $this->calculateAdditionalServices($context, $baseAmount);
+        $additionalServicesAmount = round($additionalServices['vatable'] + $additionalServices['non_vatable'], 2);
 
         $vatPercentage = (float) ($context['vat_percentage'] ?? config('branding.vat_percentage', 0));
-        $taxableAmount = $discountedFreight + $insuranceAmount + $onforwardingAmount + $additionalServicesAmount;
-        $vatAmount = round($taxableAmount * ($vatPercentage / 100), 2);
+        // Only the vatable portion of additional services enters the VAT
+        // base — a non-vatable option (Setups → Billing → Additional
+        // Services, per-option) still gets charged in full below, just
+        // never taxed.
+        $vatableSubtotal = $discountedFreight + $insuranceAmount + $onforwardingAmount + $additionalServices['vatable'];
+        $vatAmount = round($vatableSubtotal * ($vatPercentage / 100), 2);
 
-        $total = round($taxableAmount + $vatAmount, 2);
+        $total = round($vatableSubtotal + $additionalServices['non_vatable'] + $vatAmount, 2);
 
         return [
             'base_amount' => round($baseAmount, 2),
@@ -87,21 +92,39 @@ class ShipmentPricingService
      * that option's own configured service type and weight. Same
      * treatment as insurance and onforwarding either way: a real extra
      * service, not part of the negotiated freight rate, so never
-     * discounted but still taxable.
+     * discounted — but whether it's taxable now varies per option
+     * (is_vatable), so this returns the two totals split apart rather
+     * than one combined sum, letting the caller apply VAT only to the
+     * vatable portion.
+     *
+     * @return array{vatable: float, non_vatable: float}
      */
-    private function calculateAdditionalServices(array $context, float $baseAmount): float
+    private function calculateAdditionalServices(array $context, float $baseAmount): array
     {
         $ids = $context['additional_service_option_ids'] ?? [];
 
         if (empty($ids)) {
-            return 0.0;
+            return ['vatable' => 0.0, 'non_vatable' => 0.0];
         }
 
-        return \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)
-            ->get()
-            ->sum(fn ($option) => $option->charge_type === 'percentage_of_reverse_shipment'
+        $options = \App\Models\AdditionalServiceOption::whereIn('id', $ids)->where('is_active', true)->get();
+
+        $vatable = 0.0;
+        $nonVatable = 0.0;
+
+        foreach ($options as $option) {
+            $amount = $option->charge_type === 'percentage_of_reverse_shipment'
                 ? $option->resolveReverseShipmentAmount($this->pricingEngine, $context)
-                : $option->resolveAmount($baseAmount));
+                : $option->resolveAmount($baseAmount);
+
+            if ($option->is_vatable) {
+                $vatable += $amount;
+            } else {
+                $nonVatable += $amount;
+            }
+        }
+
+        return ['vatable' => $vatable, 'non_vatable' => $nonVatable];
     }
 
     private function calculateInsurance(array $context): float
