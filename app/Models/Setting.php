@@ -10,6 +10,7 @@ class Setting extends Model
         'company_name', 'logo_path',
         'color_primary', 'color_secondary', 'login_design',
         'vat_percentage', 'volumetric_divisor', 'quote_validity_days', 'currency',
+        'tracking_number_format', 'next_tracking_sequence',
         'waybill_thermal_size', 'waybill_show_qr',
         'operating_regions', 'invoice_header', 'invoice_footer',
         'supported_billing_models',
@@ -21,6 +22,7 @@ class Setting extends Model
         'vat_percentage' => 'float',
         'volumetric_divisor' => 'integer',
         'quote_validity_days' => 'integer',
+        'next_tracking_sequence' => 'integer',
         'supported_billing_models' => 'array',
     ];
 
@@ -77,5 +79,37 @@ class Setting extends Model
         // silently 404s. A root-relative path resolves against whatever
         // host/port the page is actually being viewed on, always.
         return $this->logo_path ? '/storage/' . ltrim($this->logo_path, '/') : null;
+    }
+
+    /**
+     * Tokens available in Tracking Number Format, shown in Company
+     * Settings as a reference — kept next to BILLING_MODELS/
+     * LOGIN_DESIGNS as the canonical list so the settings view never
+     * has to duplicate it.
+     */
+    public const TRACKING_NUMBER_TOKENS = [
+        '{service_code}' => "The shipment's service type code",
+        '{origin_hub}' => 'Origin hub code (blank if unresolved)',
+        '{destination_hub}' => 'Destination hub code (blank if unresolved)',
+        '{date:FORMAT}' => 'Today\'s date — FORMAT is PHP date() syntax, e.g. {date:ymd} or {date:Y-m-d}',
+        '{seq:N}' => 'A running counter, zero-padded to N digits, e.g. {seq:5} -> 00042 — never reset, never repeats',
+        '{random:N}' => 'N random uppercase letters/digits',
+    ];
+
+    /**
+     * Atomically claims and returns the next sequence number for
+     * {seq:N} — locks the settings row for the duration of the
+     * transaction so two shipments booked at the same instant still get
+     * different numbers, then increments for the next caller.
+     */
+    public function claimNextTrackingSequence(): int
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () {
+            $locked = static::where('id', $this->id)->lockForUpdate()->first();
+            $current = $locked->next_tracking_sequence;
+            $locked->update(['next_tracking_sequence' => $current + 1]);
+
+            return $current;
+        });
     }
 }

@@ -31,6 +31,7 @@ class SettingsController extends Controller
             'vat_percentage' => 'required|numeric|min:0|max:100',
             'volumetric_divisor' => 'required|integer|min:1',
             'quote_validity_days' => 'required|integer|min:1|max:365',
+            'tracking_number_format' => 'nullable|string|max:255',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
             'waybill_show_qr' => 'sometimes|boolean',

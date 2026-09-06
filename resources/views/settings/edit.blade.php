@@ -141,6 +141,20 @@
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     <p class="mt-1 text-xs text-ink-500">How long a generated Quote ID stays usable before it expires and is cleared out.</p>
                 </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Tracking number format <span class="text-xs font-normal text-ink-500">(optional — leave blank for the default)</span></label>
+                    <input type="text" name="tracking_number_format" value="{{ old('tracking_number_format', $settings->tracking_number_format) }}"
+                           placeholder="{service_code}-{origin_hub}{destination_hub}-{date:ymd}-{seq:5}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <div class="mt-2 rounded-md bg-surface-50 p-3 text-xs text-ink-500">
+                        <p class="mb-1.5 font-medium text-ink-900">Available tokens — arrange in any order, combine freely:</p>
+                        <ul class="space-y-0.5">
+                            @foreach (\App\Models\Setting::TRACKING_NUMBER_TOKENS as $token => $description)
+                                <li><code class="rounded bg-surface-0 px-1 py-0.5 font-mono text-ink-900">{{ $token }}</code> — {{ $description }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Currency (ISO code) <x-required /></label>
                     <input type="text" name="currency" maxlength="3" value="{{ old('currency', $settings->currency) }}"

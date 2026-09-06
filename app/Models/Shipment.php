@@ -54,14 +54,24 @@ class Shipment extends Model
             if (! $shipment->tracking_number) {
                 $originHub = $shipment->origin_hub_id ? Hub::find($shipment->origin_hub_id) : null;
                 $destinationHub = $shipment->destination_hub_id ? Hub::find($shipment->destination_hub_id) : null;
+                $serviceType = $shipment->service_type_id ? ServiceType::find($shipment->service_type_id) : null;
 
-                $shipment->tracking_number = static::composeTrackingNumber($originHub, $destinationHub);
+                $shipment->tracking_number = static::composeTrackingNumber($originHub, $destinationHub, $serviceType);
             }
         });
     }
 
-    private static function composeTrackingNumber(?Hub $originHub, ?Hub $destinationHub): string
+    private static function composeTrackingNumber(?Hub $originHub, ?Hub $destinationHub, ?ServiceType $serviceType = null): string
     {
+        $format = Setting::current()->tracking_number_format;
+
+        if ($format) {
+            return static::renderTrackingNumberFormat($format, $originHub, $destinationHub, $serviceType);
+        }
+
+        // No custom format configured — original, hardcoded behavior,
+        // unchanged, so an existing deployment's numbering never shifts
+        // just from the format column existing.
         $originCode = $originHub ? preg_replace('/[^A-Z0-9]/', '', strtoupper($originHub->code)) : null;
         $destinationCode = $destinationHub ? preg_replace('/[^A-Z0-9]/', '', strtoupper($destinationHub->code)) : null;
 
@@ -72,6 +82,43 @@ class Shipment extends Model
         };
 
         return $prefix . now()->format('ymd') . strtoupper(Str::random(6));
+    }
+
+    /**
+     * Parses {token} / {token:param} placeholders left to right — see
+     * Setting::TRACKING_NUMBER_TOKENS for the full list and what each
+     * one renders. A hub/service-type token with nothing to resolve
+     * renders as an empty string rather than failing the whole
+     * shipment just for an unusual route; leftover doubled/leading/
+     * trailing separators from that are cleaned up afterward so a
+     * missing token doesn't leave "--" or a dangling "-" in the result.
+     */
+    private static function renderTrackingNumberFormat(string $format, ?Hub $originHub, ?Hub $destinationHub, ?ServiceType $serviceType): string
+    {
+        $originCode = $originHub ? preg_replace('/[^A-Z0-9]/', '', strtoupper($originHub->code)) : '';
+        $destinationCode = $destinationHub ? preg_replace('/[^A-Z0-9]/', '', strtoupper($destinationHub->code)) : '';
+        $serviceCode = $serviceType ? preg_replace('/[^A-Z0-9]/', '', strtoupper($serviceType->code)) : '';
+
+        $result = preg_replace_callback('/\{([a-z_]+)(?::([^}]+))?\}/i', function ($m) use ($originCode, $destinationCode, $serviceCode) {
+            $token = strtolower($m[1]);
+            $param = $m[2] ?? null;
+
+            return match ($token) {
+                'service_code' => $serviceCode,
+                'origin_hub' => $originCode,
+                'destination_hub' => $destinationCode,
+                'date' => now()->format($param ?: 'ymd'),
+                'seq' => str_pad((string) Setting::current()->claimNextTrackingSequence(), (int) ($param ?: 5), '0', STR_PAD_LEFT),
+                'random' => strtoupper(Str::random((int) ($param ?: 6))),
+                default => $m[0],
+            };
+        }, $format);
+
+        // Collapse any run of separators (from an unresolved token
+        // leaving nothing behind) and trim a leading/trailing one.
+        $result = preg_replace('/([-_])\1+/', '$1', $result);
+
+        return trim($result, '-_');
     }
 
     /**
