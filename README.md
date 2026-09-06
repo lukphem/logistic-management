@@ -4544,3 +4544,65 @@ resources/views/origin-destination-billing/form.blade.php, index.blade.php
 ```powershell
 php artisan migrate
 ```
+
+## Increment 88 — Migrations Consolidated Into One Clean Schema
+
+Replaces all 95 incremental migration files with a single schema dump
+representing the true, verified final state — no more replaying every
+historical increment on a fresh install.
+
+### How this was actually verified, not hand-traced
+
+Rather than manually tracing every column addition/rename/drop across
+95 files by eye (real risk of a silent miss with this many increments,
+several of which fully dropped-and-rebuilt tables rather than just
+adding columns), this was done by actually **running the entire
+migration history against a real, fresh MySQL database** and letting
+Laravel's own `schema:dump` command capture the genuine result:
+
+1. A real MySQL-compatible database was stood up
+2. Every one of the 95 migrations was replayed against it, in order,
+   from scratch
+3. A real, previously-undiscovered bug surfaced partway through:
+   [`2026_01_23_000002_convert_zone_weight_rates_to_single_zone`](#)
+   tried to drop a composite unique index while a foreign key
+   (`rate_card_id`'s) still depended on it as its supporting index —
+   MySQL enforces this strictly, SQLite (evidently used for earlier
+   testing) does not. Fixed by reordering the operations: create the
+   new index *before* dropping the old one, so a supporting index
+   always exists for that foreign key, then drop the retired columns
+   only once they're no longer part of any index. This table was fully
+   dropped several increments later anyway (Increment ~41's billing
+   rebuild), so the bug never affected the final schema — but it would
+   have blocked a genuinely fresh `migrate` on MySQL for anyone.
+4. Once all 95 replayed cleanly, `php artisan schema:dump` captured
+   the actual resulting structure into `database/schema/mysql-schema.sql`
+5. **Verified, not assumed**: dropped the database, deleted every
+   migration file, and ran `php artisan migrate` against nothing but
+   the schema dump — confirmed it loads in under a second and
+   correctly reports "Nothing to migrate," with every table matching
+   the latest code exactly (spot-checked `origin_destination_tariffs`,
+   `standard_billing_tariffs.max_weight_limit`,
+   `additional_service_options.is_vatable`/`charge_type`, and others
+   directly)
+
+### What changed
+
+- **95 migration files deleted** — `database/migrations/` is now
+  empty (a `.gitkeep` keeps the folder itself tracked)
+- **`database/schema/mysql-schema.sql` added** — one `CREATE TABLE`
+  per table (50 tables) plus the `migrations` table's bookkeeping rows,
+  so Laravel knows every historical migration is already "applied"
+  the moment this loads
+- Your live database and its actual data are completely untouched —
+  this only changes which files exist in the codebase
+
+### What this means going forward
+
+A fresh `php artisan migrate` on a new install now loads this one SQL
+file directly instead of replaying 95 migrations — fast, and with zero
+risk of hitting a MySQL-vs-SQLite ordering quirk like the one found
+above. **Any new schema change from here forward goes into a new
+migration file placed in `database/migrations/`**, same as always —
+Laravel applies the schema dump first, then any migrations newer than
+it, so nothing about future work changes.
