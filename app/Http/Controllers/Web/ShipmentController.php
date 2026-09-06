@@ -79,6 +79,7 @@ class ShipmentController extends Controller
     public function create(): View
     {
         return view('shipments.create', [
+            'billingModels' => Setting::BILLING_MODELS,
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
             'states' => State::with('country')->orderBy('name')->get(),
             'cities' => City::with('state')->orderBy('name')->get(),
