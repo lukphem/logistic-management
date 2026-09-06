@@ -346,10 +346,14 @@
         const billingModelSelect = document.getElementById('billing-model');
         const modelFields = document.getElementById('model-fields');
         const modelNotImplemented = document.getElementById('model-not-implemented');
-        // Only 'standard_billing' has a real form right now — every other
-        // billing model shows the "not built yet" message instead, since
-        // the fields a future model needs could be completely different.
-        const implementedModels = ['standard_billing'];
+        // Every billing model that actually has a real form on this page
+        // — both use the same Route/Type/Service Type/Weight fields
+        // below, since Origin to Destination's own fields (origin/
+        // destination state+city) are exactly the Domestic section's
+        // existing fields, not a separate form. A genuinely different
+        // future billing model would need its own entry here AND its
+        // own fields further down, not just adding its key to this list.
+        const implementedModels = ['standard_billing', 'origin_destination_billing'];
 
         function syncModelSection() {
             const chosen = billingModelSelect.value;

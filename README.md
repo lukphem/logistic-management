@@ -4606,3 +4606,26 @@ above. **Any new schema change from here forward goes into a new
 migration file placed in `database/migrations/`**, same as always —
 Laravel applies the schema dump first, then any migrations newer than
 it, so nothing about future work changes.
+
+## Increment 89 — Bug Fix: Rate Checker Showed "Not Built Yet" for Origin to Destination
+
+Real bug: a hardcoded `implementedModels = ['standard_billing']` list
+in the Rate Checker's JS was never updated when Origin to Destination
+was actually built (Increment 86) — every selection of that billing
+model showed the "hasn't been built yet" placeholder instead of the
+real form, even though `PricingEngine` has fully supported it since
+Increment 86.
+
+Fixed by adding it to the list. Both billing models correctly share
+the same Route/Type/Service Type/Weight fields below — Origin to
+Destination's needs (origin/destination state+city) are exactly the
+existing Domestic section's fields, not a separate form, which is why
+this was just a one-line stale check rather than a missing feature.
+
+### Files
+
+```
+resources/views/rate-checker/index.blade.php   (implementedModels now includes origin_destination_billing)
+```
+
+No migration needed.
