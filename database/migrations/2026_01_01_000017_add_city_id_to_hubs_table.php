@@ -8,15 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            $table->unsignedInteger('quote_validity_days')->default(7)->after('volumetric_divisor');
+        Schema::table('hubs', function (Blueprint $table) {
+            $table->foreignId('city_id')->nullable()->constrained()->nullOnDelete();
         });
     }
 
     public function down(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            $table->dropColumn('quote_validity_days');
+        Schema::table('hubs', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('city_id');
         });
     }
 };

@@ -6,17 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Truck, Trailer, Container, etc. — Fleet Billing's lane rates are
-     * priced per vehicle type, same reference-entity shape as Zone or
-     * ServiceType.
-     */
     public function up(): void
     {
         Schema::create('vehicle_types', function (Blueprint $table) {
             $table->id();
             $table->string('name');
             $table->string('code')->unique();
+            $table->decimal('max_weight_capacity', 10, 2)->nullable();
+            $table->decimal('max_length_cm', 10, 2)->nullable();
+            $table->decimal('max_width_cm', 10, 2)->nullable();
+            $table->decimal('max_height_cm', 10, 2)->nullable();
+            $table->boolean('is_open_body')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
         });

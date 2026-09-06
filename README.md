@@ -5227,3 +5227,68 @@ resources/views/rate-checker/index.blade.php       (+ Generate Quote ID)
 resources/views/settings/edit.blade.php            (+ Quote validity field)
 routes/web.php, routes/console.php
 ```
+
+## Increment 98 — Migrations Back to One-Per-Table (Correcting My Own Mistake)
+
+The uploaded patch series' Increment 88 replaced all migrations with a
+single `database/schema/mysql-schema.sql` dump (Laravel's "consolidated
+schema" feature). I deferred to it over my own earlier one-file-per-
+table squash without checking that doing so undid something explicitly
+asked for: individual, hand-editable migration files. A single SQL
+dump isn't that — it's harder to amend by hand and doesn't update
+Laravel's migration history the way editing a real migration file
+does.
+
+### What changed
+
+`database/schema/mysql-schema.sql` removed; **45 migration files**
+restored — 3 stock Laravel (users/cache/jobs, untouched), the
+spatie/laravel-permission package migration (also untouched, recovered
+verbatim from before the schema-dump squash), and **41 one-file-per-
+table migrations**, dependency-ordered so a fresh `migrate` runs
+cleanly top to bottom.
+
+### How this was derived (more reliably than before)
+
+Not hand-traced this time. The full, real final schema — dump +
+all 6 post-dump migration files (Origin to Destination's country
+support, Vehicle Types, Fleet Billing Tariffs, the capacity/formula
+change, Quotes, Quote validity) — was loaded into an actual MySQL 8.0
+database. Every table's columns, types, nullability, defaults, and
+foreign keys (including delete rules) were read directly from
+`information_schema` and used to generate each migration file — not
+inferred from reading PHP.
+
+One real bug caught and fixed in the process: an earlier verification
+step of mine had accidentally dropped `fleet_billing_tariffs`'
+`service_type_id` foreign key (guessed the wrong auto-generated
+constraint name to remove). Caught because it was simply absent from
+`information_schema` when cross-checking dependencies — restored
+before generating anything from that database.
+
+Same `hubs`/`cities`/`routes` three-way circular dependency as
+Increment 85 — same fix: `hubs` created without `city_id`, `routes`
+and `cities` follow, then a small deferred
+`add_city_id_to_hubs_table.php` adds it back.
+
+### Verified
+
+Fully round-tripped: generated migrations → translated to raw DDL →
+executed against a **fresh** MySQL 8.0 database (83 statements, 0
+errors) → the resulting schema **diffed column-by-column against the
+authoritative database** (the one built from the real dump + all
+post-dump migrations). Every table and column matches exactly. The
+only differences found were in my own quick verification script (it
+doesn't translate `->primary()`, `->index()`, or `->useCurrent()` —
+confirmed by reading the actual generated PHP, which is correct) and
+two harmless column-ordering differences (`hubs.city_id`, `users`'
+profile fields land at the end of the table rather than their
+original interspersed positions — same as Increment 85, functionally
+irrelevant to Eloquent).
+
+### Files
+
+```
+database/migrations/   (45 files, replaces the single schema dump)
+database/schema/       (removed)
+```
