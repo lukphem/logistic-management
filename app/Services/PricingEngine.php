@@ -21,8 +21,11 @@ class PricingEngine
      * returns:
      *   base_amount          float
      *   transit_days         ?int
-     *   shipping_type        'domestic'|'international'
-     *   zone_id              int
+     *   shipping_type        'domestic'|'international'|'third_party'
+     *   zone_id              ?int — null for a billing model that
+     *                        doesn't resolve through a zone at all
+     *                        (Origin to Destination prices a route
+     *                        directly)
      *   chargeable_weight_kg ?float — the greater of actual weight
      *                        and volumetric weight (L×W×H ÷ the
      *                        configured divisor), before rounding
@@ -54,6 +57,7 @@ class PricingEngine
 
         return match ($serviceType->billing_model) {
             'standard_billing' => $this->standardBilling($serviceType, $context),
+            'origin_destination_billing' => $this->originDestinationBilling($serviceType, $context),
             default => throw new PricingUnavailableException("Billing model \"{$serviceType->billing_model}\" isn't implemented yet."),
         };
     }
@@ -79,26 +83,7 @@ class PricingEngine
             throw new PricingUnavailableException('No zone mapping configured for this route yet (Billing → Zone Mapping).');
         }
 
-        $weight = (float) ($context['weight_kg'] ?? 0);
-
-        // Volumetric weight — L×W×H (cm) divided by the company's
-        // configured divisor (Company Settings → Billing defaults) —
-        // only computed when all three dimensions are actually given.
-        // Chargeable weight is whichever is heavier, actual or
-        // volumetric: a large-but-light package is priced by the space
-        // it takes up, not just what it weighs on a scale, matching
-        // standard courier practice.
-        $lengthCm = (float) ($context['length_cm'] ?? 0);
-        $widthCm = (float) ($context['width_cm'] ?? 0);
-        $heightCm = (float) ($context['height_cm'] ?? 0);
-        $volumetricWeight = 0.0;
-
-        if ($lengthCm > 0 && $widthCm > 0 && $heightCm > 0) {
-            $divisor = max(1, (int) (\App\Models\Setting::current()->volumetric_divisor ?? 5000));
-            $volumetricWeight = ($lengthCm * $widthCm * $heightCm) / $divisor;
-        }
-
-        $chargeableWeight = max($weight, $volumetricWeight);
+        $chargeableWeight = $this->resolveChargeableWeight($context);
 
         // orderBy makes this deterministic if two tariffs for the same
         // service type ever have overlapping weight bands (a setup
@@ -134,42 +119,178 @@ class PricingEngine
             throw new PricingUnavailableException("No price configured for {$zone->name} on this tariff.");
         }
 
-        // Base charge covers the tariff's min_weight specifically, not
-        // the whole band — extra weight accrues from min_weight upward
-        // (continuing past max_weight too, for the "heavier than every
-        // configured band" fallback above), one additional_charge per
-        // additional_weight increment.
-        //
-        // The chargeable weight (actual vs volumetric, whichever is
-        // greater) is rounded UP to the tariff's own additional_weight
-        // increment before this math runs — a shipment is always billed
-        // in whole increments (0.6kg bills as 1kg on a 0.5kg increment,
-        // 1.6–1.9kg both bill as 2kg), never a fraction of one. This
-        // only affects the charge calculation — which tariff band the
-        // shipment matched above was decided by the real, unrounded
-        // chargeable weight, so a shipment doesn't jump into the wrong
-        // band just from rounding.
-        $additionalWeightUnit = max(0.01, (float) $tariff->additional_weight);
-        // A tiny epsilon before ceil() guards against binary
-        // floating-point imprecision (e.g. 1.0 / 0.1 landing on
-        // 9.999999999999998 instead of exactly 10) rounding a weight
-        // that's genuinely an exact multiple up to one extra,
-        // unnecessary increment — a real overcharge risk for financial
-        // math, not a theoretical one.
-        $billedWeight = ceil(($chargeableWeight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
-
-        $overageWeight = max(0, $billedWeight - (float) $tariff->min_weight);
-        $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
-
-        $baseAmount = (float) $zonePrice->charge + ($increments * (float) $zonePrice->additional_charge);
+        $result = $this->calculateWeightBasedCharge(
+            (float) $zonePrice->charge,
+            (float) $zonePrice->additional_charge,
+            $chargeableWeight,
+            (float) ($tariff->max_weight_limit ?? $tariff->min_weight),
+            (float) $tariff->additional_weight
+        );
 
         return [
-            'base_amount' => round($baseAmount, 2),
+            'base_amount' => round($result['amount'], 2),
             'chargeable_weight_kg' => round($chargeableWeight, 2),
-            'billed_weight_kg' => $billedWeight,
+            'billed_weight_kg' => $result['billed_weight'],
             'transit_days' => $zonePrice->transit_days,
             'shipping_type' => $shippingType,
             'zone_id' => $zone->id,
+        ];
+    }
+
+    /**
+     * Origin to Destination pricing — a second, genuinely different
+     * billing model from Standard Billing: a direct route lookup, no
+     * Zone/ZoneMapping involved. Each OriginDestinationTariff prices one
+     * specific origin-state/city to destination-state/city route
+     * directly; the weight-band matching, max_weight_limit overage
+     * reference, and rounding are identical in shape to Standard
+     * Billing (see calculateWeightBasedCharge()), just applied to a
+     * route-matched tariff instead of a zone-matched one.
+     *
+     * A shipment's origin/destination city, if given, is matched
+     * against a city-specific tariff row first — a state-wide row
+     * (origin_city_id/destination_city_id null) is the fallback that
+     * always applies unless a more specific one exists. See
+     * resolveOriginDestinationTariff() for exactly how specificity is
+     * scored.
+     */
+    private function originDestinationBilling(ServiceType $serviceType, array $context): array
+    {
+        $originStateId = $context['origin_state_id']
+            ?? (! empty($context['origin_city_id']) ? City::find($context['origin_city_id'])?->state_id : null);
+        $originCityId = $context['origin_city_id'] ?? null;
+        $destinationStateId = $context['destination_state_id']
+            ?? (! empty($context['destination_city_id']) ? City::find($context['destination_city_id'])?->state_id : null);
+        $destinationCityId = $context['destination_city_id'] ?? null;
+
+        if (! $originStateId || ! $destinationStateId) {
+            throw new PricingUnavailableException('Origin and destination states are required for this service type.');
+        }
+
+        $chargeableWeight = $this->resolveChargeableWeight($context);
+
+        $tariff = $this->resolveOriginDestinationTariff($serviceType->id, $originStateId, $originCityId, $destinationStateId, $destinationCityId, $chargeableWeight);
+
+        // Heavier than every configured band for this exact route? Fall
+        // back to the highest band on that SAME route rather than
+        // failing outright — matches Standard Billing's posture.
+        if (! $tariff) {
+            $tariff = $this->resolveOriginDestinationTariff($serviceType->id, $originStateId, $originCityId, $destinationStateId, $destinationCityId, null);
+        }
+
+        if (! $tariff) {
+            throw new PricingUnavailableException('No rate configured for this route yet (Billing → Origin to Destination).');
+        }
+
+        $result = $this->calculateWeightBasedCharge(
+            (float) $tariff->base_charge,
+            (float) $tariff->additional_charge,
+            $chargeableWeight,
+            (float) $tariff->max_weight_limit,
+            (float) $tariff->additional_weight
+        );
+
+        return [
+            'base_amount' => round($result['amount'], 2),
+            'chargeable_weight_kg' => round($chargeableWeight, 2),
+            'billed_weight_kg' => $result['billed_weight'],
+            'transit_days' => $tariff->transit_days,
+            'shipping_type' => 'domestic',
+            'zone_id' => null,
+        ];
+    }
+
+    /**
+     * Finds the most specific ACTIVE tariff for an exact origin/
+     * destination state pair. When $chargeableWeight is given, only
+     * bands actually containing that weight are considered; passing
+     * null (the "heavier than everything" fallback case) considers
+     * every band for the route and picks the highest one.
+     *
+     * Specificity: a row's origin_city_id/destination_city_id must be
+     * either null (state-wide, always eligible) or match the
+     * shipment's actual city. Among eligible rows, the one with the
+     * MOST non-null city matches wins — a row specific to both cities
+     * beats one specific to only origin, which beats a fully
+     * state-wide row.
+     */
+    private function resolveOriginDestinationTariff(int $serviceTypeId, int $originStateId, ?int $originCityId, int $destinationStateId, ?int $destinationCityId, ?float $chargeableWeight): ?\App\Models\OriginDestinationTariff
+    {
+        $query = \App\Models\OriginDestinationTariff::where('service_type_id', $serviceTypeId)
+            ->where('is_active', true)
+            ->where('origin_state_id', $originStateId)
+            ->where('destination_state_id', $destinationStateId);
+
+        if ($chargeableWeight !== null) {
+            $query->where('min_weight', '<=', $chargeableWeight)->where('max_weight', '>=', $chargeableWeight);
+        }
+
+        return $query->get()
+            ->filter(function ($tariff) use ($originCityId, $destinationCityId) {
+                $originOk = is_null($tariff->origin_city_id) || $tariff->origin_city_id == $originCityId;
+                $destinationOk = is_null($tariff->destination_city_id) || $tariff->destination_city_id == $destinationCityId;
+
+                return $originOk && $destinationOk;
+            })
+            ->sortByDesc(fn ($tariff) => ($tariff->origin_city_id ? 1 : 0) + ($tariff->destination_city_id ? 1 : 0))
+            ->when($chargeableWeight === null, fn ($collection) => $collection->sortByDesc('max_weight'))
+            ->first();
+    }
+
+    /**
+     * The greater of actual weight and volumetric weight (L×W×H ÷ the
+     * company's configured divisor, Company Settings → Billing
+     * defaults) — only computed when all three dimensions are given. A
+     * large-but-light package is priced by the space it takes up, not
+     * just what it weighs on a scale, matching standard courier
+     * practice. Shared by every weight-based billing model.
+     */
+    private function resolveChargeableWeight(array $context): float
+    {
+        $weight = (float) ($context['weight_kg'] ?? 0);
+
+        $lengthCm = (float) ($context['length_cm'] ?? 0);
+        $widthCm = (float) ($context['width_cm'] ?? 0);
+        $heightCm = (float) ($context['height_cm'] ?? 0);
+        $volumetricWeight = 0.0;
+
+        if ($lengthCm > 0 && $widthCm > 0 && $heightCm > 0) {
+            $divisor = max(1, (int) (\App\Models\Setting::current()->volumetric_divisor ?? 5000));
+            $volumetricWeight = ($lengthCm * $widthCm * $heightCm) / $divisor;
+        }
+
+        return max($weight, $volumetricWeight);
+    }
+
+    /**
+     * Rounds chargeable weight up to the tariff's own additional_weight
+     * increment, then computes base + per-increment additional charge,
+     * overage measured from $maxWeightLimit — shared by every
+     * weight-band billing model so the epsilon-guarded rounding and
+     * overage math live in exactly one place, not duplicated per model.
+     *
+     * A shipment is always billed in whole increments (0.6kg bills as
+     * 1kg on a 0.5kg increment, 1.6–1.9kg both bill as 2kg), never a
+     * fraction of one. A tiny epsilon before ceil() guards against
+     * binary floating-point imprecision (e.g. 1.0 / 0.1 landing on
+     * 9.999999999999998 instead of exactly 10) rounding a weight that's
+     * genuinely an exact multiple up to one extra, unnecessary
+     * increment — a real overcharge risk for financial math, not a
+     * theoretical one.
+     *
+     * @return array{amount: float, billed_weight: float}
+     */
+    private function calculateWeightBasedCharge(float $baseCharge, float $additionalCharge, float $chargeableWeight, float $maxWeightLimit, float $additionalWeight): array
+    {
+        $additionalWeightUnit = max(0.01, $additionalWeight);
+        $billedWeight = ceil(($chargeableWeight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
+
+        $overageWeight = max(0, $billedWeight - $maxWeightLimit);
+        $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
+
+        return [
+            'amount' => $baseCharge + ($increments * $additionalCharge),
+            'billed_weight' => $billedWeight,
         ];
     }
 

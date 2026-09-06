@@ -34,6 +34,7 @@ class Setting extends Model
      */
     public const BILLING_MODELS = [
         'standard_billing' => 'Standard Billing (Zone + Weight)',
+        'origin_destination_billing' => 'Origin to Destination',
     ];
 
     /**

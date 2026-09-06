@@ -4383,3 +4383,93 @@ resources/views/rate-checker/index.blade.php   (per-service line items in the qu
 
 No migration needed — display and breakdown changes only, on top of
 Increment 81's schema.
+
+## Increment 86 — Origin to Destination: A Second, Genuinely Different Billing Model
+
+Part 2 of the "origin to destination" request — a whole new billing
+model, built alongside Standard Billing rather than replacing it.
+Direct route-pair pricing, no Zone/ZoneMapping involved at all.
+
+### Schema
+
+`origin_destination_tariffs` — `service_type_id`, `origin_state_id` +
+optional `origin_city_id`, `destination_state_id` + optional
+`destination_city_id`, `min_weight`/`max_weight`/`max_weight_limit`
+(same independent-overage-reference concept as Increment 85),
+`base_charge`/`additional_weight`/`additional_charge` directly on the
+row (no separate zone-price table — there's no zone indirection here
+for a second table to represent), `transit_days`, `is_active`.
+
+A null city means "this rate applies state-wide"; a specific city
+means "this rate applies to that city specifically, overriding the
+state-wide rate for it" — e.g. a state-wide Lagos rate, with a
+separate, more specific rate for Lagos (Ikeja).
+
+### PricingEngine
+
+New `origin_destination_billing` dispatch branch, plus two extractions
+shared with Standard Billing (`resolveChargeableWeight()`,
+`calculateWeightBasedCharge()`) so the volumetric-weight logic and the
+epsilon-guarded rounding/overage math live in exactly one place each,
+not duplicated per billing model.
+
+`resolveOriginDestinationTariff()` picks the most specific matching
+tariff for an exact origin/destination state pair: a row's city
+fields must be null (state-wide, always eligible) or match the
+shipment's actual city; among eligible rows, the one with the most
+non-null city matches wins. A route with no tariff in the matching
+weight band falls back to its highest configured band (same posture
+as Standard Billing), and only throws if the exact route has no
+tariff configured at all.
+
+`zone_id` is now nullable in `PricingEngine::quote()`'s return shape
+— confirmed safe for the one caller that reads it
+(`RateCheckerController`, already null-safe) and for the booking
+controllers that spread the whole quote into `Shipment::create()`
+(`Shipment.$fillable` has `origin_zone_id`/`destination_zone_id`, not
+a bare `zone_id` — that key was already being silently dropped by
+mass-assignment before this change too, confirmed by checking).
+
+### Admin UI
+
+Full CRUD (`origin-destination-billing` routes/controller/views),
+mirroring Standard Billing's patterns — list, add/edit form with a
+state→city cascade on both origin and destination, and CSV
+export/import matching the columns given directly: Origin/Destination
+state+city codes, Product Code (service type), Base Weight, Max
+Weight, Max Weight Limit, Base Charge, Additional Weight, Additional
+Charge, Transit Day.
+
+### Rate Checker needed zero changes
+
+Confirmed rather than assumed: the Billing Model dropdown already
+iterates `Setting::BILLING_MODELS` dynamically, so the new model
+appeared there automatically; the existing Domestic section already
+collects origin/destination state and city, which is exactly what
+`originDestinationBilling()` reads from context. A service type using
+this billing model just needs `route_type = domestic` and it works
+through the Rate Checker with no code changes anywhere in that
+controller or view.
+
+### Files
+
+```
+database/migrations/2026_02_16_000001_create_origin_destination_tariffs_table.php
+app/Models/OriginDestinationTariff.php
+app/Models/Setting.php   (BILLING_MODELS gains origin_destination_billing)
+app/Services/PricingEngine.php   (new dispatch branch, resolveOriginDestinationTariff(), resolveChargeableWeight()/calculateWeightBasedCharge() extracted and shared with Standard Billing)
+app/Http/Controllers/Web/OriginDestinationTariffController.php
+resources/views/origin-destination-billing/index.blade.php, form.blade.php
+resources/views/components/layouts/app.blade.php   (nav item)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+To use it: create a Service Type with Billing model = "Origin to
+Destination" and Route type = Domestic, then add route rates under
+the new **Origin to Destination** nav item.
