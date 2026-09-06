@@ -49,6 +49,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:shipments:create')->group(function () {
         Route::get('/shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');
         Route::post('/shipments', [ShipmentController::class, 'store'])->name('shipments.store');
+        Route::post('/shipments/preview-price', [ShipmentController::class, 'previewPrice'])->name('shipments.preview-price');
         Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');

@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\PricingEngine;
 use App\Services\PricingUnavailableException;
 use App\Services\ShipmentPricingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -92,6 +93,83 @@ class ShipmentController extends Controller
                 ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),
             'clients' => User::where('user_type', 'client')->orderBy('name')->get(['id', 'name', 'email']),
         ]);
+    }
+
+    /**
+     * Live "Check Price" preview, called from the form before submission
+     * — same PricingEngine + ShipmentPricingService pipeline as an
+     * actual booking, so the number shown here is never a rough
+     * estimate that could differ from what create() actually charges.
+     * Nothing is persisted (no Quote row, no Shipment) - purely a
+     * read of what the current form state would cost right now.
+     */
+    public function previewPrice(Request $request): JsonResponse
+    {
+        if ($request->filled('quote_number')) {
+            $quote = Quote::where('quote_number', strtoupper(trim($request->input('quote_number'))))->first();
+
+            if (! $quote || ! $quote->isUsable()) {
+                return response()->json(['message' => 'Quote not found or no longer usable.'], 422);
+            }
+
+            $result = $quote->result;
+
+            if ($request->boolean('insured') && $request->filled('declared_value')) {
+                $insuranceAmount = $this->pricingService->calculateInsurance([
+                    'insured' => true,
+                    'declared_value' => $request->input('declared_value'),
+                ]);
+                $vatPercentage = (float) Setting::current()->vat_percentage;
+                $vatOnInsurance = round($insuranceAmount * ($vatPercentage / 100), 2);
+
+                $result['insurance_amount'] = round($insuranceAmount, 2);
+                $result['vat_amount'] = round(($result['vat_amount'] ?? 0) + $vatOnInsurance, 2);
+                $result['total_amount'] = round(($result['total_amount'] ?? 0) + $insuranceAmount + $vatOnInsurance, 2);
+            }
+
+            return response()->json(['result' => $result, 'from_quote' => true]);
+        }
+
+        $context = [
+            'service_type_id' => $request->integer('service_type_id'),
+            'weight_kg' => (float) $request->input('weight_kg'),
+            'length_cm' => $request->filled('length_cm') ? (float) $request->input('length_cm') : null,
+            'width_cm' => $request->filled('width_cm') ? (float) $request->input('width_cm') : null,
+            'height_cm' => $request->filled('height_cm') ? (float) $request->input('height_cm') : null,
+            'origin_state_id' => $request->filled('origin_state_id') ? $request->integer('origin_state_id') : null,
+            'destination_state_id' => $request->filled('destination_state_id') ? $request->integer('destination_state_id') : null,
+            'origin_city_id' => $request->filled('origin_city_id') ? $request->integer('origin_city_id') : null,
+            'destination_city_id' => $request->filled('destination_city_id') ? $request->integer('destination_city_id') : null,
+            'origin_district_id' => $request->filled('origin_district_id') ? $request->integer('origin_district_id') : null,
+            'destination_district_id' => $request->filled('destination_district_id') ? $request->integer('destination_district_id') : null,
+            'origin_country_id' => $request->filled('origin_country_id') ? $request->integer('origin_country_id') : null,
+            'destination_country_id' => $request->filled('destination_country_id') ? $request->integer('destination_country_id') : null,
+            'additional_service_option_ids' => $request->input('additional_service_option_ids', []),
+            'vehicle_type_id' => $request->filled('vehicle_type_id') ? $request->integer('vehicle_type_id') : null,
+            'is_empty_return' => $request->boolean('is_empty_return'),
+            'insured' => $request->boolean('insured'),
+            'declared_value' => $request->input('declared_value'),
+        ];
+
+        try {
+            $quote = $this->pricingEngine->quote($context);
+        } catch (PricingUnavailableException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        $context['base_amount'] = $quote['base_amount'];
+        $context['surcharges'] = array_merge($context['surcharges'] ?? [], $quote['surcharges'] ?? []);
+
+        $billingProfile = ClientBillingProfile::resolveForClientUser($request->input('client_user_id'));
+        $result = [
+            ...$this->pricingService->priceShipment($context, $billingProfile),
+            'transit_days' => $quote['transit_days'],
+            'shipping_type' => $quote['shipping_type'],
+            'chargeable_weight_kg' => $quote['chargeable_weight_kg'] ?? null,
+            'billed_weight_kg' => $quote['billed_weight_kg'] ?? null,
+        ];
+
+        return response()->json(['result' => $result, 'from_quote' => false]);
     }
 
     /**
@@ -180,6 +258,14 @@ class ShipmentController extends Controller
 
         $shipment = Shipment::create([
             'client_user_id' => $data['client_user_id'] ?? null,
+            'sender_name' => $data['sender_name'],
+            'sender_phone' => $data['sender_phone'],
+            'sender_email' => $data['sender_email'] ?? null,
+            'receiver_name' => $data['receiver_name'],
+            'receiver_phone' => $data['receiver_phone'],
+            'receiver_email' => $data['receiver_email'] ?? null,
+            'package_description' => $data['package_description'],
+            'special_instructions' => $data['special_instructions'] ?? null,
             'service_type_id' => $context['service_type_id'] ?? null,
             'shipping_type' => $result['shipping_type'] ?? null,
             'origin_address' => $data['origin_address'],
@@ -222,6 +308,9 @@ class ShipmentController extends Controller
             'quote_number' => 'nullable|string|max:32',
             'service_type_id' => 'required_without:quote_number|nullable|exists:service_types,id',
             'client_user_id' => 'nullable|exists:users,id',
+            'sender_name' => 'required|string|max:255',
+            'sender_phone' => 'required|string|max:255',
+            'sender_email' => 'nullable|email|max:255',
             'origin_address' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
@@ -230,6 +319,11 @@ class ShipmentController extends Controller
             'origin_state_id' => 'nullable|exists:states,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'destination_hub_id' => 'nullable|exists:hubs,id',
+            'receiver_name' => 'required|string|max:255',
+            'receiver_phone' => 'required|string|max:255',
+            'receiver_email' => 'nullable|email|max:255',
+            'package_description' => 'required|string|max:255',
+            'special_instructions' => 'nullable|string',
             'destination_address' => 'required|string',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',

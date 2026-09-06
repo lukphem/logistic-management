@@ -5354,3 +5354,83 @@ app/Services/PricingEngine.php              (max weight limit cap)
 database/seeders/AdditionalServiceSeeder.php  (new)
 database/seeders/DatabaseSeeder.php           (calls it)
 ```
+
+## Increment 100 (part 2) — Complete Waybill Information + Price Preview
+
+Building on part 1's tracking number format. Two more real gaps closed
+in Create Shipment.
+
+### Complete waybill information
+
+`shipments` gains 8 columns that simply didn't exist before:
+`sender_name`/`sender_phone`/`sender_email`,
+`receiver_name`/`receiver_phone`/`receiver_email`,
+`package_description`, `special_instructions`. Origin/destination
+address alone covered *where* a shipment goes, never *who* it's
+from/to or *what's* inside — every real courier waybill (DHL/FedEx/UPS
+included) needs at minimum a name+phone on both ends and a package
+description for handling/customs.
+
+Name, phone, and package description are marked compulsory
+(`<x-required />`, `required` server-side); email on both sides and
+special instructions are optional — matching standard waybill
+convention, not invented. Grouped into visually distinct Sender/
+Receiver panels, each paired with its matching address field, closer
+to how a real waybill reads.
+
+COD and Insurance — which aren't part of any standard courier
+waybill, specific to this business — are now visually set apart under
+their own "Not on a standard courier waybill" panel rather than mixed
+in with the standard fields, so the distinction is visible in the UI,
+not just known to whoever built it.
+
+Added to all three booking paths for consistency (staff Create
+Shipment, the API's walk-in booking, and the client portal's booking
+endpoint) — a shipment's completeness shouldn't depend on which door
+it was booked through.
+
+### Price preview before creation
+
+New `POST /shipments/preview-price` (`ShipmentController::previewPrice()`)
+— runs the exact same `PricingEngine` + `ShipmentPricingService`
+pipeline a real booking would, but persists nothing (no `Quote` row,
+no `Shipment`). A "Check price" button on Create Shipment calls it
+with the form's current state and shows the full breakdown (freight,
+surcharge, onforwarding, additional services, discount, insurance,
+VAT, total) right above the submit button — so price is visible
+before committing to create the shipment, not only discoverable after.
+
+Respects a loaded Quote ID the same way `store()` does: if one's
+present, the preview reflects that quote's frozen price (with fresh
+insurance layered on top, same rule as booking) rather than
+recalculating from scratch.
+
+### Files
+
+```
+database/migrations/..._add_waybill_contact_fields_to_shipments_table.php
+app/Models/Shipment.php                        (fillable)
+app/Http/Controllers/Web/ShipmentController.php   (previewPrice(), validation)
+app/Http/Controllers/Api/ShipmentController.php   (validation)
+app/Http/Controllers/Api/ClientShipmentController.php   (validation)
+resources/views/shipments/create.blade.php     (Sender/Receiver panels, price preview)
+routes/web.php
+```
+
+## Fix — charge_type enum never actually included percentage_of_reverse_shipment
+
+Real bug dating back to the original Increment 72 (predates all
+reconciliation work here): that migration added
+`reverse_service_type_id`/`reverse_weight_kg` (the columns
+`percentage_of_reverse_shipment` needs) but never actually widened
+`charge_type`'s enum to include that third value — so saving an
+Acknowledgement option with this charge type has always failed with
+`SQLSTATE[01000]: Data truncated for column 'charge_type'`, even
+though the model, controller, and pricing logic all fully support it.
+
+Fixed with a raw `ALTER ... MODIFY` rather than
+`Schema::table()->enum()->change()` — this codebase has a documented
+`doctrine/dbal` reliability concern with Blueprint's `change()` (see
+the `max_weight_limit` migration's own note); a plain `MODIFY` has no
+such dependency. Verified against live MySQL by reproducing the exact
+failing INSERT from the error report and confirming it now succeeds.

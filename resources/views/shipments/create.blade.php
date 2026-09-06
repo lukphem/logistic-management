@@ -316,37 +316,112 @@
                 </select>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin address <x-required /></label>
-                    <textarea name="origin_address" rows="2" required
-                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('origin_address') }}</textarea>
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                <div class="space-y-3 rounded-lg border border-line p-4">
+                    <p class="text-sm font-semibold text-ink-900">Sender</p>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Full name <x-required /></label>
+                        <input type="text" name="sender_name" value="{{ old('sender_name') }}" required
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Phone <x-required /></label>
+                        <input type="text" name="sender_phone" value="{{ old('sender_phone') }}" required
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Email <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                        <input type="email" name="sender_email" value="{{ old('sender_email') }}"
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Origin address <x-required /></label>
+                        <textarea name="origin_address" rows="2" required
+                                  class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('origin_address') }}</textarea>
+                    </div>
                 </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Destination address <x-required /></label>
-                    <textarea name="destination_address" rows="2" required
-                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('destination_address') }}</textarea>
+                <div class="space-y-3 rounded-lg border border-line p-4">
+                    <p class="text-sm font-semibold text-ink-900">Receiver</p>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Full name <x-required /></label>
+                        <input type="text" name="receiver_name" value="{{ old('receiver_name') }}" required
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Phone <x-required /></label>
+                        <input type="text" name="receiver_phone" value="{{ old('receiver_phone') }}" required
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Email <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                        <input type="email" name="receiver_email" value="{{ old('receiver_email') }}"
+                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Destination address <x-required /></label>
+                        <textarea name="destination_address" rows="2" required
+                                  class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('destination_address') }}</textarea>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex flex-wrap gap-6">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                        <input type="checkbox" id="is-cod" name="is_cod" value="1" @checked(old('is_cod')) class="rounded border-line">
-                        Cash on delivery
-                    </label>
-                    <input type="number" step="0.01" min="0" id="cod-amount" name="cod_amount" value="{{ old('cod_amount') }}" placeholder="Amount to collect"
-                           class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('is_cod') ? '' : 'disabled' }}>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Package description <x-required /> <span class="text-xs font-normal text-ink-500">(what's inside — needed for handling/customs)</span></label>
+                    <input type="text" name="package_description" value="{{ old('package_description') }}" required
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
                 <div>
-                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                        <input type="checkbox" id="is-insured" name="insured" value="1" @checked(old('insured')) class="rounded border-line">
-                        Insure this shipment
-                    </label>
-                    <input type="number" step="0.01" min="0" id="declared-value" name="declared_value" value="{{ old('declared_value') }}" placeholder="Declared value"
-                           class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('insured') ? '' : 'disabled' }}>
-                    <p class="mt-1 text-xs text-ink-500">1% of declared value. Entered here, at booking — never part of a Quote ID's frozen price, so this is always added fresh.</p>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Special instructions <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                    <input type="text" name="special_instructions" value="{{ old('special_instructions') }}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
+            </div>
+
+            <div class="rounded-lg border border-dashed border-line p-4">
+                <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Not on a standard courier waybill — specific to this business</p>
+                <div class="flex flex-wrap gap-6">
+                    <div>
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" id="is-cod" name="is_cod" value="1" @checked(old('is_cod')) class="rounded border-line">
+                            Cash on delivery
+                        </label>
+                        <input type="number" step="0.01" min="0" id="cod-amount" name="cod_amount" value="{{ old('cod_amount') }}" placeholder="Amount to collect"
+                               class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('is_cod') ? '' : 'disabled' }}>
+                    </div>
+                    <div>
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" id="is-insured" name="insured" value="1" @checked(old('insured')) class="rounded border-line">
+                            Insure this shipment
+                        </label>
+                        <input type="number" step="0.01" min="0" id="declared-value" name="declared_value" value="{{ old('declared_value') }}" placeholder="Declared value"
+                               class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('insured') ? '' : 'disabled' }}>
+                        <p class="mt-1 text-xs text-ink-500">1% of declared value. Entered here, at booking — never part of a Quote ID's frozen price, so this is always added fresh.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-line bg-surface-50 p-4">
+                <div class="flex items-center justify-between gap-3">
+                    <p class="text-sm font-medium text-ink-900">Price</p>
+                    <button type="button" id="check-price-btn" class="rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">
+                        Check price
+                    </button>
+                </div>
+                <div id="price-preview-placeholder" class="mt-2 text-xs text-ink-500">
+                    Fill in the route and weight above, then check the price before creating this shipment.
+                </div>
+                <div id="price-preview-result" class="mt-2 hidden space-y-1 text-sm text-ink-900">
+                    <div class="flex justify-between"><span class="text-ink-500">Base freight</span><span id="pv-base"></span></div>
+                    <div id="pv-surcharge-row" class="hidden justify-between"><span class="text-ink-500">Surcharge</span><span id="pv-surcharge"></span></div>
+                    <div id="pv-onforwarding-row" class="hidden justify-between"><span class="text-ink-500">Onforwarding</span><span id="pv-onforwarding"></span></div>
+                    <div id="pv-additional-row" class="hidden justify-between"><span class="text-ink-500">Additional services</span><span id="pv-additional"></span></div>
+                    <div id="pv-discount-row" class="hidden justify-between text-status-delivered"><span>Discount</span><span id="pv-discount"></span></div>
+                    <div id="pv-insurance-row" class="hidden justify-between"><span class="text-ink-500">Insurance</span><span id="pv-insurance"></span></div>
+                    <div class="flex justify-between"><span class="text-ink-500">VAT</span><span id="pv-vat"></span></div>
+                    <div class="flex justify-between border-t border-line pt-1 font-semibold"><span>Total</span><span id="pv-total"></span></div>
+                </div>
+                <p id="price-preview-error" class="mt-2 hidden text-xs text-status-exception"></p>
             </div>
 
             <div class="flex justify-end pt-2">
@@ -834,6 +909,79 @@
 
             wireToggle('is-cod', 'cod-amount');
             wireToggle('is-insured', 'declared-value');
+        })();
+
+        // Check Price — posts the current form state to a preview
+        // endpoint that runs the exact same pricing pipeline as an
+        // actual booking but persists nothing (no Quote, no Shipment).
+        // If a quote_number is already loaded, the preview reflects
+        // that quote's frozen price (plus fresh insurance, same as
+        // store() would) instead of recalculating.
+        (function () {
+            const btn = document.getElementById('check-price-btn');
+            const placeholder = document.getElementById('price-preview-placeholder');
+            const resultBox = document.getElementById('price-preview-result');
+            const errorBox = document.getElementById('price-preview-error');
+            const form = document.getElementById('create-shipment-form');
+
+            function money(value) {
+                return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            function showRow(rowId, valueId, amount) {
+                const row = document.getElementById(rowId);
+                if (amount && Number(amount) !== 0) {
+                    row.classList.remove('hidden');
+                    row.classList.add('flex');
+                    document.getElementById(valueId).textContent = money(amount);
+                } else {
+                    row.classList.add('hidden');
+                    row.classList.remove('flex');
+                }
+            }
+
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                btn.textContent = 'Checking…';
+                errorBox.classList.add('hidden');
+
+                fetch('{{ route('shipments.preview-price') }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json',
+                    },
+                    body: new FormData(form),
+                })
+                    .then(async function (res) {
+                        const body = await res.json();
+                        if (!res.ok) throw new Error(body.message || 'Could not price this shipment yet.');
+                        return body;
+                    })
+                    .then(function (body) {
+                        const r = body.result;
+                        document.getElementById('pv-base').textContent = money(r.base_amount);
+                        showRow('pv-surcharge-row', 'pv-surcharge', r.surcharge_amount);
+                        showRow('pv-onforwarding-row', 'pv-onforwarding', r.onforwarding_amount);
+                        showRow('pv-additional-row', 'pv-additional', r.additional_services_amount);
+                        showRow('pv-discount-row', 'pv-discount', r.discount_amount);
+                        showRow('pv-insurance-row', 'pv-insurance', r.insurance_amount);
+                        document.getElementById('pv-vat').textContent = money(r.vat_amount);
+                        document.getElementById('pv-total').textContent = money(r.total_amount);
+                        placeholder.classList.add('hidden');
+                        resultBox.classList.remove('hidden');
+                    })
+                    .catch(function (err) {
+                        errorBox.textContent = err.message;
+                        errorBox.classList.remove('hidden');
+                        placeholder.classList.add('hidden');
+                        resultBox.classList.add('hidden');
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = 'Check price';
+                    });
+            });
         })();
     </script>
 

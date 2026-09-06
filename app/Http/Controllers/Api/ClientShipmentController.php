@@ -41,6 +41,14 @@ class ClientShipmentController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
+            'sender_name' => 'required|string|max:255',
+            'sender_phone' => 'required|string|max:255',
+            'sender_email' => 'nullable|email|max:255',
+            'receiver_name' => 'required|string|max:255',
+            'receiver_phone' => 'required|string|max:255',
+            'receiver_email' => 'nullable|email|max:255',
+            'package_description' => 'required|string|max:255',
+            'special_instructions' => 'nullable|string',
             'origin_address' => 'required|string',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
