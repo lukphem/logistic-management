@@ -81,11 +81,12 @@ class PricingEngine
      *  3. find that tariff's price row for the resolved zone
      *  4. the zone's charge covers the tariff up to max_weight —
      *     weight above that is charged in additional_weight-sized
-     *     increments at the zone's additional_charge, continuing up
-     *     through max_weight_limit (and beyond, for the "heavier than
-     *     every configured band" fallback below). max_weight is
-     *     independently settable from min_weight/max_weight_limit — it
-     *     need not equal either.
+     *     increments at the zone's additional_charge, up to
+     *     max_weight_limit — never beyond it, even in the "heavier than
+     *     every configured band" fallback below; max_weight_limit is
+     *     the highest weight this tariff can ever bill for.
+     *     max_weight is independently settable from min_weight/
+     *     max_weight_limit — it need not equal either.
      */
     private function standardBilling(ServiceType $serviceType, array $context): array
     {
@@ -136,6 +137,7 @@ class PricingEngine
             (float) $zonePrice->additional_charge,
             $chargeableWeight,
             (float) ($tariff->max_weight ?? $tariff->min_weight),
+            (float) $tariff->max_weight_limit,
             (float) $tariff->additional_weight
         );
 
@@ -217,6 +219,7 @@ class PricingEngine
             (float) $tariff->additional_charge,
             $chargeableWeight,
             (float) $tariff->max_weight,
+            (float) $tariff->max_weight_limit,
             (float) $tariff->additional_weight
         );
 
@@ -327,6 +330,7 @@ class PricingEngine
             (float) $tariff->additional_charge,
             $chargeableWeight,
             (float) $tariff->max_weight,
+            (float) $tariff->max_weight_limit,
             (float) $tariff->additional_weight
         );
 
@@ -482,9 +486,21 @@ class PricingEngine
     /**
      * Rounds chargeable weight up to the tariff's own additional_weight
      * increment, then computes base + per-increment additional charge,
-     * overage measured from $maxWeightLimit — shared by every
-     * weight-band billing model so the epsilon-guarded rounding and
-     * overage math live in exactly one place, not duplicated per model.
+     * overage measured from $overageFrom — shared by every weight-band
+     * billing model so the epsilon-guarded rounding and overage math
+     * live in exactly one place, not duplicated per model.
+     *
+     * $maxWeightLimit is a hard cap on the weight actually billed for —
+     * "the highest weight that can be billed", per the tariff's own
+     * definition. A normal in-band match never exceeds it (the
+     * band-matching query already guarantees chargeableWeight <=
+     * max_weight_limit), so this only ever bites in the "heavier than
+     * every configured band" fallback: without it, a shipment far
+     * heavier than anything configured would keep accruing overage
+     * increments indefinitely, unbounded by anything an operator
+     * actually set up. Capped here means the fallback still prices
+     * (never fails just for being unexpectedly heavy), but never bills
+     * for more than the heaviest band's own ceiling.
      *
      * A shipment is always billed in whole increments (0.6kg bills as
      * 1kg on a 0.5kg increment, 1.6–1.9kg both bill as 2kg), never a
@@ -497,12 +513,14 @@ class PricingEngine
      *
      * @return array{amount: float, billed_weight: float}
      */
-    private function calculateWeightBasedCharge(float $baseCharge, float $additionalCharge, float $chargeableWeight, float $maxWeightLimit, float $additionalWeight): array
+    private function calculateWeightBasedCharge(float $baseCharge, float $additionalCharge, float $chargeableWeight, float $overageFrom, float $maxWeightLimit, float $additionalWeight): array
     {
-        $additionalWeightUnit = max(0.01, $additionalWeight);
-        $billedWeight = ceil(($chargeableWeight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
+        $billableWeight = min($chargeableWeight, $maxWeightLimit);
 
-        $overageWeight = max(0, $billedWeight - $maxWeightLimit);
+        $additionalWeightUnit = max(0.01, $additionalWeight);
+        $billedWeight = ceil(($billableWeight / $additionalWeightUnit) - 0.00001) * $additionalWeightUnit;
+
+        $overageWeight = max(0, $billedWeight - $overageFrom);
         $increments = $overageWeight > 0 ? (int) ceil($overageWeight / $additionalWeightUnit) : 0;
 
         return [

@@ -5292,3 +5292,65 @@ irrelevant to Eloquent).
 database/migrations/   (45 files, replaces the single schema dump)
 database/schema/       (removed)
 ```
+
+## Increment 99 — Two Real Bugs: Max Weight Limit Cap, Missing Additional Service Seeds
+
+### Max Weight Limit wasn't actually a cap
+
+All three billing models (Standard, Origin to Destination, Fleet)
+shared the same bug: a shipment heavier than every configured tariff
+band falls back to the highest band rather than failing outright —
+correct — but the overage calculation kept extrapolating from the
+*actual* shipment weight indefinitely, never bounded by that band's
+own `max_weight_limit`. A shipment absurdly heavier than anything
+configured would just keep accruing per-kg increments forever.
+
+Per its own definition — "the highest weight that can be billed" —
+`max_weight_limit` should cap what's actually billed for, not just
+decide which band matches. `calculateWeightBasedCharge()` now caps the
+weight fed into the overage/rounding math at `max_weight_limit` before
+computing anything; a shipment far heavier than every band now bills
+identically to one weighing exactly the heaviest band's own limit,
+instead of extrapolating past it. `chargeable_weight_kg` in the result
+still reports the true, uncapped weight for display; `billed_weight_kg`
+now correctly reflects what was actually billed for.
+
+No database change — pure logic fix in `app/Services/PricingEngine.php`.
+
+### Additional Services: Packaging/Acknowledgement never got seeded
+
+`AdditionalService::isProtected()` and the whole admin UI assume
+Packaging and Acknowledgement exist as two `kind`-tagged, protected
+built-in rows — the model's own comment says they're "seeded once" —
+but no seeder or migration anywhere ever actually created them. The
+Additional Services create form doesn't even have a `kind` field, so
+there was no way to end up with a properly-`kind`-tagged row through
+the UI at all.
+
+New `AdditionalServiceSeeder`, wired into `DatabaseSeeder`, creates
+both via `updateOrCreate` keyed on `kind` — safe to re-run, and
+backfills the name on an already-existing nameless `kind='packaging'`
+row rather than creating a duplicate.
+
+Cash on Delivery is **not** a third Additional Service — it's a
+separate, already-implemented shipment-level feature (`is_cod` +
+`cod_amount`, present on Create Shipment and the Shipment record
+itself), not part of this catalog.
+
+### To apply locally
+
+```powershell
+php artisan db:seed --class=AdditionalServiceSeeder
+```
+
+Safe to run against an existing database with real data — only
+touches the two protected rows, creates or backfills them, nothing
+else. (Also runs automatically as part of `migrate:fresh --seed`.)
+
+### Files
+
+```
+app/Services/PricingEngine.php              (max weight limit cap)
+database/seeders/AdditionalServiceSeeder.php  (new)
+database/seeders/DatabaseSeeder.php           (calls it)
+```

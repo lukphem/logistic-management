@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(RolePermissionSeeder::class);
         $this->call(ScanStatusSeeder::class);
         $this->call(LocationSeeder::class);
+        $this->call(AdditionalServiceSeeder::class);
 
         // User::factory(10)->create();
 
