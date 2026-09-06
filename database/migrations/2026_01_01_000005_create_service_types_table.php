@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('service_types', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('code')->unique();
+            $table->string('billing_model')->nullable();
+            $table->enum('route_type', ['domestic', 'international'])->default('domestic');
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+            $table->enum('trade_direction', ['import', 'export', 'cross_trade'])->nullable();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('service_types');
+    }
+};

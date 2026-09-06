@@ -4383,3 +4383,80 @@ resources/views/rate-checker/index.blade.php   (per-service line items in the qu
 
 No migration needed — display and breakdown changes only, on top of
 Increment 81's schema.
+
+## Increment 85 — Migrations Squashed to One `create` File Per Table, MySQL Default
+
+Pure database-layer housekeeping — no application code touched, no
+behavior change. The schema itself is unchanged; only how it's expressed
+in migration files is different.
+
+### Why
+
+The 92 original migrations were accretive: a table's current shape was
+often scattered across five or six files (`zones`, for instance, was
+touched by its `create` plus five later `add_x_to`/`replace_x_with_y`
+files). Fine for history, painful for "I need to change a column" —
+the file to edit was never obvious.
+
+### What changed
+
+Every table now has exactly one `Schema::create` migration reflecting
+its **current, final shape** — the 92 original files are preserved
+untouched in `database/migrations_legacy/` for historical reference
+(and are what actually ran in dev/staging so far), but are no longer
+part of the active migration set.
+
+Derived by mechanically replaying all 92 files' `up()` methods in order
+(script, not hand-transcription) and cross-checked against every
+model's `$fillable` array — `Shipment` (37 fields) and `User` (27
+fields) both matched exactly, which is the strongest signal the
+replay is faithful.
+
+Two structural notes from the squash:
+
+- **`hubs` ⇄ `cities` ⇄ `routes` circular reference.** `hubs.city_id`,
+  `cities.route_id`/`operational_hub_id`, and `routes.hub_id` form a
+  three-way dependency cycle that only worked originally because the
+  columns were added incrementally, long after all three tables
+  already existed. Squashed, `hubs` is created without `city_id`;
+  `routes` and `cities` follow (both can reference the already-created
+  `hubs`); then a single small follow-up migration
+  (`2026_01_01_000016_add_city_id_to_hubs_table.php`) adds `city_id`
+  back once `cities` exists. Same end state, just sequenced to avoid
+  the cycle.
+- **`users`** keeps Laravel's stock `create_users_table` migration
+  untouched (name/email/password — other code may expect that file to
+  exist as-is) and adds every app-specific column (staff profile,
+  access scope, account status, etc.) in one follow-up
+  `add_profile_and_access_fields_to_users_table.php`.
+
+All 43 tables' dependency order was hand-verified (parents before
+children) so a fresh `migrate` runs cleanly top to bottom. `dropped`
+tables from the original history (`rate_cards`, `zone_rate_matrix`,
+`carton_rates`, `zone_weight_rates`) don't appear at all, matching
+their actual final state.
+
+### Database driver
+
+`.env.example` and `config/database.php`'s default connection both
+switched from `sqlite` to `mysql`. Nothing else in `config/database.php`
+changed — the `mysql` connection block was already fully configured.
+
+### Not yet done
+
+This was assembled and reviewed without a PHP runtime available in the
+environment it was built in — no `php artisan migrate` was actually
+run against it. **Before relying on this**, run
+`php artisan migrate:fresh --seed` against a real MySQL database and
+confirm it completes cleanly and the seeders still pass. If anything
+doesn't line up, `database/migrations_legacy/` has the exact original
+92-file history to diff against.
+
+### Files
+
+```
+database/migrations/                    (41 files — 3 framework, 37 app tables + 1 deferred FK, 1 permission tables)
+database/migrations_legacy/              (the original 92 files, kept for history — no longer run)
+.env.example                             (DB_CONNECTION=mysql, sensible local defaults)
+config/database.php                      (default connection fallback: mysql)
+```
