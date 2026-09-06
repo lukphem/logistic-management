@@ -4629,3 +4629,75 @@ resources/views/rate-checker/index.blade.php   (implementedModels now includes o
 ```
 
 No migration needed.
+
+## Increment 90 — Origin to Destination Gets International Support
+
+Mirrors Standard Billing's Domestic/International split onto Origin to
+Destination — either side of a route can now be a country instead of a
+Nigeria state, driven the same way by the selected service type's
+`route_type`/`trade_direction` (Export: Nigeria origin, foreign
+destination; Import: the reverse).
+
+### Schema
+
+`origin_state_id`/`destination_state_id` became nullable;
+`origin_country_id`/`destination_country_id` added alongside them.
+Exactly one of state/country is expected per side — enforced in
+`OriginDestinationTariffController`'s validation (an explicit
+`origin_type`/`destination_type` radio choice, not inferred from which
+fields happen to be filled), not a database constraint.
+
+### PricingEngine
+
+`originDestinationBilling()` and `resolveOriginDestinationTariff()`
+extended to accept a country id per side alongside state/city —
+`shipping_type` is now correctly derived as `'international'` whenever
+either side is country-based, `'domestic'` otherwise. A country-based
+side matches exactly on country id; a state-based side keeps the
+existing city-specificity scoring (Increment 86) unchanged.
+
+### This was verified end-to-end against a real database, not just syntax-checked
+
+Reusing the real MySQL test environment built for Increment 88's
+migration consolidation:
+
+- Ran the actual new migration against the already-fully-migrated
+  schema and confirmed the resulting column structure directly
+- Created a real Service Type (Export, International,
+  `origin_destination_billing`) and a real Lagos → United States
+  tariff row, then called `PricingEngine::quote()` directly —
+  confirmed the 1kg quote (₦15,000, no overage) and a 21kg quote
+  (₦19,000 — correctly triggering 2 overage increments past
+  `max_weight`) both match hand-calculated expected values exactly
+- Confirmed the reverse, unconfigured direction (US origin → Lagos
+  destination) correctly throws rather than silently matching — this
+  model's routes are directional by design, not bidirectional the way
+  domestic `ZoneMapping` is
+- Rendered both the form and index Blade views directly through
+  Laravel's real compiler (not just brace-counting) — confirmed the
+  edit form's Type radios correctly pre-select `state`/`country` based
+  on the tariff's actual stored data
+- **Ran an actual request through the real, unmodified
+  `RateCheckerController`** exactly as a browser would submit it —
+  confirmed the full pipeline (VAT, totals, labels, shipping_type) all
+  come back correct with zero changes needed to the Rate Checker at
+  all, matching Increment 86's original domestic-side confirmation
+
+### Files
+
+```
+database/migrations/2026_02_18_000001_add_country_support_to_origin_destination_tariffs.php
+app/Models/OriginDestinationTariff.php   (country columns/relations, originLabel()/destinationLabel() handle a country-based side)
+app/Services/PricingEngine.php   (originDestinationBilling()/resolveOriginDestinationTariff() support a country per side)
+app/Http/Controllers/Web/OriginDestinationTariffController.php   (state-or-country validation, CSV country codes, formOptions() passes countries)
+resources/views/origin-destination-billing/form.blade.php   (state/country toggle per side)
+```
+
+No changes needed to the Rate Checker or `index.blade.php` — both
+already worked correctly once the underlying model/engine supported it.
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

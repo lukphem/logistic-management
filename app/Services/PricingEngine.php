@@ -143,11 +143,17 @@ class PricingEngine
      * Origin to Destination pricing — a second, genuinely different
      * billing model from Standard Billing: a direct route lookup, no
      * Zone/ZoneMapping involved. Each OriginDestinationTariff prices one
-     * specific origin-state/city to destination-state/city route
-     * directly; the weight-band matching, max_weight overage
-     * reference, and rounding are identical in shape to Standard
-     * Billing (see calculateWeightBasedCharge()), just applied to a
-     * route-matched tariff instead of a zone-matched one.
+     * specific route directly; the weight-band matching, max_weight
+     * overage reference, and rounding are identical in shape to
+     * Standard Billing (see calculateWeightBasedCharge()), just applied
+     * to a route-matched tariff instead of a zone-matched one.
+     *
+     * Either side can be a Nigeria state (+ optional city) or a
+     * country — mirroring Standard Billing's Domestic/International
+     * split, driven the same way by the selected service type's
+     * route_type/trade_direction (Export: Nigeria origin, foreign
+     * country destination; Import: the reverse). shipping_type is
+     * 'international' whenever either side is country-based.
      *
      * A shipment's origin/destination city, if given, is matched
      * against a city-specific tariff row first — a state-wide row
@@ -158,26 +164,38 @@ class PricingEngine
      */
     private function originDestinationBilling(ServiceType $serviceType, array $context): array
     {
-        $originStateId = $context['origin_state_id']
-            ?? (! empty($context['origin_city_id']) ? City::find($context['origin_city_id'])?->state_id : null);
-        $originCityId = $context['origin_city_id'] ?? null;
-        $destinationStateId = $context['destination_state_id']
-            ?? (! empty($context['destination_city_id']) ? City::find($context['destination_city_id'])?->state_id : null);
-        $destinationCityId = $context['destination_city_id'] ?? null;
+        $originCountryId = $context['origin_country_id'] ?? null;
+        $destinationCountryId = $context['destination_country_id'] ?? null;
 
-        if (! $originStateId || ! $destinationStateId) {
-            throw new PricingUnavailableException('Origin and destination states are required for this service type.');
+        $originStateId = $originCountryId ? null : ($context['origin_state_id']
+            ?? (! empty($context['origin_city_id']) ? City::find($context['origin_city_id'])?->state_id : null));
+        $originCityId = $originCountryId ? null : ($context['origin_city_id'] ?? null);
+
+        $destinationStateId = $destinationCountryId ? null : ($context['destination_state_id']
+            ?? (! empty($context['destination_city_id']) ? City::find($context['destination_city_id'])?->state_id : null));
+        $destinationCityId = $destinationCountryId ? null : ($context['destination_city_id'] ?? null);
+
+        if ((! $originStateId && ! $originCountryId) || (! $destinationStateId && ! $destinationCountryId)) {
+            throw new PricingUnavailableException('Origin and destination are required for this service type.');
         }
+
+        $shippingType = ($originCountryId || $destinationCountryId) ? 'international' : 'domestic';
 
         $chargeableWeight = $this->resolveChargeableWeight($context);
 
-        $tariff = $this->resolveOriginDestinationTariff($serviceType->id, $originStateId, $originCityId, $destinationStateId, $destinationCityId, $chargeableWeight);
+        $tariff = $this->resolveOriginDestinationTariff(
+            $serviceType->id, $originStateId, $originCityId, $originCountryId,
+            $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+        );
 
         // Heavier than every configured band for this exact route? Fall
         // back to the highest band on that SAME route rather than
         // failing outright — matches Standard Billing's posture.
         if (! $tariff) {
-            $tariff = $this->resolveOriginDestinationTariff($serviceType->id, $originStateId, $originCityId, $destinationStateId, $destinationCityId, null);
+            $tariff = $this->resolveOriginDestinationTariff(
+                $serviceType->id, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, null
+            );
         }
 
         if (! $tariff) {
@@ -197,31 +215,48 @@ class PricingEngine
             'chargeable_weight_kg' => round($chargeableWeight, 2),
             'billed_weight_kg' => $result['billed_weight'],
             'transit_days' => $tariff->transit_days,
-            'shipping_type' => 'domestic',
+            'shipping_type' => $shippingType,
             'zone_id' => null,
         ];
     }
 
     /**
      * Finds the most specific ACTIVE tariff for an exact origin/
-     * destination state pair. When $chargeableWeight is given, only
-     * bands actually containing that weight are considered; passing
-     * null (the "heavier than everything" fallback case) considers
-     * every band for the route and picks the highest one.
+     * destination pair — each side matched by country when a country
+     * id is given, or by state (+ optional city specificity) otherwise.
+     * When $chargeableWeight is given, only bands actually containing
+     * that weight are considered; passing null (the "heavier than
+     * everything" fallback case) considers every band for the route and
+     * picks the highest one.
      *
-     * Specificity: a row's origin_city_id/destination_city_id must be
+     * Specificity: for a state-based side, a row's city field must be
      * either null (state-wide, always eligible) or match the
      * shipment's actual city. Among eligible rows, the one with the
      * MOST non-null city matches wins — a row specific to both cities
      * beats one specific to only origin, which beats a fully
-     * state-wide row.
+     * state-wide row. A country-based side has no such refinement —
+     * it's an exact country match or it isn't eligible at all.
      */
-    private function resolveOriginDestinationTariff(int $serviceTypeId, int $originStateId, ?int $originCityId, int $destinationStateId, ?int $destinationCityId, ?float $chargeableWeight): ?\App\Models\OriginDestinationTariff
-    {
+    private function resolveOriginDestinationTariff(
+        int $serviceTypeId,
+        ?int $originStateId, ?int $originCityId, ?int $originCountryId,
+        ?int $destinationStateId, ?int $destinationCityId, ?int $destinationCountryId,
+        ?float $chargeableWeight
+    ): ?\App\Models\OriginDestinationTariff {
         $query = \App\Models\OriginDestinationTariff::where('service_type_id', $serviceTypeId)
-            ->where('is_active', true)
-            ->where('origin_state_id', $originStateId)
-            ->where('destination_state_id', $destinationStateId);
+            ->where('is_active', true);
+
+        if ($originCountryId) {
+            $query->where('origin_country_id', $originCountryId);
+        } else {
+            $query->where('origin_state_id', $originStateId)->whereNull('origin_country_id');
+        }
+
+        if ($destinationCountryId) {
+            $query->where('destination_country_id', $destinationCountryId);
+        } else {
+            $query->where('destination_state_id', $destinationStateId)->whereNull('destination_country_id');
+        }
 
         if ($chargeableWeight !== null) {
             $query->where('min_weight', '<=', $chargeableWeight)->where('max_weight_limit', '>=', $chargeableWeight);

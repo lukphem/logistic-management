@@ -29,12 +29,28 @@
             </select>
         </div>
 
+        @php
+            $originType = old('origin_type', $tariff->origin_country_id ? 'country' : 'state');
+            $destinationType = old('destination_type', $tariff->destination_country_id ? 'country' : 'state');
+        @endphp
+
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="rounded-lg border border-line p-4">
                 <p class="mb-3 text-sm font-semibold text-ink-900">Origin</p>
-                <div class="space-y-3">
+                <div class="mb-3 flex gap-3">
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-2 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="origin_type" value="state" @checked($originType === 'state') onchange="toggleOriginDestinationType('origin', 'state');" class="rounded-full border-line">
+                        Nigeria (state)
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-2 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="origin_type" value="country" @checked($originType === 'country') onchange="toggleOriginDestinationType('origin', 'country');" class="rounded-full border-line">
+                        Country
+                    </label>
+                </div>
+
+                <div id="origin-state-fields" class="space-y-3" style="{{ $originType === 'country' ? 'display:none' : '' }}">
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">State <x-required /></label>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">State</label>
                         <select id="origin-state" name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             <option value="">Select a state</option>
                             @foreach ($states as $state)
@@ -49,13 +65,34 @@
                         </select>
                     </div>
                 </div>
+
+                <div id="origin-country-fields" style="{{ $originType === 'country' ? '' : 'display:none' }}">
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Country</label>
+                    <select name="origin_country_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Select a country</option>
+                        @foreach ($countries as $country)
+                            <option value="{{ $country->id }}" @selected(old('origin_country_id', $tariff->origin_country_id) == $country->id)>{{ $country->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
 
             <div class="rounded-lg border border-line p-4">
                 <p class="mb-3 text-sm font-semibold text-ink-900">Destination</p>
-                <div class="space-y-3">
+                <div class="mb-3 flex gap-3">
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-2 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="destination_type" value="state" @checked($destinationType === 'state') onchange="toggleOriginDestinationType('destination', 'state');" class="rounded-full border-line">
+                        Nigeria (state)
+                    </label>
+                    <label class="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line p-2 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                        <input type="radio" name="destination_type" value="country" @checked($destinationType === 'country') onchange="toggleOriginDestinationType('destination', 'country');" class="rounded-full border-line">
+                        Country
+                    </label>
+                </div>
+
+                <div id="destination-state-fields" class="space-y-3" style="{{ $destinationType === 'country' ? 'display:none' : '' }}">
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">State <x-required /></label>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">State</label>
                         <select id="destination-state" name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             <option value="">Select a state</option>
                             @foreach ($states as $state)
@@ -70,9 +107,19 @@
                         </select>
                     </div>
                 </div>
+
+                <div id="destination-country-fields" style="{{ $destinationType === 'country' ? '' : 'display:none' }}">
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Country</label>
+                    <select name="destination_country_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Select a country</option>
+                        @foreach ($countries as $country)
+                            <option value="{{ $country->id }}" @selected(old('destination_country_id', $tariff->destination_country_id) == $country->id)>{{ $country->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </div>
-        <p class="-mt-2 text-xs text-ink-500">e.g. Abuja to Lagos (Ikeja) — a city-specific rate always wins over a state-wide one for that city.</p>
+        <p class="-mt-2 text-xs text-ink-500">e.g. Abuja to Lagos (Ikeja) for a domestic rate, or Lagos to United States for an international one — a city-specific rate always wins over a state-wide one for that city.</p>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -133,6 +180,11 @@
     </form>
 
     <script>
+        function toggleOriginDestinationType(side, type) {
+            document.getElementById(side + '-state-fields').style.display = type === 'state' ? '' : 'none';
+            document.getElementById(side + '-country-fields').style.display = type === 'country' ? '' : 'none';
+        }
+
         // Simple state -> city cascade, one per side — no district level
         // needed here, this billing model only prices at state or city
         // granularity.
