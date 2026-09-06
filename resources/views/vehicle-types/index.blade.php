@@ -21,6 +21,8 @@
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Capacity</th>
+                    <th class="px-5 py-3 font-medium">Body</th>
                     <th class="px-5 py-3 font-medium">Status</th>
                     <th class="px-5 py-3"></th>
                 </tr>
@@ -30,6 +32,13 @@
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $vehicleType->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $vehicleType->code }}</td>
+                        <td class="px-5 py-3 text-ink-500">
+                            {{ $vehicleType->max_weight_capacity ? number_format($vehicleType->max_weight_capacity, 0) . 'kg' : '—' }}
+                            @if ($vehicleType->max_length_cm && $vehicleType->max_width_cm && $vehicleType->max_height_cm)
+                                <br><span class="text-xs">{{ rtrim(rtrim(number_format($vehicleType->max_length_cm, 1), '0'), '.') }}×{{ rtrim(rtrim(number_format($vehicleType->max_width_cm, 1), '0'), '.') }}×{{ rtrim(rtrim(number_format($vehicleType->max_height_cm, 1), '0'), '.') }}cm</span>
+                            @endif
+                        </td>
+                        <td class="px-5 py-3 text-ink-500">{{ $vehicleType->is_open_body ? 'Open' : 'Enclosed' }}</td>
                         <td class="px-5 py-3">
                             @if ($vehicleType->is_active)
                                 <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-2.5 py-0.5 text-xs font-medium text-status-delivered">Active</span>
@@ -46,7 +55,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No vehicle types configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No vehicle types configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

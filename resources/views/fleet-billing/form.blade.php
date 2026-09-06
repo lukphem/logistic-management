@@ -168,39 +168,11 @@
                     <label class="mb-1 block text-xs font-medium text-ink-900">Weight base charge <x-required /></label>
                     <input type="number" step="0.01" min="0" name="base_charge" value="{{ old('base_charge', $tariff->base_charge ?? 0) }}"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <p class="mt-1 text-xs text-ink-500">Separate from Base Haul Rate below — this is the weight-band's own charge, added on top.</p>
+                    <p class="mt-1 text-xs text-ink-500">The weight-band's charge — this is the entire freight amount now, with fuel surcharge and empty return added on top.</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-ink-900">Additional charge <x-required /></label>
                     <input type="number" step="0.01" min="0" name="additional_charge" value="{{ old('additional_charge', $tariff->additional_charge ?? 0) }}"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-            </div>
-        </div>
-
-        <div class="rounded-lg border border-line p-4">
-            <p class="mb-3 text-sm font-semibold text-ink-900">Haul rate, distance, and floor</p>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Base haul rate <x-required /></label>
-                    <input type="number" step="0.01" min="0" name="base_haul_rate" value="{{ old('base_haul_rate', $tariff->base_haul_rate ?? 0) }}"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <p class="mt-1 text-xs text-ink-500">Flat charge for this lane + vehicle type.</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Minimum trip charge <x-required /></label>
-                    <input type="number" step="0.01" min="0" name="minimum_trip_charge" value="{{ old('minimum_trip_charge', $tariff->minimum_trip_charge ?? 0) }}"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <p class="mt-1 text-xs text-ink-500">Freight never bills below this, whatever the above adds up to.</p>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Distance (km) <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <input type="number" step="0.01" min="0" name="distance_km" value="{{ old('distance_km', $tariff->distance_km) }}"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Distance rate (per km) <x-required /></label>
-                    <input type="number" step="0.01" min="0" name="distance_rate_per_km" value="{{ old('distance_rate_per_km', $tariff->distance_rate_per_km ?? 0) }}"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 </div>
             </div>
@@ -213,7 +185,7 @@
                     <label class="mb-1 block text-xs font-medium text-ink-900">Fuel surcharge (%) <x-required /></label>
                     <input type="number" step="0.01" min="0" max="100" name="fuel_surcharge_percentage" value="{{ old('fuel_surcharge_percentage', $tariff->fuel_surcharge_percentage ?? 0) }}"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <p class="mt-1 text-xs text-ink-500">Percentage of the freight total (haul + weight + distance, after the minimum-trip floor).</p>
+                    <p class="mt-1 text-xs text-ink-500">Percentage of the freight total (the weight charge above).</p>
                 </div>
                 <div>
                     <label class="mb-1 block text-xs font-medium text-ink-900">Empty return charge type <x-required /></label>

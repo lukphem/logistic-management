@@ -1,7 +1,8 @@
     <p class="mb-4 text-sm text-ink-500">
-        Industry-standard cost-based freight rating: Base Haul Rate + Weight Charge + Distance Charge, floored at the
-        Minimum Trip Charge, then Fuel Surcharge on top — plus an Empty Return charge when the shipper marks a trip as
-        empty-return at booking. Priced per lane (origin to destination, state/city or country) and vehicle type.
+        Weight-based freight rating: a Weight Charge (per vehicle type and route) plus Fuel Surcharge on top, plus an
+        Empty Return charge when the shipper marks a trip as empty-return at booking. Priced per lane (origin to
+        destination, state/city or country) and vehicle type — a shipment's weight is also checked against the
+        selected vehicle's real capacity (Vehicle Types) regardless of what any rate below allows.
     </p>
 
     <div class="mb-5 flex items-center justify-between gap-3">
@@ -24,9 +25,8 @@
                     <th class="px-5 py-3 font-medium">Vehicle</th>
                     <th class="px-5 py-3 font-medium">Origin</th>
                     <th class="px-5 py-3 font-medium">Destination</th>
-                    <th class="px-5 py-3 font-medium">Haul rate</th>
-                    <th class="px-5 py-3 font-medium">Distance</th>
-                    <th class="px-5 py-3 font-medium">Min. trip</th>
+                    <th class="px-5 py-3 font-medium">Weight band</th>
+                    <th class="px-5 py-3 font-medium">Weight charge</th>
                     <th class="px-5 py-3 font-medium">Fuel %</th>
                     <th class="px-5 py-3 font-medium">Status</th>
                     <th class="px-5 py-3"></th>
@@ -39,9 +39,16 @@
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->vehicleType->name }}</td>
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->originLabel() }}</td>
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->destinationLabel() }}</td>
-                        <td class="px-5 py-3 font-mono text-ink-900">{{ number_format($tariff->base_haul_rate, 2) }}</td>
-                        <td class="px-5 py-3 text-ink-500">{{ $tariff->distance_km ? rtrim(rtrim(number_format($tariff->distance_km, 2), '0'), '.') . 'km' : '—' }}</td>
-                        <td class="px-5 py-3 font-mono text-ink-900">{{ number_format($tariff->minimum_trip_charge, 2) }}</td>
+                        <td class="px-5 py-3 text-ink-500">
+                            {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
+                            @if ((float) $tariff->max_weight !== (float) $tariff->min_weight)
+                                <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg</span>
+                            @endif
+                        </td>
+                        <td class="px-5 py-3">
+                            <span class="font-mono text-ink-900">{{ number_format($tariff->base_charge, 2) }}</span>
+                            <span class="text-xs text-ink-500">+ {{ number_format($tariff->additional_charge, 2) }} / {{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }}kg</span>
+                        </td>
                         <td class="px-5 py-3 text-ink-500">{{ rtrim(rtrim(number_format($tariff->fuel_surcharge_percentage, 2), '0'), '.') }}%</td>
                         <td class="px-5 py-3">
                             @if ($tariff->is_active)

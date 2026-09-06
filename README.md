@@ -5031,3 +5031,105 @@ resources/views/components/layouts/app.blade.php   (Vehicle Types added to the B
 ```
 
 No migration needed.
+
+## Increment 96 — Fleet Billing Simplified, Vehicle Capacity Actually Enforced
+
+Two changes, both per explicit direction: the formula loses three
+components, and vehicle capacity becomes a real, enforced constraint
+instead of just something a tariff's own band happened to claim.
+
+### The bug this fixes
+
+A shipment could be billed against a tariff configured for more weight
+than the vehicle could physically carry (e.g. a 15,000kg van still
+pricing a 30,000kg shipment) — because nothing anywhere stored what a
+vehicle could actually carry. The tariff's own weight band was the
+only thing checked, and nothing validated it against reality.
+
+### Vehicle Type gains real capacity fields
+
+`max_weight_capacity`, `max_length_cm`/`max_width_cm`/`max_height_cm`
+(cargo dimensions — separate from a shipment's own volumetric weight,
+which is about pricing, not physical fit), and `is_open_body`.
+
+### Two enforcement points, not one
+
+1. **At tariff configuration** — `FleetBillingTariffController` now
+   rejects saving a tariff whose Max weight limit exceeds the selected
+   vehicle's capacity. Kept editable rather than locked (per explicit
+   choice) — a specific lane can still be more restrictive than the
+   vehicle's full capacity (e.g. a bridge weight limit), just never
+   higher.
+2. **At quote time** — `PricingEngine::fleetBilling()` now checks a
+   shipment's actual weight against the selected vehicle's real
+   capacity directly, independent of whatever any tariff's band
+   allows. This is the check that actually closes the reported gap —
+   a bad tariff, however it got that way, can no longer produce an
+   over-capacity quote.
+
+### Formula simplified
+
+Base Haul Rate, Distance Charge, and the Minimum Trip Charge floor are
+removed entirely, per explicit direction:
+
+```
+Freight = Weight Charge
+Fuel Surcharge = Freight × Fuel Surcharge %
+Empty Return = flat or % of Freight (only when flagged at quote time)
+Total = Freight + Fuel Surcharge + Empty Return (if applicable)
+```
+
+Removed from the migration, model, controller (validation + CSV
+export/import), the form (the whole "Haul rate, distance, and floor"
+section deleted), and the list view (replaced with Weight band /
+Weight charge columns).
+
+### Verified end-to-end against the real database
+
+- Confirmed `2026_02_20_000001` in `migrate:status` before testing
+  anything, so nothing was tested against a stale schema
+- Created a real 15,000kg-capacity vehicle and tariff, ran an actual
+  quote — hand-verified ₦50,000 base + ₦5,000 fuel surcharge (10%),
+  matching the simplified formula exactly
+- **The critical test**: quoted a 20,000kg shipment against the
+  15,000kg-capacity vehicle — confirmed `PricingEngine` correctly
+  throws rather than silently pricing it, with a clear message naming
+  both figures. Also confirmed a shipment at exactly 15,000kg (the
+  boundary) still prices correctly — the check doesn't over-reject
+- Confirmed the configuration-time validation separately: attempted to
+  save a tariff with Max weight limit = 30,000kg against the same
+  15,000kg vehicle through the real controller — correctly rejected
+  with the exact expected error message
+- Swept the whole codebase for any remaining reference to the removed
+  fields — the only hits were an unrelated, pre-existing `distance_km`
+  column on `Shipment` itself (general shipment tracking, coincidental
+  name collision, not connected to Fleet Billing tariffs)
+- Rendered the merged Standard Billing page's Fleet Billing tab and
+  the Vehicle Types list through Laravel's real compiler with the new
+  test data — confirmed the new columns display correctly and no
+  stale "Haul rate" column remains
+
+### Files
+
+```
+database/migrations/2026_02_20_000001_fleet_billing_vehicle_capacity_and_formula_change.php
+app/Models/VehicleType.php   (capacity/volumetric/open-body fields)
+app/Models/FleetBillingTariff.php   (haul rate/distance/floor removed from fillable)
+app/Services/PricingEngine.php   (formula simplified, quote-time capacity check added)
+app/Http/Controllers/Web/FleetBillingTariffController.php   (fields removed, capacity validation added)
+app/Http/Controllers/Web/VehicleTypeController.php   (validation for new fields)
+resources/views/fleet-billing/form.blade.php   ("Haul rate, distance, and floor" section removed)
+resources/views/fleet-billing/_route-rate-table.blade.php   (Weight band/Weight charge columns replace the removed ones)
+resources/views/vehicle-types/form.blade.php, index.blade.php   (capacity/dimensions/open-body fields)
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+Existing Fleet Billing tariffs (if any) keep their weight-band values
+unchanged — only the removed columns disappear. Worth reviewing any
+existing tariffs' Max weight limit against their vehicle's actual
+capacity once Vehicle Types have capacity figures entered.

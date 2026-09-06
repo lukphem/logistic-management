@@ -54,11 +54,23 @@ class VehicleTypeController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:vehicle_types,code,' . $request->route('vehicleType')?->id,
+            'max_weight_capacity' => 'nullable|numeric|min:0',
+            'max_length_cm' => 'nullable|numeric|min:0',
+            'max_width_cm' => 'nullable|numeric|min:0',
+            'max_height_cm' => 'nullable|numeric|min:0',
+            'is_open_body' => 'sometimes|boolean',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $data = $validator->validate();
+        $data['is_open_body'] = $request->boolean('is_open_body');
         $data['is_active'] = $request->boolean('is_active', true);
+
+        foreach (['max_weight_capacity', 'max_length_cm', 'max_width_cm', 'max_height_cm'] as $field) {
+            if (($data[$field] ?? null) === '') {
+                $data[$field] = null;
+            }
+        }
 
         return $data;
     }

@@ -76,7 +76,7 @@ class FleetBillingTariffController extends Controller
                 $t->destinationState?->short_code, $t->destinationCity?->short_code, $t->destinationCountry?->code,
                 $t->serviceType->code,
                 $t->min_weight, $t->max_weight, $t->max_weight_limit, $t->base_charge, $t->additional_weight, $t->additional_charge,
-                $t->base_haul_rate, $t->minimum_trip_charge, $t->distance_km, $t->distance_rate_per_km, $t->fuel_surcharge_percentage,
+                $t->fuel_surcharge_percentage,
                 $t->empty_return_charge_type, $t->empty_return_charge_value, $t->transit_days,
             ]);
 
@@ -86,7 +86,7 @@ class FleetBillingTariffController extends Controller
             'destination_state_code', 'destination_city_code', 'destination_country_code',
             'product_code',
             'base_weight', 'max_weight', 'max_weight_limit', 'weight_base_charge', 'additional_weight', 'additional_charge',
-            'base_haul_rate', 'minimum_trip_charge', 'distance_km', 'distance_rate_per_km', 'fuel_surcharge_percentage',
+            'fuel_surcharge_percentage',
             'empty_return_charge_type', 'empty_return_charge_value', 'transit_days',
         ], $rows);
     }
@@ -152,10 +152,6 @@ class FleetBillingTariffController extends Controller
                     'base_charge' => is_numeric($row['weight_base_charge'] ?? null) ? $row['weight_base_charge'] : 0,
                     'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
                     'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
-                    'base_haul_rate' => is_numeric($row['base_haul_rate'] ?? null) ? $row['base_haul_rate'] : 0,
-                    'minimum_trip_charge' => is_numeric($row['minimum_trip_charge'] ?? null) ? $row['minimum_trip_charge'] : 0,
-                    'distance_km' => is_numeric($row['distance_km'] ?? null) ? $row['distance_km'] : null,
-                    'distance_rate_per_km' => is_numeric($row['distance_rate_per_km'] ?? null) ? $row['distance_rate_per_km'] : 0,
                     'fuel_surcharge_percentage' => is_numeric($row['fuel_surcharge_percentage'] ?? null) ? $row['fuel_surcharge_percentage'] : 0,
                     'empty_return_charge_type' => in_array($row['empty_return_charge_type'] ?? null, ['flat', 'percentage']) ? $row['empty_return_charge_type'] : 'flat',
                     'empty_return_charge_value' => is_numeric($row['empty_return_charge_value'] ?? null) ? $row['empty_return_charge_value'] : 0,
@@ -199,16 +195,31 @@ class FleetBillingTariffController extends Controller
             'base_charge' => 'required|numeric|min:0',
             'additional_weight' => 'required|numeric|min:0.01',
             'additional_charge' => 'required|numeric|min:0',
-            'base_haul_rate' => 'required|numeric|min:0',
-            'minimum_trip_charge' => 'required|numeric|min:0',
-            'distance_km' => 'nullable|numeric|min:0',
-            'distance_rate_per_km' => 'required|numeric|min:0',
             'fuel_surcharge_percentage' => 'required|numeric|min:0|max:100',
             'empty_return_charge_type' => 'required|in:flat,percentage',
             'empty_return_charge_value' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        // A tariff's Max weight limit can't exceed the selected
+        // vehicle's own real capacity — a lower, more restrictive
+        // figure is fine (e.g. a specific lane with a bridge weight
+        // limit), just never higher than the vehicle can actually
+        // carry. PricingEngine separately checks a SHIPMENT's weight
+        // against this same capacity at quote time too, regardless of
+        // how the matched tariff happens to be configured.
+        $validator->after(function ($validator) use ($request) {
+            $vehicleType = \App\Models\VehicleType::find($request->input('vehicle_type_id'));
+            $maxWeightLimit = (float) $request->input('max_weight_limit');
+
+            if ($vehicleType?->max_weight_capacity && $maxWeightLimit > (float) $vehicleType->max_weight_capacity) {
+                $validator->errors()->add(
+                    'max_weight_limit',
+                    "Max weight limit ({$maxWeightLimit}kg) can't exceed {$vehicleType->name}'s capacity ({$vehicleType->max_weight_capacity}kg)."
+                );
+            }
+        });
 
         $data = $validator->validate();
         $data['is_active'] = $request->boolean('is_active', true);
@@ -234,9 +245,6 @@ class FleetBillingTariffController extends Controller
         }
         if (($data['destination_city_id'] ?? null) === '') {
             $data['destination_city_id'] = null;
-        }
-        if (($data['distance_km'] ?? null) === '') {
-            $data['distance_km'] = null;
         }
         if (($data['transit_days'] ?? null) === '') {
             $data['transit_days'] = null;

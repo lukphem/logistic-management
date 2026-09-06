@@ -12,7 +12,7 @@ class FleetBillingTariff extends Model
         'origin_state_id', 'origin_city_id', 'origin_country_id',
         'destination_state_id', 'destination_city_id', 'destination_country_id',
         'min_weight', 'max_weight', 'max_weight_limit', 'base_charge', 'additional_weight', 'additional_charge',
-        'base_haul_rate', 'minimum_trip_charge', 'distance_km', 'distance_rate_per_km', 'fuel_surcharge_percentage',
+        'fuel_surcharge_percentage',
         'empty_return_charge_type', 'empty_return_charge_value',
         'transit_days', 'is_active',
     ];

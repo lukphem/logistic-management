@@ -231,12 +231,12 @@ class PricingEngine
     }
 
     /**
-     * Fleet Billing — the industry-standard cost-based freight rating
-     * formula, given directly:
+     * Fleet Billing — cost-based freight rating, simplified per
+     * explicit direction to just the weight charge (Base Haul Rate,
+     * Distance Charge, and the Minimum Trip Charge floor were removed
+     * entirely):
      *
-     *   freight = base_haul_rate + weight_charge + distance_charge
-     *   freight = max(freight, minimum_trip_charge)      -- a floor,
-     *             never lets a short/light haul undercut the minimum
+     *   freight = weight_charge
      *   fuel_surcharge = freight × fuel_surcharge_percentage
      *   empty_return    = flat or % of freight, ONLY when the shipper
      *                     marks this trip as empty-return at booking/
@@ -245,10 +245,17 @@ class PricingEngine
      * weight_charge reuses the exact same weight-band mechanism as
      * Standard Billing / Origin to Destination (calculateWeightBasedCharge()) —
      * base_charge/additional_weight/additional_charge on the matched
-     * tariff, separate from base_haul_rate (the lane+vehicle flat fee).
-     * distance_charge is distance_km × distance_rate_per_km, both
-     * configured on the tariff (a known lane has a known distance, not
-     * re-entered per shipment).
+     * tariff.
+     *
+     * Before matching a tariff at all, the shipment's chargeable weight
+     * is checked against the selected VehicleType's own
+     * max_weight_capacity — a hard, quote-time check independent of
+     * whatever any tariff's own weight band says. A tariff's own Max
+     * weight limit is separately validated at configuration time
+     * (FleetBillingTariffController) not to exceed this same figure,
+     * but that only stops a bad tariff from being SAVED — this stops a
+     * shipment from being PRICED past the vehicle's real capacity
+     * regardless of how a tariff happens to be configured.
      *
      * Route/lane matching is identical in shape to Origin to
      * Destination (see resolveRouteTariff()), with one more condition:
@@ -287,6 +294,17 @@ class PricingEngine
 
         $chargeableWeight = $this->resolveChargeableWeight($context);
         $vehicleTypeId = (int) $context['vehicle_type_id'];
+        $vehicleType = \App\Models\VehicleType::find($vehicleTypeId);
+
+        // A hard check against the vehicle's own real capacity —
+        // independent of whatever a tariff's weight band says. A
+        // tariff's Max weight limit is validated not to exceed this at
+        // configuration time (FleetBillingTariffController), but this
+        // catches it at quote time too, regardless of how any tariff
+        // was configured.
+        if ($vehicleType?->max_weight_capacity && $chargeableWeight > (float) $vehicleType->max_weight_capacity) {
+            throw new PricingUnavailableException("This shipment ({$chargeableWeight}kg) exceeds {$vehicleType->name}'s capacity ({$vehicleType->max_weight_capacity}kg) — choose a larger vehicle type.");
+        }
 
         $tariff = $this->resolveFleetBillingTariff(
             $serviceType->id, $vehicleTypeId, $originStateId, $originCityId, $originCountryId,
@@ -312,10 +330,7 @@ class PricingEngine
             (float) $tariff->additional_weight
         );
 
-        $distanceCharge = (float) ($tariff->distance_km ?? 0) * (float) $tariff->distance_rate_per_km;
-
-        $freight = (float) $tariff->base_haul_rate + $weightResult['amount'] + $distanceCharge;
-        $freight = max($freight, (float) $tariff->minimum_trip_charge);
+        $freight = $weightResult['amount'];
 
         $surcharges = [];
 
