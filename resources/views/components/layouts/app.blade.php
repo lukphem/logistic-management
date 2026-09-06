@@ -56,6 +56,7 @@
                     // than a flat list of six items.
                     $billingItems = [
                         ['label' => 'Service Types', 'route' => 'service-types.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
+                        ['label' => 'Vehicle Types', 'route' => 'vehicle-types.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Zones', 'route' => 'zones.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Onforwarding', 'route' => 'onforwarding-classifications.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Zone Mapping', 'route' => 'zone-mappings.index', 'icon' => 'layers', 'permission' => 'rates:read'],

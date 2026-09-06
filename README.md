@@ -5010,3 +5010,24 @@ To use it: add a Vehicle Type (Setups → Billing → Standard Billing →
 Fleet Billing tab → "Vehicle types" button), create a Service Type
 with Billing model = "Fleet Billing", then add a fleet rate for a
 lane + vehicle type combination.
+
+## Increment 95 — Bug Fix: "Vehicle Types" Nav Path Didn't Actually Exist
+
+Real bug from Increment 94: the Fleet Billing form's empty-state
+warning said "add one under Setups → Billing → Vehicle Types first" —
+but no such nav path existed. The only way to reach it was a
+"Vehicle types" button tucked inside the Fleet Billing tab itself, not
+a real menu item.
+
+Fixed by adding **Vehicle Types** as a real item in the Billing
+submenu, matching how Service Types and Zones are already surfaced —
+rather than rewriting the warning text to describe the workaround.
+The in-tab shortcut button stays too; no harm in both paths existing.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (Vehicle Types added to the Billing submenu)
+```
+
+No migration needed.
