@@ -1,29 +1,16 @@
-<x-layouts.app :title="'Origin to Destination'">
-
-    @if (session('status'))
-        <div class="mb-5 rounded-xl bg-status-delivered/10 px-4 py-3 text-sm font-medium text-status-delivered">
-            {{ session('status') }}
-        </div>
-    @endif
-
-    @if ($errors->any())
-        <div class="mb-5 rounded-xl bg-status-exception/10 px-4 py-3 text-sm text-status-exception">
-            {{ $errors->first() }}
-        </div>
-    @endif
-
     <p class="mb-4 text-sm text-ink-500">
         Prices a specific route directly — origin to destination, state or a specific city within a state on either
-        side — with no zone involved at all. A shipment matches by service type, route, and weight; a city-specific
-        rate always wins over a state-wide one for that city, and a state-wide rate is the fallback everywhere else.
+        side (or a country, for an international route) — with no zone involved at all. A shipment matches by
+        service type, route, and weight; a city-specific rate always wins over a state-wide one for that city, and a
+        state-wide rate is the fallback everywhere else.
     </p>
 
     <x-csv-actions :export-route="route('origin-destination-billing.export')" :import-route="route('origin-destination-billing.import')" label="Origin to Destination" />
     <p class="mb-5 -mt-3 text-xs text-ink-500">
         Origin/Destination Code is the state's short code, with an optional city short code alongside for a
-        city-specific rate (e.g. state code "LA", city code "IKJ" for Lagos/Ikeja specifically) — Product Code is the
-        service type's code. Import creates rates that don't exist yet and updates ones that do, matched by service
-        type + exact route + weight band.
+        city-specific rate (e.g. state code "LA", city code "IKJ" for Lagos/Ikeja specifically) — or a country code
+        for an international route. Product Code is the service type's code. Import creates rates that don't exist
+        yet and updates ones that do, matched by service type + exact route + weight band.
     </p>
 
     <div class="mb-5 flex items-center justify-between">
@@ -49,7 +36,7 @@
                 </tr>
             </thead>
             <tbody>
-                @forelse ($tariffs as $tariff)
+                @forelse ($originDestinationTariffs as $tariff)
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $tariff->serviceType->name }}</td>
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->originLabel() }}</td>
@@ -88,6 +75,4 @@
         </table>
     </div>
 
-    <div class="mt-5">{{ $tariffs->links() }}</div>
-
-</x-layouts.app>
+    <div class="mt-5">{{ $originDestinationTariffs->links() }}</div>

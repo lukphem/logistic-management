@@ -179,7 +179,6 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/standard-billing', [StandardBillingController::class, 'index'])->name('standard-billing.index');
         Route::get('/standard-billing/export', [StandardBillingController::class, 'exportAll'])->name('standard-billing.export');
         Route::get('/standard-billing/{tariff}/zone-prices/export', [StandardBillingController::class, 'exportZonePrices'])->name('standard-billing.zone-prices.export');
-        Route::get('/origin-destination-billing', [OriginDestinationTariffController::class, 'index'])->name('origin-destination-billing.index');
         Route::get('/origin-destination-billing/export', [OriginDestinationTariffController::class, 'export'])->name('origin-destination-billing.export');
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
         Route::get('/additional-services', [AdditionalServiceController::class, 'index'])->name('additional-services.index');

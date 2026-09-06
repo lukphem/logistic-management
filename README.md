@@ -4701,3 +4701,58 @@ already worked correctly once the underlying model/engine supported it.
 ```powershell
 php artisan migrate
 ```
+
+## Increment 91 — Origin to Destination Merged Under Standard Billing
+
+Both billing models now live on one page — **Standard Billing** and
+**Origin to Destination** as top-level tabs, matching the same
+client-side tab pattern already used for Zone Mapping and Standard
+Billing's own Domestic/International split. The separate "Origin to
+Destination" nav item is gone.
+
+### A real merge, not just a visual wrapper
+
+`OriginDestinationTariffController::index()` is removed entirely —
+`StandardBillingController::index()` now fetches both models' data in
+one request and passes both to the same view. Every action that used
+to redirect to the standalone index (`store`/`update`/`destroy`) now
+redirects to `standard-billing.index?model=origin-destination`
+instead, so adding, editing, or removing a route rate correctly lands
+back on the right tab — not a separate page that no longer exists.
+
+The route-rate table itself was extracted into a reusable
+`origin-destination-billing/_route-rate-table.blade.php` partial
+(mirroring `standard-billing/_tariff-table.blade.php`'s existing
+pattern) and included directly into the merged page.
+
+### Verified end-to-end against the real test environment, not assumed
+
+Reusing the MySQL environment from Increments 88/90:
+
+- Confirmed via `php artisan route:list` that the old
+  `origin-destination-billing.index` route is gone and every other
+  route (create/store/edit/update/destroy/export/import) still
+  resolves correctly
+- Rendered the actual merged page content through Laravel's real
+  compiler with genuine data — confirmed both tab buttons render and
+  the Origin to Destination tab correctly shows the Lagos → United
+  States test tariff from Increment 90's verification
+- Called the real `OriginDestinationTariffController::destroy()`
+  action directly and confirmed its redirect resolves to exactly
+  `standard-billing?model=origin-destination` — the query param the
+  page's JS reads to land on the correct tab
+
+### Files
+
+```
+app/Http/Controllers/Web/StandardBillingController.php   (index() now fetches both models)
+app/Http/Controllers/Web/OriginDestinationTariffController.php   (index() removed, redirects point to the merged page)
+resources/views/standard-billing/index.blade.php   (outer Standard Billing / Origin to Destination tabs)
+resources/views/origin-destination-billing/_route-rate-table.blade.php   (new — extracted from the removed standalone index)
+resources/views/origin-destination-billing/form.blade.php   (Cancel link updated)
+resources/views/components/layouts/app.blade.php   (separate nav item removed)
+routes/web.php   (origin-destination-billing.index route removed)
+```
+
+No migration needed — this is entirely routing/view reorganization on
+top of Increment 90's schema.

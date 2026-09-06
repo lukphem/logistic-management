@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\OriginDestinationTariff;
 use App\Models\ServiceType;
 use App\Models\StandardBillingTariff;
 use App\Models\TariffZonePrice;
@@ -28,7 +29,19 @@ class StandardBillingController extends Controller
         $domesticTariffs = $baseQuery('domestic')->paginate(15, ['*'], 'domestic_page');
         $internationalTariffs = $baseQuery('international')->paginate(15, ['*'], 'international_page');
 
-        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs'));
+        // Origin to Destination is a second billing MODEL, not another
+        // domestic/international split within Standard Billing — shown
+        // as a sibling top-level tab on this same page rather than a
+        // separate one, so switching between the two models never
+        // needs a page reload.
+        $originDestinationTariffs = OriginDestinationTariff::with([
+            'serviceType', 'originState', 'originCity', 'originCountry',
+            'destinationState', 'destinationCity', 'destinationCountry',
+        ])
+            ->orderBy('service_type_id')->orderBy('origin_state_id')->orderBy('destination_state_id')->orderBy('min_weight')
+            ->paginate(20, ['*'], 'origin_destination_page');
+
+        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs', 'originDestinationTariffs'));
     }
 
     public function create(Request $request): View

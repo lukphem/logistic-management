@@ -20,18 +20,6 @@ class OriginDestinationTariffController extends Controller
     {
     }
 
-    public function index(): View
-    {
-        $tariffs = OriginDestinationTariff::with([
-            'serviceType', 'originState', 'originCity', 'originCountry',
-            'destinationState', 'destinationCity', 'destinationCountry',
-        ])
-            ->orderBy('service_type_id')->orderBy('origin_state_id')->orderBy('destination_state_id')->orderBy('min_weight')
-            ->paginate(20);
-
-        return view('origin-destination-billing.index', compact('tariffs'));
-    }
-
     public function create(): View
     {
         return view('origin-destination-billing.form', [
@@ -46,7 +34,7 @@ class OriginDestinationTariffController extends Controller
 
         OriginDestinationTariff::create($data);
 
-        return redirect()->route('origin-destination-billing.index')->with('status', 'Route rate added.');
+        return redirect()->route('standard-billing.index', ['model' => 'origin-destination'])->with('status', 'Route rate added.');
     }
 
     public function edit(OriginDestinationTariff $tariff): View
@@ -63,14 +51,14 @@ class OriginDestinationTariffController extends Controller
 
         $tariff->update($data);
 
-        return redirect()->route('origin-destination-billing.index')->with('status', 'Route rate updated.');
+        return redirect()->route('standard-billing.index', ['model' => 'origin-destination'])->with('status', 'Route rate updated.');
     }
 
     public function destroy(OriginDestinationTariff $tariff): RedirectResponse
     {
         $tariff->delete();
 
-        return redirect()->route('origin-destination-billing.index')->with('status', 'Route rate removed.');
+        return redirect()->route('standard-billing.index', ['model' => 'origin-destination'])->with('status', 'Route rate removed.');
     }
 
     /**

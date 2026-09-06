@@ -172,7 +172,7 @@
         </label>
 
         <div class="flex justify-end gap-3 pt-2">
-            <a href="{{ route('origin-destination-billing.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
+            <a href="{{ route('standard-billing.index', ['model' => 'origin-destination']) }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
                 {{ $tariff->exists ? 'Save changes' : 'Add route rate' }}
             </button>
