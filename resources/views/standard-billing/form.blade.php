@@ -48,7 +48,7 @@
             @endif
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Min weight (kg) <x-required /></label>
                 <input type="number" step="0.01" min="0" name="min_weight" value="{{ old('min_weight', $tariff->min_weight) }}"
@@ -60,6 +60,12 @@
                 <input type="number" step="0.01" min="0" name="max_weight" value="{{ old('max_weight', $tariff->max_weight) }}"
                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 <p class="mt-1 text-xs text-ink-500">The top of this tariff's band — heavier shipments match a different tariff instead.</p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Max weight limit (kg) <x-required /></label>
+                <input type="number" step="0.01" min="0" name="max_weight_limit" value="{{ old('max_weight_limit', $tariff->max_weight_limit ?? $tariff->min_weight) }}"
+                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <p class="mt-1 text-xs text-ink-500">The zone's charge covers up to this weight — anything heavier is billed in increments below. Set independently of Min/Max weight above.</p>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Additional weight (kg) <x-required /></label>

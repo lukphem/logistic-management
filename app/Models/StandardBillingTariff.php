@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StandardBillingTariff extends Model
 {
-    protected $fillable = ['service_type_id', 'min_weight', 'max_weight', 'additional_weight', 'is_active'];
+    protected $fillable = ['service_type_id', 'min_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
 

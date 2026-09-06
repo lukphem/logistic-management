@@ -60,6 +60,7 @@ class StandardBillingController extends Controller
             'service_type_id' => 'required|exists:service_types,id',
             'min_weight' => 'required|numeric|min:0',
             'max_weight' => 'required|numeric|gt:min_weight',
+            'max_weight_limit' => 'required|numeric|min:0',
             'additional_weight' => 'required|numeric|min:0.01',
             'zone_prices' => 'nullable|array',
             'zone_prices.*.zone_id' => 'nullable|exists:zones,id',
@@ -84,6 +85,7 @@ class StandardBillingController extends Controller
             'service_type_id' => $data['service_type_id'],
             'min_weight' => $data['min_weight'],
             'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
             'additional_weight' => $data['additional_weight'],
             'is_active' => $request->boolean('is_active', true),
         ]);
@@ -259,13 +261,13 @@ class StandardBillingController extends Controller
 
         foreach (StandardBillingTariff::with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get() as $tariff) {
             if ($tariff->zonePrices->isEmpty()) {
-                $rows[] = [$tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->additional_weight, '', '', '', ''];
+                $rows[] = [$tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->max_weight_limit, $tariff->additional_weight, '', '', '', ''];
                 continue;
             }
 
             foreach ($tariff->zonePrices as $price) {
                 $rows[] = [
-                    $tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->additional_weight,
+                    $tariff->serviceType->code, $tariff->min_weight, $tariff->max_weight, $tariff->max_weight_limit, $tariff->additional_weight,
                     $price->zone->code, $price->charge, $price->additional_charge, $price->transit_days,
                 ];
             }
@@ -273,7 +275,7 @@ class StandardBillingController extends Controller
 
         return $this->csv->download(
             'standard-billing.csv',
-            ['service_type_code', 'min_weight', 'max_weight', 'additional_weight', 'zone_code', 'charge', 'additional_charge', 'transit_days'],
+            ['service_type_code', 'min_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'zone_code', 'charge', 'additional_charge', 'transit_days'],
             $rows
         );
     }
@@ -328,6 +330,7 @@ class StandardBillingController extends Controller
                         'service_type_id' => $serviceType->id,
                         'min_weight' => $minWeight,
                         'max_weight' => $maxWeight,
+                        'max_weight_limit' => is_numeric($row['max_weight_limit'] ?? null) ? $row['max_weight_limit'] : $maxWeight,
                         'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
                         'is_active' => true,
                     ]);
@@ -366,6 +369,7 @@ class StandardBillingController extends Controller
             'service_type_id' => 'required|exists:service_types,id',
             'min_weight' => 'required|numeric|min:0',
             'max_weight' => 'required|numeric|gt:min_weight',
+            'max_weight_limit' => 'required|numeric|min:0',
             'additional_weight' => 'required|numeric|min:0.01',
             'is_active' => 'sometimes|boolean',
         ]);
