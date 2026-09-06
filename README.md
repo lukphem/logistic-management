@@ -4756,3 +4756,55 @@ routes/web.php   (origin-destination-billing.index route removed)
 
 No migration needed — this is entirely routing/view reorganization on
 top of Increment 90's schema.
+
+## Increment 92 — "Standard Billing" the Method Renamed to "Zoning and Weight"
+
+Per explicit direction, establishing the pattern for every future
+billing model: **"Standard Billing" stays as the parent nav item** (the
+umbrella page), while the tab that used to confusingly share that exact
+same name is renamed to **"Zoning and Weight"** — descriptive of what
+it actually is (zone + weight-band tariffs), and distinct from the
+page it lives under. **Origin to Destination** (Increment 91) already
+followed this shape; any future billing model goes in as another tab
+here too, not a new top-level nav item.
+
+Only the display label changed — `billing_model = 'standard_billing'`
+stays the internal code value everywhere (validation, `PricingEngine`
+dispatch, database), matching the same code-stable/display-renamed
+pattern already used for Cross-Trade (Increment 79) and Packaging/
+Acknowledgement's `kind` field (Increment 83).
+
+### Where this propagated automatically vs. needed explicit changes
+
+`Setting::BILLING_MODELS['standard_billing']`'s label change
+propagates automatically to the Service Type form's Billing Model
+dropdown and the Rate Checker's Billing Model dropdown — both already
+read this constant dynamically via `@foreach`, confirmed directly
+rather than assumed.
+
+Needed explicit updates: the tab button text itself, its CSV actions
+label, two user-facing strings on the Add/Edit Tariff form (a link
+label and a missing-service-type warning), and two `PricingEngine`
+error messages whose nav-path references were already stale after
+Increment 91's merge (one said "Pricing Engine → Standard Billing"
+instead of the actual location; the Origin to Destination one still
+said "Billing → Origin to Destination" even though that page no longer
+exists as a standalone nav item).
+
+Verified end-to-end against the real test environment: rendered the
+actual page content and confirmed "Zoning and Weight" appears with no
+stale "Standard Billing" tab text remaining, and confirmed
+`Setting::BILLING_MODELS['standard_billing']` directly returns the new
+label.
+
+### Files
+
+```
+app/Models/Setting.php   (BILLING_MODELS label)
+app/Services/PricingEngine.php   (two stale nav-path error messages corrected)
+resources/views/standard-billing/index.blade.php   (tab button, CSV label, JS comment)
+resources/views/standard-billing/form.blade.php   (link text, missing-service-type warning)
+```
+
+No migration needed — label-only change on top of Increment 91's
+schema.

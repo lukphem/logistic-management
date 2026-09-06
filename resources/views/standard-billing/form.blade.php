@@ -16,7 +16,7 @@
             <p class="-mt-3 text-xs text-ink-500">
                 For bulk-adding many zones to THIS tariff at once (4 columns: zone_code, charge, additional_charge, transit_days).
                 To set up multiple tariffs across multiple service types from one file instead, use the Export/Import on the
-                <a href="{{ route('standard-billing.index') }}" class="text-[var(--brand-primary)] hover:underline">Standard Billing list page</a> —
+                <a href="{{ route('standard-billing.index') }}" class="text-[var(--brand-primary)] hover:underline">Zoning and Weight list page</a> —
                 that one includes service type and weight range too.
             </p>
         </div>
@@ -44,7 +44,7 @@
                 @endforeach
             </select>
             @if ($serviceTypes->isEmpty())
-                <p class="mt-1 text-xs text-status-exception">No service type is set to "Standard Billing" yet — set one under Setups → Billing → Service Types first.</p>
+                <p class="mt-1 text-xs text-status-exception">No service type is set to "Zoning and Weight" yet — set one under Setups → Billing → Service Types first.</p>
             @endif
         </div>
 

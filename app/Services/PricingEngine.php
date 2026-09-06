@@ -112,7 +112,7 @@ class PricingEngine
         }
 
         if (! $tariff) {
-            throw new PricingUnavailableException('No tariff configured for this service type and weight (Pricing Engine → Standard Billing).');
+            throw new PricingUnavailableException('No tariff configured for this service type and weight (Billing → Standard Billing → Zoning and Weight).');
         }
 
         $zonePrice = TariffZonePrice::where('tariff_id', $tariff->id)->where('zone_id', $zone->id)->first();
@@ -199,7 +199,7 @@ class PricingEngine
         }
 
         if (! $tariff) {
-            throw new PricingUnavailableException('No rate configured for this route yet (Billing → Origin to Destination).');
+            throw new PricingUnavailableException('No rate configured for this route yet (Billing → Standard Billing → Origin to Destination).');
         }
 
         $result = $this->calculateWeightBasedCharge(

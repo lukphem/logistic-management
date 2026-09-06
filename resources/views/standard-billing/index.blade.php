@@ -15,7 +15,7 @@
     <div class="mb-6 flex gap-2 rounded-lg bg-surface-50 p-1">
         <button type="button" id="model-btn-standard" onclick="showBillingModelTab('standard')"
                 class="flex-1 rounded-md bg-surface-0 px-3 py-2 text-sm font-semibold text-ink-900 shadow-sm">
-            Standard Billing
+            Zoning and Weight
         </button>
         <button type="button" id="model-btn-origin-destination" onclick="showBillingModelTab('origin-destination')"
                 class="flex-1 rounded-md px-3 py-2 text-sm font-medium text-ink-500 hover:text-ink-900">
@@ -31,7 +31,7 @@
             appear under that same tab, alongside regular Nigeria-anchored ones.
         </p>
 
-        <x-csv-actions :export-route="route('standard-billing.export')" :import-route="route('standard-billing.import')" label="Standard Billing" />
+        <x-csv-actions :export-route="route('standard-billing.export')" :import-route="route('standard-billing.import')" label="Zoning and Weight" />
         <p class="mb-5 -mt-3 text-xs text-ink-500">
             Covers every tariff and zone price together (8 columns, including service type and weight range) — one row per
             zone, sharing service type/weight range across rows. Import creates tariffs and prices that don't exist yet,
@@ -93,7 +93,7 @@
 
         // Restores state a redirect (e.g. after saving a tariff or a
         // route rate) asked to land on: ?model=origin-destination for
-        // the outer tab, ?tab=international for Standard Billing's own
+        // the outer tab, ?tab=international for Zoning and Weight's own
         // inner tab.
         (function () {
             const params = new URLSearchParams(window.location.search);

@@ -33,7 +33,7 @@ class Setting extends Model
      * when it isn't yet.
      */
     public const BILLING_MODELS = [
-        'standard_billing' => 'Standard Billing (Zone + Weight)',
+        'standard_billing' => 'Zoning and Weight',
         'origin_destination_billing' => 'Origin to Destination',
     ];
 
