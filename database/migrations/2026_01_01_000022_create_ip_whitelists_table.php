@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('label')->nullable();
             $table->timestamp('added_at')->useCurrent();
             $table->timestamps();
-            \$table->unique(['api_client_id', 'ip_or_cidr']);
+            $table->unique(['api_client_id', 'ip_or_cidr']);
         });
     }
 

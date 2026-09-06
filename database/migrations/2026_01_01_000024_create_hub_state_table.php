@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('hub_id')->constrained()->cascadeOnDelete();
             $table->foreignId('state_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
-            \$table->unique(['hub_id', 'state_id']);
+            $table->unique(['hub_id', 'state_id']);
         });
     }
 

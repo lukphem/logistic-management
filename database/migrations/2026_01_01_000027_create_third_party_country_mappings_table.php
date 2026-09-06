@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('country_b_id')->constrained('countries')->cascadeOnDelete();
             $table->foreignId('zone_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
-            \$table->unique(['country_a_id', 'country_b_id']);
+            $table->unique(['country_a_id', 'country_b_id']);
         });
     }
 

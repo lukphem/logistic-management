@@ -14,7 +14,7 @@ return new class extends Migration
             $table->foreignId('state_b_id')->constrained('states')->cascadeOnDelete();
             $table->foreignId('zone_id')->nullable()->constrained()->cascadeOnDelete();
             $table->timestamps();
-            \$table->unique(['state_a_id', 'state_b_id']);
+            $table->unique(['state_a_id', 'state_b_id']);
         });
     }
 

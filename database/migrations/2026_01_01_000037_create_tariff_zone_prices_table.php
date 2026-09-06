@@ -16,7 +16,7 @@ return new class extends Migration
             $table->decimal('additional_charge', 12, 2)->default(0.00);
             $table->unsignedInteger('transit_days')->nullable();
             $table->timestamps();
-            \$table->unique(['tariff_id', 'zone_id']);
+            $table->unique(['tariff_id', 'zone_id']);
         });
     }
 
