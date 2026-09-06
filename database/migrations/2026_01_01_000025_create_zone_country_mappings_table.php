@@ -13,7 +13,7 @@ return new class extends Migration
             $table->foreignId('country_a_id')->nullable()->constrained('countries')->cascadeOnDelete();
             $table->foreignId('zone_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamps();
-            $table->foreignId('country_b_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignId('country_b_id')->unique()->constrained('countries')->cascadeOnDelete();
         });
     }
 
