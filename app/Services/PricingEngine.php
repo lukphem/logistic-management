@@ -31,10 +31,19 @@ class PricingEngine
      *                        configured divisor), before rounding
      *   billed_weight_kg     ?float — chargeable_weight_kg rounded up
      *                        to the matched tariff's own
-     *                        additional_weight increment
-     *                        (Standard Billing only; a future
-     *                        non-weight-based model just wouldn't set
-     *                        these two keys)
+     *                        additional_weight increment (every
+     *                        weight-band model sets these two keys —
+     *                        Standard Billing, Origin to Destination,
+     *                        Fleet Billing; a future non-weight-based
+     *                        model just wouldn't)
+     *   surcharges           array<string, float> — labeled surcharge
+     *                        amounts computed by the billing model
+     *                        itself (currently only Fleet Billing's
+     *                        fuel surcharge / empty-return charge);
+     *                        absent for models with nothing to add.
+     *                        The caller merges this into
+     *                        $context['surcharges'] before calling
+     *                        ShipmentPricingService::priceShipment()
      *
      * Throws PricingUnavailableException — never returns a guessed or
      * zero price — whenever the service type has no model assigned, the
@@ -58,6 +67,7 @@ class PricingEngine
         return match ($serviceType->billing_model) {
             'standard_billing' => $this->standardBilling($serviceType, $context),
             'origin_destination_billing' => $this->originDestinationBilling($serviceType, $context),
+            'fleet_billing' => $this->fleetBilling($serviceType, $context),
             default => throw new PricingUnavailableException("Billing model \"{$serviceType->billing_model}\" isn't implemented yet."),
         };
     }
@@ -221,9 +231,155 @@ class PricingEngine
     }
 
     /**
+     * Fleet Billing — the industry-standard cost-based freight rating
+     * formula, given directly:
+     *
+     *   freight = base_haul_rate + weight_charge + distance_charge
+     *   freight = max(freight, minimum_trip_charge)      -- a floor,
+     *             never lets a short/light haul undercut the minimum
+     *   fuel_surcharge = freight × fuel_surcharge_percentage
+     *   empty_return    = flat or % of freight, ONLY when the shipper
+     *                     marks this trip as empty-return at booking/
+     *                     quote time — not part of every quote
+     *
+     * weight_charge reuses the exact same weight-band mechanism as
+     * Standard Billing / Origin to Destination (calculateWeightBasedCharge()) —
+     * base_charge/additional_weight/additional_charge on the matched
+     * tariff, separate from base_haul_rate (the lane+vehicle flat fee).
+     * distance_charge is distance_km × distance_rate_per_km, both
+     * configured on the tariff (a known lane has a known distance, not
+     * re-entered per shipment).
+     *
+     * Route/lane matching is identical in shape to Origin to
+     * Destination (see resolveRouteTariff()), with one more condition:
+     * vehicle type must match too.
+     *
+     * fuel_surcharge and empty_return are returned as a 'surcharges'
+     * array rather than folded into base_amount — the same generic,
+     * labeled mechanism ShipmentPricingService::calculateSurcharges()
+     * already accepts (previously unused by any billing model). The
+     * caller merges this into $context['surcharges'] before calling
+     * priceShipment(), so both show as their own line items on a
+     * quote rather than one opaque number.
+     */
+    private function fleetBilling(ServiceType $serviceType, array $context): array
+    {
+        if (empty($context['vehicle_type_id'])) {
+            throw new PricingUnavailableException('A vehicle type is required for this service type.');
+        }
+
+        $originCountryId = $context['origin_country_id'] ?? null;
+        $destinationCountryId = $context['destination_country_id'] ?? null;
+
+        $originStateId = $originCountryId ? null : ($context['origin_state_id']
+            ?? (! empty($context['origin_city_id']) ? City::find($context['origin_city_id'])?->state_id : null));
+        $originCityId = $originCountryId ? null : ($context['origin_city_id'] ?? null);
+
+        $destinationStateId = $destinationCountryId ? null : ($context['destination_state_id']
+            ?? (! empty($context['destination_city_id']) ? City::find($context['destination_city_id'])?->state_id : null));
+        $destinationCityId = $destinationCountryId ? null : ($context['destination_city_id'] ?? null);
+
+        if ((! $originStateId && ! $originCountryId) || (! $destinationStateId && ! $destinationCountryId)) {
+            throw new PricingUnavailableException('Origin and destination are required for this service type.');
+        }
+
+        $shippingType = ($originCountryId || $destinationCountryId) ? 'international' : 'domestic';
+
+        $chargeableWeight = $this->resolveChargeableWeight($context);
+        $vehicleTypeId = (int) $context['vehicle_type_id'];
+
+        $tariff = $this->resolveFleetBillingTariff(
+            $serviceType->id, $vehicleTypeId, $originStateId, $originCityId, $originCountryId,
+            $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+        );
+
+        if (! $tariff) {
+            $tariff = $this->resolveFleetBillingTariff(
+                $serviceType->id, $vehicleTypeId, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, null
+            );
+        }
+
+        if (! $tariff) {
+            throw new PricingUnavailableException('No fleet rate configured for this route and vehicle type yet (Billing → Standard Billing → Fleet Billing).');
+        }
+
+        $weightResult = $this->calculateWeightBasedCharge(
+            (float) $tariff->base_charge,
+            (float) $tariff->additional_charge,
+            $chargeableWeight,
+            (float) $tariff->max_weight,
+            (float) $tariff->additional_weight
+        );
+
+        $distanceCharge = (float) ($tariff->distance_km ?? 0) * (float) $tariff->distance_rate_per_km;
+
+        $freight = (float) $tariff->base_haul_rate + $weightResult['amount'] + $distanceCharge;
+        $freight = max($freight, (float) $tariff->minimum_trip_charge);
+
+        $surcharges = [];
+
+        $fuelSurcharge = round($freight * ((float) $tariff->fuel_surcharge_percentage / 100), 2);
+        if ($fuelSurcharge > 0) {
+            $surcharges['Fuel surcharge'] = $fuelSurcharge;
+        }
+
+        if (! empty($context['is_empty_return'])) {
+            $emptyReturnCharge = $tariff->resolveEmptyReturnCharge($freight);
+            if ($emptyReturnCharge > 0) {
+                $surcharges['Empty return charge'] = $emptyReturnCharge;
+            }
+        }
+
+        return [
+            'base_amount' => round($freight, 2),
+            'chargeable_weight_kg' => round($chargeableWeight, 2),
+            'billed_weight_kg' => $weightResult['billed_weight'],
+            'transit_days' => $tariff->transit_days,
+            'shipping_type' => $shippingType,
+            'zone_id' => null,
+            'surcharges' => $surcharges,
+        ];
+    }
+
+    /**
+     * Route to the shared resolveRouteTariff() helper — see its own
+     * docblock for exactly how matching/specificity works.
+     */
+    private function resolveOriginDestinationTariff(
+        int $serviceTypeId,
+        ?int $originStateId, ?int $originCityId, ?int $originCountryId,
+        ?int $destinationStateId, ?int $destinationCityId, ?int $destinationCountryId,
+        ?float $chargeableWeight
+    ): ?\App\Models\OriginDestinationTariff {
+        return $this->resolveRouteTariff(
+            \App\Models\OriginDestinationTariff::class, [],
+            $serviceTypeId, $originStateId, $originCityId, $originCountryId,
+            $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+        );
+    }
+
+    private function resolveFleetBillingTariff(
+        int $serviceTypeId, int $vehicleTypeId,
+        ?int $originStateId, ?int $originCityId, ?int $originCountryId,
+        ?int $destinationStateId, ?int $destinationCityId, ?int $destinationCountryId,
+        ?float $chargeableWeight
+    ): ?\App\Models\FleetBillingTariff {
+        return $this->resolveRouteTariff(
+            \App\Models\FleetBillingTariff::class, ['vehicle_type_id' => $vehicleTypeId],
+            $serviceTypeId, $originStateId, $originCityId, $originCountryId,
+            $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+        );
+    }
+
+    /**
      * Finds the most specific ACTIVE tariff for an exact origin/
-     * destination pair — each side matched by country when a country
-     * id is given, or by state (+ optional city specificity) otherwise.
+     * destination pair, on whichever model class is given — shared by
+     * Origin to Destination and Fleet Billing, since both price a
+     * direct route the same way, just with different extra columns
+     * ($extraConditions — e.g. Fleet Billing also matches on
+     * vehicle_type_id). Each side matched by country when a country id
+     * is given, or by state (+ optional city specificity) otherwise.
      * When $chargeableWeight is given, only bands actually containing
      * that weight are considered; passing null (the "heavier than
      * everything" fallback case) considers every band for the route and
@@ -236,15 +392,24 @@ class PricingEngine
      * beats one specific to only origin, which beats a fully
      * state-wide row. A country-based side has no such refinement —
      * it's an exact country match or it isn't eligible at all.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     * @param class-string<TModel> $modelClass
+     * @return TModel|null
      */
-    private function resolveOriginDestinationTariff(
+    private function resolveRouteTariff(
+        string $modelClass, array $extraConditions,
         int $serviceTypeId,
         ?int $originStateId, ?int $originCityId, ?int $originCountryId,
         ?int $destinationStateId, ?int $destinationCityId, ?int $destinationCountryId,
         ?float $chargeableWeight
-    ): ?\App\Models\OriginDestinationTariff {
-        $query = \App\Models\OriginDestinationTariff::where('service_type_id', $serviceTypeId)
+    ) {
+        $query = $modelClass::where('service_type_id', $serviceTypeId)
             ->where('is_active', true);
+
+        foreach ($extraConditions as $column => $value) {
+            $query->where($column, $value);
+        }
 
         if ($originCountryId) {
             $query->where('origin_country_id', $originCountryId);

@@ -21,6 +21,10 @@
                 class="flex-1 rounded-md px-3 py-2 text-sm font-medium text-ink-500 hover:text-ink-900">
             Origin to Destination
         </button>
+        <button type="button" id="model-btn-fleet" onclick="showBillingModelTab('fleet')"
+                class="flex-1 rounded-md px-3 py-2 text-sm font-medium text-ink-500 hover:text-ink-900">
+            Fleet Billing
+        </button>
     </div>
 
     <div id="model-standard">
@@ -63,9 +67,13 @@
         @include('origin-destination-billing._route-rate-table')
     </div>
 
+    <div id="model-fleet" style="display:none">
+        @include('fleet-billing._route-rate-table')
+    </div>
+
     <script>
         function showBillingModelTab(model) {
-            ['standard', 'origin-destination'].forEach(function (name) {
+            ['standard', 'origin-destination', 'fleet'].forEach(function (name) {
                 document.getElementById('model-' + name).style.display = model === name ? '' : 'none';
 
                 const btn = document.getElementById('model-btn-' + name);
@@ -92,13 +100,13 @@
         }
 
         // Restores state a redirect (e.g. after saving a tariff or a
-        // route rate) asked to land on: ?model=origin-destination for
-        // the outer tab, ?tab=international for Zoning and Weight's own
-        // inner tab.
+        // route rate) asked to land on: ?model=origin-destination or
+        // ?model=fleet for the outer tab, ?tab=international for
+        // Zoning and Weight's own inner tab.
         (function () {
             const params = new URLSearchParams(window.location.search);
-            if (params.get('model') === 'origin-destination') {
-                showBillingModelTab('origin-destination');
+            if (params.get('model') === 'origin-destination' || params.get('model') === 'fleet') {
+                showBillingModelTab(params.get('model'));
             }
             if (params.get('tab') === 'international') {
                 showStandardBillingTab('international');

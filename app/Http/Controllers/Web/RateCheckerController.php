@@ -63,11 +63,21 @@ class RateCheckerController extends Controller
                     'destination_district_id' => $request->filled('destination_district_id') ? $request->integer('destination_district_id') : null,
                     'origin_country_id' => $request->filled('origin_country_id') ? $request->integer('origin_country_id') : null,
                     'destination_country_id' => $request->filled('destination_country_id') ? $request->integer('destination_country_id') : null,
+                    'vehicle_type_id' => $request->filled('vehicle_type_id') ? $request->integer('vehicle_type_id') : null,
+                    'is_empty_return' => $request->boolean('is_empty_return'),
                     'additional_service_option_ids' => $request->input('additional_service_option_ids', []),
                 ];
 
                 $quote = $this->pricingEngine->quote($context);
                 $context['base_amount'] = $quote['base_amount'];
+                // Some billing models (currently only Fleet Billing)
+                // compute their own labeled surcharges — fuel, empty
+                // return — as part of resolving the quote itself, since
+                // they need the tariff to compute the amounts.
+                // ShipmentPricingService's surcharge mechanism was
+                // already generic (Increment ?, calculateSurcharges())
+                // but nothing populated it until now.
+                $context['surcharges'] = array_merge($context['surcharges'] ?? [], $quote['surcharges'] ?? []);
 
                 $breakdown = $this->pricingService->priceShipment($context);
                 $zone = Zone::find($quote['zone_id']);
@@ -105,6 +115,7 @@ class RateCheckerController extends Controller
             'districts' => District::with('city')->orderBy('name')->get(),
             'countries' => Country::where('code', '!=', 'NG')->orderBy('name')->get(),
             'volumetricDivisor' => Setting::current()->volumetric_divisor,
+            'vehicleTypes' => \App\Models\VehicleType::where('is_active', true)->orderBy('name')->get(),
             'additionalServices' => AdditionalService::where('is_active', true)
                 ->with(['options' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
                 ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),

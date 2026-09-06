@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\FleetBillingTariff;
 use App\Models\OriginDestinationTariff;
 use App\Models\ServiceType;
 use App\Models\StandardBillingTariff;
@@ -41,7 +42,16 @@ class StandardBillingController extends Controller
             ->orderBy('service_type_id')->orderBy('origin_state_id')->orderBy('destination_state_id')->orderBy('min_weight')
             ->paginate(20, ['*'], 'origin_destination_page');
 
-        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs', 'originDestinationTariffs'));
+        // Fleet Billing is a third billing model, same sibling-tab
+        // treatment as Origin to Destination above.
+        $fleetBillingTariffs = FleetBillingTariff::with([
+            'serviceType', 'vehicleType', 'originState', 'originCity', 'originCountry',
+            'destinationState', 'destinationCity', 'destinationCountry',
+        ])
+            ->orderBy('service_type_id')->orderBy('vehicle_type_id')->orderBy('min_weight')
+            ->paginate(20, ['*'], 'fleet_page');
+
+        return view('standard-billing.index', compact('domesticTariffs', 'internationalTariffs', 'originDestinationTariffs', 'fleetBillingTariffs'));
     }
 
     public function create(Request $request): View

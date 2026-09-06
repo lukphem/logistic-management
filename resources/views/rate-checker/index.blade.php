@@ -195,6 +195,26 @@
                 </div>
             </div>
 
+            <div id="fleet-fields" style="{{ $selectedServiceType?->billing_model === 'fleet_billing' ? '' : 'display:none' }}">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Vehicle type <x-required /></label>
+                        <select name="vehicle_type_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select a vehicle type</option>
+                            @foreach ($vehicleTypes as $vehicleType)
+                                <option value="{{ $vehicleType->id }}" @selected(request('vehicle_type_id') == $vehicleType->id)>{{ $vehicleType->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="flex items-end pb-2">
+                        <label class="flex items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" name="is_empty_return" value="1" @checked(request('is_empty_return')) class="rounded border-line">
+                            Empty return / repositioning trip
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Weight & dimensions</label>
                 <div class="flex flex-wrap items-end gap-3">
@@ -291,7 +311,9 @@
             </dl>
             <dl class="space-y-1.5 border-t border-line pt-4 text-sm">
                 <div class="flex justify-between"><dt class="text-ink-500">Base</dt><dd class="font-mono text-ink-900">{{ number_format($result['base_amount'], 2) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-ink-500">Surcharges</dt><dd class="font-mono text-ink-900">{{ number_format($result['surcharge_amount'], 2) }}</dd></div>
+                @foreach ($result['surcharges_breakdown'] ?? [] as $line)
+                    <div class="flex justify-between"><dt class="text-ink-500">{{ $line['label'] }}</dt><dd class="font-mono text-ink-900">{{ number_format($line['amount'], 2) }}</dd></div>
+                @endforeach
                 @if ($result['onforwarding_amount'] > 0)
                     <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($result['onforwarding_amount'], 2) }}</dd></div>
                 @endif
@@ -353,7 +375,7 @@
         // existing fields, not a separate form. A genuinely different
         // future billing model would need its own entry here AND its
         // own fields further down, not just adding its key to this list.
-        const implementedModels = ['standard_billing', 'origin_destination_billing'];
+        const implementedModels = ['standard_billing', 'origin_destination_billing', 'fleet_billing'];
 
         function syncModelSection() {
             const chosen = billingModelSelect.value;
@@ -467,6 +489,16 @@
             if (type === 'international') {
                 updateTradeDirection();
             }
+
+            // Vehicle type / empty-return are independent of domestic
+            // vs international — shown by billing_model instead, since
+            // Fleet Billing can route through either.
+            const fleetFields = document.getElementById('fleet-fields');
+            const isFleet = selected?.dataset.billingModel === 'fleet_billing';
+            fleetFields.style.display = isFleet ? '' : 'none';
+            fleetFields.querySelectorAll('input, select').forEach(function (el) {
+                el.disabled = !isFleet;
+            });
 
             filterServiceTypes();
         }

@@ -31,7 +31,8 @@ class ShipmentPricingService
     public function priceShipment(array $context, ?ClientBillingProfile $billingProfile = null): array
     {
         $baseAmount = (float) ($context['base_amount'] ?? 0);
-        $surchargeAmount = $this->calculateSurcharges($context);
+        $surcharges = $this->calculateSurcharges($context);
+        $surchargeAmount = $surcharges['total'];
 
         $discountFraction = $billingProfile?->discountFraction() ?? 0.0;
         $discountAmount = round(($baseAmount + $surchargeAmount) * $discountFraction, 2);
@@ -58,6 +59,7 @@ class ShipmentPricingService
         return [
             'base_amount' => round($baseAmount, 2),
             'surcharge_amount' => round($surchargeAmount, 2),
+            'surcharges_breakdown' => $surcharges['breakdown'],
             'onforwarding_amount' => round($onforwardingAmount, 2),
             'additional_services_amount' => round($additionalServicesAmount, 2),
             'additional_services_breakdown' => $additionalServices['breakdown'],
@@ -68,16 +70,31 @@ class ShipmentPricingService
         ];
     }
 
-    private function calculateSurcharges(array $context): float
+    /**
+     * $context['surcharges'] is a labeled amount map — e.g.
+     * ['Fuel surcharge' => 31250, 'Empty return charge' => 46875],
+     * currently only ever populated by Fleet Billing (see
+     * PricingEngine::fleetBilling()) — returns both the combined total
+     * (for the existing running-subtotal math above) and a per-label
+     * breakdown, matching calculateAdditionalServices()'s shape, so a
+     * quote can show "Fuel surcharge" and "Empty return charge" as
+     * their own lines rather than one opaque "Surcharges" total.
+     *
+     * @return array{total: float, breakdown: array<int, array{label: string, amount: float}>}
+     */
+    private function calculateSurcharges(array $context): array
     {
+        $surcharges = $context['surcharges'] ?? [];
         $total = 0.0;
-        $surcharges = $context['surcharges'] ?? []; // e.g. ['fuel' => 200, 'remote_area' => 500]
+        $breakdown = [];
 
-        foreach ($surcharges as $amount) {
-            $total += (float) $amount;
+        foreach ($surcharges as $label => $amount) {
+            $amount = (float) $amount;
+            $total += $amount;
+            $breakdown[] = ['label' => is_string($label) ? $label : 'Surcharge', 'amount' => round($amount, 2)];
         }
 
-        return $total;
+        return ['total' => $total, 'breakdown' => $breakdown];
     }
 
     /**

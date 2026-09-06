@@ -79,6 +79,7 @@
                     $standardBillingItems = [
                         ['label' => 'Zoning and Weight', 'route' => 'standard-billing.index', 'model' => 'standard', 'icon' => 'sliders', 'permission' => 'billing:read'],
                         ['label' => 'Origin to Destination', 'route' => 'standard-billing.index', 'model' => 'origin-destination', 'icon' => 'route', 'permission' => 'billing:read'],
+                        ['label' => 'Fleet Billing', 'route' => 'standard-billing.index', 'model' => 'fleet', 'icon' => 'sliders', 'permission' => 'billing:read'],
                     ];
 
                     // Ordered by setup dependency. Location-related screens
@@ -236,13 +237,6 @@
                                                             {{ $item['label'] }}
                                                         </a>
                                                     @endforeach
-                                                    {{-- Not built yet — kept visible so the eventual menu shape is
-                                                         already right, rather than appearing later with everything
-                                                         shifting around. --}}
-                                                    <span class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/25" title="Not built yet">
-                                                        <x-icon name="sliders" class="h-3.5 w-3.5 shrink-0" />
-                                                        Fleet Billing
-                                                    </span>
                                                 </div>
                                             </details>
                                         @endif

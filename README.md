@@ -4877,3 +4877,136 @@ resources/views/components/layouts/app.blade.php   (Standard Billing restructure
 ```
 
 No migration needed.
+
+## Increment 94 — Fleet Billing: Industry-Standard Cost-Based Freight Rating
+
+A third billing model, built from the industry-standard formula given
+directly:
+
+```
+freight = base_haul_rate + weight_charge + distance_charge
+freight = max(freight, minimum_trip_charge)          -- a floor
+fuel_surcharge = freight × fuel_surcharge_percentage
+empty_return    = flat or % of freight, only when the shipper marks
+                   the trip as empty-return at booking/quote time
+```
+
+Per explicit direction: Route/Lane matching reuses Origin to
+Destination's exact pattern (state/city/country per side); Weight
+charge reuses the Base Weight/Max Weight/Max Weight Limit banding
+built for the other two models; Fuel surcharge reuses the existing
+(previously unpopulated) generic surcharge mechanism; Empty return is
+chosen at booking time, not baked into the tariff match.
+
+### A genuine finding: most of the "Accessorial Charges" already existed
+
+Before building anything, checked what the existing pipeline already
+covered against the industry breakdown given. Discounts, Taxes (VAT),
+Insurance, and Surcharges were already generic, model-agnostic layers
+in `ShipmentPricingService` — every billing model just produces a
+`base_amount` and lets that shared pipeline handle the rest. The six
+Accessorial Charges listed (loading/offloading, detention, tolls,
+escort, storage, special handling) map onto the existing Additional
+Services mechanism almost exactly. So Fleet Billing's actual new work
+was narrower than the full spec suggested — just Base Haul Rate +
+Variable Operating Charges, the same slot the other two models fill.
+
+### Schema
+
+`vehicle_types` — simple reference entity (Truck, Trailer, Container).
+
+`fleet_billing_tariffs` — service type, vehicle type, origin/
+destination (state+optional city, or country, per side — identical
+shape to `origin_destination_tariffs`), the same three-field weight
+band (`min_weight`/`max_weight`/`max_weight_limit`, Increment 87's
+corrected definitions), `base_charge`/`additional_weight`/
+`additional_charge` for the weight-band's own charge (kept separate
+from `base_haul_rate` — the lane+vehicle flat fee), `minimum_trip_charge`,
+`distance_km` (configured per lane, not re-entered per shipment) +
+`distance_rate_per_km`, `fuel_surcharge_percentage`, and
+`empty_return_charge_type`/`empty_return_charge_value` (flat or
+percentage, reusing the same charge-type pattern as Additional
+Services).
+
+### PricingEngine
+
+`resolveRouteTariff()` — generalized from Origin to Destination's
+matching logic to accept a model class and extra WHERE conditions, so
+Fleet Billing (matching on vehicle type too) and Origin to Destination
+share one implementation instead of duplicating the specificity-
+scoring logic.
+
+`fleetBilling()` computes the formula above and returns fuel surcharge
+and empty-return charge as a `surcharges` array — the same generic,
+labeled mechanism `ShipmentPricingService::calculateSurcharges()`
+already accepted but nothing had ever populated. That method now also
+returns a per-label breakdown, matching the pattern already used for
+additional services (Increment 84).
+
+### Admin UI and Rate Checker
+
+Full CRUD (`VehicleTypeController`, `FleetBillingTariffController`,
+CSV export/import) mirroring Origin to Destination's patterns exactly.
+Wired into the merged Standard Billing page as its third tab and into
+the sidebar as a real sub-menu item — replacing the disabled
+placeholder from Increment 93. Rate Checker gained a Vehicle Type
+dropdown and an Empty Return checkbox, shown whenever the selected
+service type's billing model is Fleet Billing (independent of
+domestic/international, unlike the other route fields).
+
+### Verified end-to-end against a real database throughout, not assumed
+
+Reusing the MySQL test environment from Increments 88/90/93:
+
+- Ran the actual migrations against the real schema and confirmed the
+  resulting columns directly
+- Created a real vehicle type, service type, and tariff, then called
+  `PricingEngine::quote()` directly — hand-verified three separate
+  cases: a normal quote (₦312,500 freight, ₦31,250 fuel surcharge),
+  the empty-return surcharge (₦46,875 = 15% of freight), and the
+  minimum-trip-charge floor correctly overriding a low calculated
+  freight (₦5,000 → floored to ₦250,000, with fuel surcharge computed
+  *after* the floor, not before)
+- Ran an actual request through the real, unmodified
+  `RateCheckerController` and confirmed the full pipeline — VAT,
+  totals, labels — all correct
+- **Caught a real gap before finishing**: the backend surcharge
+  breakdown had been built, but never wired into the Rate Checker's
+  display — it was still showing one combined "Surcharges" total
+  instead of separate "Fuel surcharge"/"Empty return charge" lines.
+  Fixed and re-verified the exact rendered number (₦31,250.00) matches
+  the hand-calculated value precisely
+- Rendered the merged Standard Billing page's Fleet Billing tab and
+  the sidebar's nav item through Laravel's real compiler, confirming
+  both show real tariff data and correct active-state highlighting
+
+### Files
+
+```
+database/migrations/2026_02_19_000001_create_vehicle_types_table.php
+database/migrations/2026_02_19_000002_create_fleet_billing_tariffs_table.php
+app/Models/VehicleType.php, FleetBillingTariff.php
+app/Models/Setting.php   (BILLING_MODELS gains fleet_billing)
+app/Services/PricingEngine.php   (resolveRouteTariff() generalized, fleetBilling() added)
+app/Services/ShipmentPricingService.php   (calculateSurcharges() returns a breakdown)
+app/Http/Controllers/Web/VehicleTypeController.php, FleetBillingTariffController.php
+app/Http/Controllers/Web/StandardBillingController.php   (fetches fleet tariffs for the third tab)
+app/Http/Controllers/Web/RateCheckerController.php   (vehicle_type_id/is_empty_return context, merges quote surcharges)
+resources/views/vehicle-types/index.blade.php, form.blade.php
+resources/views/fleet-billing/form.blade.php, _route-rate-table.blade.php
+resources/views/standard-billing/index.blade.php   (third tab)
+resources/views/components/layouts/app.blade.php   (Fleet Billing is now a real link, not disabled)
+resources/views/rate-checker/index.blade.php   (Vehicle Type + Empty Return fields, surcharges breakdown display, fleet_billing added to implementedModels)
+routes/web.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```
+
+To use it: add a Vehicle Type (Setups → Billing → Standard Billing →
+Fleet Billing tab → "Vehicle types" button), create a Service Type
+with Billing model = "Fleet Billing", then add a fleet rate for a
+lane + vehicle type combination.
