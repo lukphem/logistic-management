@@ -4442,13 +4442,28 @@ their actual final state.
 switched from `sqlite` to `mysql`. Nothing else in `config/database.php`
 changed — the `mysql` connection block was already fully configured.
 
-### Not yet done
+### Verified against real MySQL
 
-This was assembled and reviewed without a PHP runtime available in the
-environment it was built in — no `php artisan migrate` was actually
-run against it. **Before relying on this**, run
-`php artisan migrate:fresh --seed` against a real MySQL database and
-confirm it completes cleanly and the seeders still pass. If anything
+No PHP/Composer runtime was available in the environment this was
+built in (no Packagist access), so `php artisan migrate` itself
+couldn't be run. Instead, a local MySQL 8.0 server was installed and
+every `Schema::create`/`Schema::table` call across all 41 migrations
+was translated to raw DDL and executed against it in order — 79
+statements, 0 errors, 48 tables created, every foreign key resolved
+to its correct target (spot-checked in full on `users` and
+`shipments`).
+
+That pass caught one real bug: `zone_country_mappings.country_b_id`
+(renamed from `country_id` by a later migration in the original
+history) used a bare `->constrained()`, which infers the target table
+from the *current* column name — `country_bs`, which doesn't exist.
+Fixed by making it explicit: `->constrained('countries')`.
+
+This confirms the DDL itself is sound on MySQL. It does **not**
+replace running `php artisan migrate:fresh --seed` through Laravel
+itself once you have Composer access — that's still worth doing to
+confirm the seeders and model events (e.g. `State`/`City`'s
+auto-composed `code` fields) still behave end to end. If anything
 doesn't line up, `database/migrations_legacy/` has the exact original
 92-file history to diff against.
 
