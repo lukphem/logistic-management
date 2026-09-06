@@ -28,9 +28,9 @@
                             @if ($i === 0)
                                 <td class="px-5 py-3 font-medium text-ink-900" rowspan="{{ $rowCount }}">{{ $tariff->serviceType->name }}</td>
                                 <td class="px-5 py-3 text-ink-500" rowspan="{{ $rowCount }}">
-                                    {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg
-                                    @if ($tariff->max_weight_limit !== null && (float) $tariff->max_weight_limit !== (float) $tariff->min_weight)
-                                        <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg</span>
+                                    {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
+                                    @if ((float) $tariff->max_weight !== (float) $tariff->min_weight)
+                                        <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg</span>
                                     @endif
                                 </td>
                                 <td class="px-5 py-3 text-ink-500" rowspan="{{ $rowCount }}">{{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }} kg</td>
@@ -60,9 +60,9 @@
                         <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                             <td class="px-5 py-3 font-medium text-ink-900">{{ $tariff->serviceType->name }}</td>
                             <td class="px-5 py-3 text-ink-500">
-                                {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg
-                                @if ($tariff->max_weight_limit !== null && (float) $tariff->max_weight_limit !== (float) $tariff->min_weight)
-                                    <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg</span>
+                                {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
+                                @if ((float) $tariff->max_weight !== (float) $tariff->min_weight)
+                                    <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg</span>
                                 @endif
                             </td>
                             <td class="px-5 py-3 text-ink-500">{{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }} kg</td>

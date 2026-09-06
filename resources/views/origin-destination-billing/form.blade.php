@@ -85,13 +85,13 @@
                 <label class="mb-1 block text-sm font-medium text-ink-900">Max weight (kg) <x-required /></label>
                 <input type="number" step="0.01" min="0" name="max_weight" value="{{ old('max_weight', $tariff->max_weight) }}"
                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <p class="mt-1 text-xs text-ink-500">The top of this band — heavier shipments match a different rate.</p>
+                <p class="mt-1 text-xs text-ink-500">Base charge covers up to here — extra kg beyond this is billed below.</p>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Max weight limit (kg) <x-required /></label>
                 <input type="number" step="0.01" min="0" name="max_weight_limit" value="{{ old('max_weight_limit', $tariff->max_weight_limit ?? $tariff->min_weight) }}"
                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                <p class="mt-1 text-xs text-ink-500">Base charge covers up to here — extra kg beyond this is billed below.</p>
+                <p class="mt-1 text-xs text-ink-500">The top of this band — heavier shipments match a different rate.</p>
             </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Additional weight (kg) <x-required /></label>

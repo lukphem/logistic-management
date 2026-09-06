@@ -4473,3 +4473,74 @@ php artisan migrate
 To use it: create a Service Type with Billing model = "Origin to
 Destination" and Route type = Domestic, then add route rates under
 the new **Origin to Destination** nav item.
+
+## Increment 87 — Max Weight / Max Weight Limit: Corrected Definitions, Applied Everywhere
+
+Corrects a naming mix-up from Increments 85/86, per explicit direction.
+The two *concepts* are unchanged — a band-matching boundary, and a
+separate overage-start reference — only which field represents which
+concept swaps, consistently across both billing models:
+
+| Field | Now means |
+|---|---|
+| **Max weight** | Overage reference — base charge covers up to here, extra kg beyond this is billed |
+| **Max weight limit** | Band's matching boundary — heavier shipments match a different rate |
+
+```
+band match:  min_weight <= weight <= max_weight_limit   (was: <= max_weight)
+overage:     billed_weight - max_weight                  (was: - max_weight_limit)
+```
+
+### Existing data swapped explicitly, not via a single SQL statement
+
+Column names are unchanged — only which one the code treats as "the
+boundary" vs "the overage point" changes. But existing Standard
+Billing tariffs were stored under the *old* meaning, so their actual
+values needed to trade places for pricing to stay identical after this
+correction.
+
+Deliberately **not** `UPDATE ... SET max_weight = max_weight_limit,
+max_weight_limit = max_weight` in one statement — MySQL's evaluation
+order for multiple column assignments referencing each other in a
+single UPDATE isn't something worth trusting for financial data. Every
+row is swapped explicitly in PHP instead, using values read before any
+write, so there's no engine-dependent ambiguity — applied to both
+`standard_billing_tariffs` and `origin_destination_tariffs`.
+
+### Everywhere the swap needed to happen
+
+- **`PricingEngine`** — both `standardBilling()`'s and
+  `originDestinationBilling()`'s band-matching queries now use
+  `max_weight_limit`; both models' overage calculation now measures
+  from `max_weight`
+- **Overlap detection** (Standard Billing — two tariffs for the same
+  service type can't have overlapping ranges) now compares
+  `max_weight_limit` against other tariffs' `max_weight_limit`, not
+  `max_weight`
+- **Validation** — `gt:min_weight` moved from `max_weight` to
+  `max_weight_limit` in both controllers, matching which field is now
+  the real boundary
+- **CSV import's tariff-identity/matching key** (deciding whether an
+  imported row updates an existing tariff or creates a new one) now
+  uses `min_weight` + `max_weight_limit`, the real band identity — not
+  `max_weight`, which could now differ between two rows describing the
+  same physical band
+- **Both admin forms' help text, both list-table displays** (including
+  which field the "overage from Xkg" annotation reads)
+
+### Files
+
+```
+database/migrations/2026_02_17_000001_swap_max_weight_and_max_weight_limit_meaning.php
+app/Services/PricingEngine.php   (both billing models' matching + overage swapped)
+app/Http/Controllers/Web/StandardBillingController.php   (validation, overlap detection, CSV identity key)
+app/Http/Controllers/Web/OriginDestinationTariffController.php   (validation, CSV identity key)
+resources/views/standard-billing/form.blade.php, _tariff-table.blade.php
+resources/views/origin-destination-billing/form.blade.php, index.blade.php
+```
+
+### To apply locally
+
+```powershell
+php artisan migrate
+```

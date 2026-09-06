@@ -55,9 +55,9 @@
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->originLabel() }}</td>
                         <td class="px-5 py-3 text-ink-900">{{ $tariff->destinationLabel() }}</td>
                         <td class="px-5 py-3 text-ink-500">
-                            {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg
-                            @if ((float) $tariff->max_weight_limit !== (float) $tariff->min_weight)
-                                <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg</span>
+                            {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
+                            @if ((float) $tariff->max_weight !== (float) $tariff->min_weight)
+                                <br><span class="text-xs">overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg</span>
                             @endif
                         </td>
                         <td class="px-5 py-3 font-mono text-ink-900">{{ number_format($tariff->base_charge, 2) }}</td>

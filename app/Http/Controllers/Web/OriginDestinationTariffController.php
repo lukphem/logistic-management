@@ -115,9 +115,9 @@ class OriginDestinationTariffController extends Controller
             $destinationState = State::where('short_code', strtoupper(trim($row['destination_state_code'] ?? '')))->first();
             $serviceType = ServiceType::where('code', strtoupper(trim($row['product_code'] ?? '')))->first();
             $minWeight = $row['base_weight'] ?? null;
-            $maxWeight = $row['max_weight'] ?? null;
+            $maxWeightLimit = $row['max_weight_limit'] ?? null;
 
-            if (! $originState || ! $destinationState || ! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeight)) {
+            if (! $originState || ! $destinationState || ! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
                 $skipped++;
                 continue;
             }
@@ -137,10 +137,10 @@ class OriginDestinationTariffController extends Controller
                     'destination_state_id' => $destinationState->id,
                     'destination_city_id' => $destinationCity?->id,
                     'min_weight' => $minWeight,
-                    'max_weight' => $maxWeight,
+                    'max_weight_limit' => $maxWeightLimit,
                 ],
                 [
-                    'max_weight_limit' => is_numeric($row['max_weight_limit'] ?? null) ? $row['max_weight_limit'] : $minWeight,
+                    'max_weight' => is_numeric($row['max_weight'] ?? null) ? $row['max_weight'] : $minWeight,
                     'base_charge' => is_numeric($row['base_charge'] ?? null) ? $row['base_charge'] : 0,
                     'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
                     'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
@@ -172,8 +172,8 @@ class OriginDestinationTariffController extends Controller
             'destination_state_id' => 'required|exists:states,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'min_weight' => 'required|numeric|min:0',
-            'max_weight' => 'required|numeric|gt:min_weight',
-            'max_weight_limit' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
             'base_charge' => 'required|numeric|min:0',
             'additional_weight' => 'required|numeric|min:0.01',
             'additional_charge' => 'required|numeric|min:0',

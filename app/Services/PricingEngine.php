@@ -67,13 +67,15 @@ class PricingEngine
      *  1. resolve the route to a zone (domestic state-pair or
      *     international country mapping — see resolveZoneAndType())
      *  2. find the tariff for this service type whose weight band
-     *     contains the shipment weight
+     *     (min_weight to max_weight_limit) contains the shipment weight
      *  3. find that tariff's price row for the resolved zone
-     *  4. the zone's charge covers the tariff's min_weight specifically
-     *     — weight above min_weight is charged in additional_weight-
-     *     sized increments at the zone's additional_charge, continuing
-     *     up through max_weight (and beyond, for the "heavier than
-     *     every configured band" fallback below)
+     *  4. the zone's charge covers the tariff up to max_weight —
+     *     weight above that is charged in additional_weight-sized
+     *     increments at the zone's additional_charge, continuing up
+     *     through max_weight_limit (and beyond, for the "heavier than
+     *     every configured band" fallback below). max_weight is
+     *     independently settable from min_weight/max_weight_limit — it
+     *     need not equal either.
      */
     private function standardBilling(ServiceType $serviceType, array $context): array
     {
@@ -93,7 +95,7 @@ class PricingEngine
         $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
             ->where('is_active', true)
             ->where('min_weight', '<=', $chargeableWeight)
-            ->where('max_weight', '>=', $chargeableWeight)
+            ->where('max_weight_limit', '>=', $chargeableWeight)
             ->orderBy('min_weight')
             ->first();
 
@@ -105,7 +107,7 @@ class PricingEngine
         if (! $tariff) {
             $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
                 ->where('is_active', true)
-                ->orderByDesc('max_weight')
+                ->orderByDesc('max_weight_limit')
                 ->first();
         }
 
@@ -123,7 +125,7 @@ class PricingEngine
             (float) $zonePrice->charge,
             (float) $zonePrice->additional_charge,
             $chargeableWeight,
-            (float) ($tariff->max_weight_limit ?? $tariff->min_weight),
+            (float) ($tariff->max_weight ?? $tariff->min_weight),
             (float) $tariff->additional_weight
         );
 
@@ -142,7 +144,7 @@ class PricingEngine
      * billing model from Standard Billing: a direct route lookup, no
      * Zone/ZoneMapping involved. Each OriginDestinationTariff prices one
      * specific origin-state/city to destination-state/city route
-     * directly; the weight-band matching, max_weight_limit overage
+     * directly; the weight-band matching, max_weight overage
      * reference, and rounding are identical in shape to Standard
      * Billing (see calculateWeightBasedCharge()), just applied to a
      * route-matched tariff instead of a zone-matched one.
@@ -186,7 +188,7 @@ class PricingEngine
             (float) $tariff->base_charge,
             (float) $tariff->additional_charge,
             $chargeableWeight,
-            (float) $tariff->max_weight_limit,
+            (float) $tariff->max_weight,
             (float) $tariff->additional_weight
         );
 
@@ -222,7 +224,7 @@ class PricingEngine
             ->where('destination_state_id', $destinationStateId);
 
         if ($chargeableWeight !== null) {
-            $query->where('min_weight', '<=', $chargeableWeight)->where('max_weight', '>=', $chargeableWeight);
+            $query->where('min_weight', '<=', $chargeableWeight)->where('max_weight_limit', '>=', $chargeableWeight);
         }
 
         return $query->get()
@@ -233,7 +235,7 @@ class PricingEngine
                 return $originOk && $destinationOk;
             })
             ->sortByDesc(fn ($tariff) => ($tariff->origin_city_id ? 1 : 0) + ($tariff->destination_city_id ? 1 : 0))
-            ->when($chargeableWeight === null, fn ($collection) => $collection->sortByDesc('max_weight'))
+            ->when($chargeableWeight === null, fn ($collection) => $collection->sortByDesc('max_weight_limit'))
             ->first();
     }
 

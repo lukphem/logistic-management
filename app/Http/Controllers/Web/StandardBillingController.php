@@ -59,8 +59,8 @@ class StandardBillingController extends Controller
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'min_weight' => 'required|numeric|min:0',
-            'max_weight' => 'required|numeric|gt:min_weight',
-            'max_weight_limit' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
             'additional_weight' => 'required|numeric|min:0.01',
             'zone_prices' => 'nullable|array',
             'zone_prices.*.zone_id' => 'nullable|exists:zones,id',
@@ -72,10 +72,10 @@ class StandardBillingController extends Controller
         $validator->after(function ($validator) use ($request) {
             $this->rejectIfOverlapping(
                 $validator,
-                'max_weight',
+                'max_weight_limit',
                 (int) $request->input('service_type_id'),
                 (float) $request->input('min_weight'),
-                (float) $request->input('max_weight')
+                (float) $request->input('max_weight_limit')
             );
         });
 
@@ -282,7 +282,7 @@ class StandardBillingController extends Controller
 
     /**
      * Creates tariffs AND their zone prices together from one file —
-     * rows sharing the same (service_type_code, min_weight, max_weight)
+     * rows sharing the same (service_type_code, min_weight, max_weight_limit)
      * build up one tariff's several zone prices. An exact-match tariff
      * is reused (so re-importing an amended export updates rather than
      * duplicates); a NEW range that overlaps an existing active tariff
@@ -302,24 +302,24 @@ class StandardBillingController extends Controller
         foreach ($rows as $row) {
             $serviceType = ServiceType::where('code', strtoupper(trim($row['service_type_code'] ?? '')))->first();
             $minWeight = $row['min_weight'] ?? null;
-            $maxWeight = $row['max_weight'] ?? null;
+            $maxWeightLimit = $row['max_weight_limit'] ?? null;
 
-            if (! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeight)) {
+            if (! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
                 $skipped++;
                 continue;
             }
 
-            $cacheKey = "{$serviceType->id}:{$minWeight}:{$maxWeight}";
+            $cacheKey = "{$serviceType->id}:{$minWeight}:{$maxWeightLimit}";
 
             if (! isset($tariffCache[$cacheKey])) {
                 $tariff = StandardBillingTariff::where('service_type_id', $serviceType->id)
-                    ->where('min_weight', $minWeight)->where('max_weight', $maxWeight)->first();
+                    ->where('min_weight', $minWeight)->where('max_weight_limit', $maxWeightLimit)->first();
 
                 if (! $tariff) {
                     $overlaps = StandardBillingTariff::where('service_type_id', $serviceType->id)
                         ->where('is_active', true)
-                        ->get(['min_weight', 'max_weight'])
-                        ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeight, (float) $t->min_weight, (float) $t->max_weight));
+                        ->get(['min_weight', 'max_weight_limit'])
+                        ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeightLimit, (float) $t->min_weight, (float) $t->max_weight_limit));
 
                     if ($overlaps) {
                         $skipped++;
@@ -329,8 +329,8 @@ class StandardBillingController extends Controller
                     $tariff = StandardBillingTariff::create([
                         'service_type_id' => $serviceType->id,
                         'min_weight' => $minWeight,
-                        'max_weight' => $maxWeight,
-                        'max_weight_limit' => is_numeric($row['max_weight_limit'] ?? null) ? $row['max_weight_limit'] : $maxWeight,
+                        'max_weight' => is_numeric($row['max_weight'] ?? null) ? $row['max_weight'] : $minWeight,
+                        'max_weight_limit' => $maxWeightLimit,
                         'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
                         'is_active' => true,
                     ]);
@@ -368,8 +368,8 @@ class StandardBillingController extends Controller
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'min_weight' => 'required|numeric|min:0',
-            'max_weight' => 'required|numeric|gt:min_weight',
-            'max_weight_limit' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
             'additional_weight' => 'required|numeric|min:0.01',
             'is_active' => 'sometimes|boolean',
         ]);
@@ -377,10 +377,10 @@ class StandardBillingController extends Controller
         $validator->after(function ($validator) use ($request, $ignoring) {
             $this->rejectIfOverlapping(
                 $validator,
-                'max_weight',
+                'max_weight_limit',
                 (int) $request->input('service_type_id'),
                 (float) $request->input('min_weight'),
-                (float) $request->input('max_weight'),
+                (float) $request->input('max_weight_limit'),
                 $ignoring
             );
         });
@@ -402,13 +402,13 @@ class StandardBillingController extends Controller
         $others = StandardBillingTariff::where('service_type_id', $serviceTypeId)
             ->where('is_active', true)
             ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
-            ->get(['min_weight', 'max_weight']);
+            ->get(['min_weight', 'max_weight_limit']);
 
         foreach ($others as $tariff) {
-            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight)) {
+            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight_limit)) {
                 $validator->errors()->add(
                     $errorField,
-                    "This range ({$min}–{$max}kg) overlaps another tariff for this service type ({$tariff->min_weight}–{$tariff->max_weight}kg)."
+                    "This range ({$min}–{$max}kg) overlaps another tariff for this service type ({$tariff->min_weight}–{$tariff->max_weight_limit}kg)."
                 );
             }
         }
@@ -419,7 +419,8 @@ class StandardBillingController extends Controller
      * one ends strictly before the other begins. Touching endpoints
      * (0–20 and 20–40) count as overlapping on purpose: a shipment at
      * exactly 20kg would otherwise match two tariffs at once, and
-     * PricingEngine already treats max_weight as an inclusive boundary.
+     * PricingEngine already treats max_weight_limit as an inclusive
+     * boundary.
      */
     private function rangesOverlap(float $minA, float $maxA, float $minB, float $maxB): bool
     {
