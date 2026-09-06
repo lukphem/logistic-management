@@ -17,6 +17,12 @@
                 Filter
             </button>
         </form>
+
+        @can('shipments:create')
+            <a href="{{ route('shipments.create') }}" class="shrink-0 rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
+                + Create shipment
+            </a>
+        @endcan
     </div>
 
     <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">

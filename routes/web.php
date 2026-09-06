@@ -12,6 +12,7 @@ use App\Http\Controllers\Web\HubController;
 use App\Http\Controllers\Web\InvoiceController;
 use App\Http\Controllers\Web\OnforwardingClassificationController;
 use App\Http\Controllers\Web\OutletController;
+use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\RateCheckerController;
 use App\Http\Controllers\Web\RegionController;
 use App\Http\Controllers\Web\RoleController;
@@ -42,6 +43,11 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
+    Route::middleware('can:shipments:create')->group(function () {
+        Route::get('/shipments/create', [ShipmentController::class, 'create'])->name('shipments.create');
+        Route::post('/shipments', [ShipmentController::class, 'store'])->name('shipments.store');
+        Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
+    });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
 
     // System setup — gated to whoever holds settings:update (Super Admin, Finance-read only sees nothing here).
@@ -179,6 +185,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/standard-billing/export', [StandardBillingController::class, 'exportAll'])->name('standard-billing.export');
         Route::get('/standard-billing/{tariff}/zone-prices/export', [StandardBillingController::class, 'exportZonePrices'])->name('standard-billing.zone-prices.export');
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
+        Route::post('/rate-checker/quote', [QuoteController::class, 'store'])->name('quotes.store');
         Route::get('/additional-services', [AdditionalServiceController::class, 'index'])->name('additional-services.index');
         Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
         Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');

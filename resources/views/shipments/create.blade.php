@@ -1,17 +1,49 @@
-<x-layouts.app :title="'Rate Checker'">
+<x-layouts.app :title="'Create Shipment'">
 
     <p class="mb-5 text-sm text-ink-500">
-        Check what a shipment would cost without creating one — runs the exact same pricing pipeline as a real
-        booking, so the number here is always what a customer would actually be charged.
+        Same Route → Type → Service Type flow as the Rate Checker. Have a Quote ID? Load it below and the price is
+        locked in at whatever it was quoted at. No Quote ID? Fill this in and it prices fresh, at today's rates,
+        the moment you submit.
     </p>
 
-    <form method="GET" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+    @if ($errors->any())
+        <div class="mb-5 max-w-2xl rounded-xl border border-status-exception/30 bg-status-exception/5 p-4 text-sm text-status-exception">
+            <p class="font-medium">Couldn't create this shipment</p>
+            <ul class="mt-1 list-disc pl-5">
+                @foreach ($errors->all() as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <div class="mb-5 max-w-2xl rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        <label class="mb-1 block text-sm font-medium text-ink-900">Have a Quote ID?</label>
+        <div class="flex gap-2">
+            <input type="text" id="quote-lookup-input" placeholder="e.g. QT-7K2XPB"
+                   class="w-48 rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            <button type="button" id="load-quote-btn" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">
+                Load quote
+            </button>
+        </div>
+        <p id="quote-lookup-error" class="mt-2 hidden text-xs text-status-exception"></p>
+        <div id="quote-lookup-success" class="mt-3 hidden rounded-md bg-[var(--brand-primary)]/5 px-3 py-2 text-sm text-ink-900">
+            Quote <span id="loaded-quote-number" class="font-mono font-semibold"></span> loaded — locked total
+            <span id="loaded-quote-total" class="font-mono font-semibold"></span>, expires
+            <span id="loaded-quote-expiry"></span>. Fields below have been filled in — adjust addresses and other
+            shipment details, then create the shipment.
+        </div>
+    </div>
+
+    <form method="POST" action="{{ route('shipments.store') }}" id="create-shipment-form" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        @csrf
+        <input type="hidden" name="quote_number" id="quote-number-field" value="{{ old('quote_number') }}">
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <x-required /></label>
             <select id="billing-model" name="billing_model" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">Select a billing model</option>
                 @foreach ($billingModels as $key => $label)
-                    <option value="{{ $key }}" @selected(request('billing_model') === $key)>{{ $label }}</option>
+                    <option value="{{ $key }}" @selected(old('billing_model') === $key)>{{ $label }}</option>
                 @endforeach
             </select>
             <p class="mt-1 text-xs text-ink-500">The rest of this form depends on which model is picked — different models need different fields.</p>
@@ -23,11 +55,11 @@
 
         <div id="model-fields" class="hidden space-y-4">
             @php
-                $selectedRouteType = request('route_type', 'domestic');
+                $selectedRouteType = old('route_type', 'domestic');
                 // No default here on purpose — Type must be actively
                 // chosen before Service Type reveals, matching the
                 // sequential Route -> Type -> Service Type flow.
-                $selectedTradeDirectionChoice = request('trade_direction');
+                $selectedTradeDirectionChoice = old('trade_direction');
                 $showServiceTypeSelector = $selectedRouteType === 'domestic' || ($selectedRouteType === 'international' && $selectedTradeDirectionChoice);
             @endphp
 
@@ -68,13 +100,13 @@
                 <select id="service-type" name="service_type_id" onchange="syncFieldsForServiceType();" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     <option value="">Select a service type</option>
                     @foreach ($serviceTypes as $serviceType)
-                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(request('service_type_id') == $serviceType->id)>{{ $serviceType->name }}{{ $serviceType->trade_direction === 'cross_trade' ? ' (Cross-Trade)' : '' }}</option>
+                        <option value="{{ $serviceType->id }}" data-billing-model="{{ $serviceType->billing_model }}" data-route-type="{{ $serviceType->route_type }}" data-trade-direction="{{ $serviceType->trade_direction }}" @selected(old('service_type_id') == $serviceType->id)>{{ $serviceType->name }}{{ $serviceType->trade_direction === 'cross_trade' ? ' (Cross-Trade)' : '' }}</option>
                     @endforeach
                 </select>
             </div>
 
             @php
-                $selectedServiceType = request('service_type_id') ? \App\Models\ServiceType::find(request('service_type_id')) : null;
+                $selectedServiceType = old('service_type_id') ? \App\Models\ServiceType::find(old('service_type_id')) : null;
                 $tradeDirection = $selectedServiceType?->trade_direction ?? 'export';
                 // Which side Nigeria is on determines which field names
                 // carry the Nigeria state/city vs the foreign country —
@@ -92,7 +124,7 @@
                         <select id="origin-state" name="origin_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             <option value="">Select a state</option>
                             @foreach ($states as $state)
-                                <option value="{{ $state->id }}" @selected(request('origin_state_id') == $state->id)>{{ $state->name }}</option>
+                                <option value="{{ $state->id }}" @selected(old('origin_state_id') == $state->id)>{{ $state->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -116,7 +148,7 @@
                         <select id="destination-state" name="destination_state_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             <option value="">Select a state</option>
                             @foreach ($states as $state)
-                                <option value="{{ $state->id }}" @selected(request('destination_state_id') == $state->id)>{{ $state->name }}</option>
+                                <option value="{{ $state->id }}" @selected(old('destination_state_id') == $state->id)>{{ $state->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -148,7 +180,7 @@
                             <select id="intl-nigeria-state" name="{{ $nigeriaStateField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 <option value="">Select a state</option>
                                 @foreach ($states as $state)
-                                    <option value="{{ $state->id }}" @selected(request($nigeriaStateField) == $state->id)>{{ $state->name }}</option>
+                                    <option value="{{ $state->id }}" @selected(old($nigeriaStateField) == $state->id)>{{ $state->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -163,7 +195,7 @@
                             <select id="intl-foreign-country" name="{{ $foreignCountryField }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 <option value="">Select a country</option>
                                 @foreach ($countries as $country)
-                                    <option value="{{ $country->id }}" @selected(request($foreignCountryField) == $country->id)>{{ $country->name }}</option>
+                                    <option value="{{ $country->id }}" @selected(old($foreignCountryField) == $country->id)>{{ $country->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -178,7 +210,7 @@
                             <select id="ctp-origin-country" name="origin_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 <option value="">Select a country</option>
                                 @foreach ($countries as $country)
-                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && request('origin_country_id') == $country->id)>{{ $country->name }}</option>
+                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && old('origin_country_id') == $country->id)>{{ $country->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -187,7 +219,7 @@
                             <select id="ctp-destination-country" name="destination_country_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                 <option value="">Select a country</option>
                                 @foreach ($countries as $country)
-                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && request('destination_country_id') == $country->id)>{{ $country->name }}</option>
+                                    <option value="{{ $country->id }}" @selected($tradeDirection === 'cross_trade' && old('destination_country_id') == $country->id)>{{ $country->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -200,22 +232,22 @@
                 <div class="flex flex-wrap items-end gap-3">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Weight (kg) <x-required /></label>
-                        <input type="number" step="0.01" min="0" name="weight_kg" value="{{ request('weight_kg') }}"
+                        <input type="number" step="0.01" min="0" name="weight_kg" value="{{ old('weight_kg') }}"
                                class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Length (cm)</label>
-                        <input type="number" step="0.1" min="0" id="dim-length" name="length_cm" value="{{ request('length_cm') }}"
+                        <input type="number" step="0.1" min="0" id="dim-length" name="length_cm" value="{{ old('length_cm') }}"
                                class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Width (cm)</label>
-                        <input type="number" step="0.1" min="0" id="dim-width" name="width_cm" value="{{ request('width_cm') }}"
+                        <input type="number" step="0.1" min="0" id="dim-width" name="width_cm" value="{{ old('width_cm') }}"
                                class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Height (cm)</label>
-                        <input type="number" step="0.1" min="0" id="dim-height" name="height_cm" value="{{ request('height_cm') }}"
+                        <input type="number" step="0.1" min="0" id="dim-height" name="height_cm" value="{{ old('height_cm') }}"
                                class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
@@ -231,7 +263,7 @@
                 <div>
                     <label class="mb-2 block text-sm font-medium text-ink-900">Additional services <span class="text-xs font-normal text-ink-500">(optional)</span></label>
                     <div class="space-y-2">
-                        @php $selectedOptions = (array) request('additional_service_option_ids', []); @endphp
+                        @php $selectedOptions = (array) old('additional_service_option_ids', []); @endphp
                         @foreach ($additionalServices as $service)
                             @php
                                 $selectedForThisService = collect($service->options)->first(fn ($o) => in_array((string) $o->id, $selectedOptions));
@@ -249,84 +281,61 @@
                     </div>
                 </div>
             @endif
+        </div>
+
+        <div class="space-y-4 border-t border-line pt-4">
+            <p class="text-sm font-semibold text-ink-900">Shipment details</p>
+
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Client <span class="text-xs font-normal text-ink-500">(optional — leave blank for a walk-in customer)</span></label>
+                <select name="client_user_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    <option value="">Walk-in customer</option>
+                    @foreach ($clients as $client)
+                        <option value="{{ $client->id }}" @selected(old('client_user_id') == $client->id)>{{ $client->name }} ({{ $client->email }})</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin address <x-required /></label>
+                    <textarea name="origin_address" rows="2" required
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('origin_address') }}</textarea>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Destination address <x-required /></label>
+                    <textarea name="destination_address" rows="2" required
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('destination_address') }}</textarea>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-6">
+                <div>
+                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" id="is-cod" name="is_cod" value="1" @checked(old('is_cod')) class="rounded border-line">
+                        Cash on delivery
+                    </label>
+                    <input type="number" step="0.01" min="0" id="cod-amount" name="cod_amount" value="{{ old('cod_amount') }}" placeholder="Amount to collect"
+                           class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('is_cod') ? '' : 'disabled' }}>
+                </div>
+                <div>
+                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" id="is-insured" name="insured" value="1" @checked(old('insured')) class="rounded border-line">
+                        Insure this shipment
+                    </label>
+                    <input type="number" step="0.01" min="0" id="declared-value" name="declared_value" value="{{ old('declared_value') }}" placeholder="Declared value"
+                           class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('insured') ? '' : 'disabled' }}>
+                    <p class="mt-1 text-xs text-ink-500">1% of declared value. Entered here, at booking — never part of a Quote ID's frozen price, so this is always added fresh.</p>
+                </div>
+            </div>
 
             <div class="flex justify-end pt-2">
                 <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
-                    Check rate
+                    Create shipment
                 </button>
             </div>
         </div>
     </form>
-
-    @if ($error)
-        <div class="mt-6 max-w-2xl rounded-xl border border-status-exception/30 bg-status-exception/5 p-5">
-            <p class="text-sm font-medium text-status-exception">Can't be rated</p>
-            <p class="mt-1 text-sm text-ink-900">{{ $error }}</p>
-        </div>
-    @elseif ($result)
-        <div class="mt-6 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
-            <p class="mb-1 text-sm font-semibold text-ink-900">Quote</p>
-            <p class="mb-4 text-sm text-ink-500">
-                {{ $result['service_type_name'] }} · {{ $result['origin_label'] ?? '—' }} → {{ $result['destination_label'] ?? '—' }} · {{ rtrim(rtrim(number_format($result['weight_kg'], 2), '0'), '.') }} kg
-                @if ($result['chargeable_weight_kg'] && $result['chargeable_weight_kg'] != $result['weight_kg'])
-                    <span class="text-ink-900">(volumetric: {{ rtrim(rtrim(number_format($result['chargeable_weight_kg'], 2), '0'), '.') }} kg)</span>
-                @endif
-                @if ($result['billed_weight_kg'] && $result['billed_weight_kg'] != ($result['chargeable_weight_kg'] ?: $result['weight_kg']))
-                    <span class="text-ink-900">(billed as {{ rtrim(rtrim(number_format($result['billed_weight_kg'], 2), '0'), '.') }} kg)</span>
-                @endif
-            </p>
-            <dl class="mb-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
-                <div>
-                    <dt class="text-ink-500">Zone</dt>
-                    <dd class="text-ink-900">{{ $result['zone_name'] ?? '—' }}</dd>
-                </div>
-                <div>
-                    <dt class="text-ink-500">Route type</dt>
-                    <dd class="text-ink-900">{{ ucfirst($result['shipping_type']) }}</dd>
-                </div>
-                <div>
-                    <dt class="text-ink-500">Transit days</dt>
-                    <dd class="text-ink-900">{{ $result['transit_days'] ?? '—' }}</dd>
-                </div>
-            </dl>
-            <dl class="space-y-1.5 border-t border-line pt-4 text-sm">
-                <div class="flex justify-between"><dt class="text-ink-500">Base</dt><dd class="font-mono text-ink-900">{{ number_format($result['base_amount'], 2) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-ink-500">Surcharges</dt><dd class="font-mono text-ink-900">{{ number_format($result['surcharge_amount'], 2) }}</dd></div>
-                @if ($result['onforwarding_amount'] > 0)
-                    <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($result['onforwarding_amount'], 2) }}</dd></div>
-                @endif
-                @foreach ($result['additional_services_breakdown'] ?? [] as $line)
-                    <div class="flex justify-between"><dt class="text-ink-500">{{ $line['label'] }}</dt><dd class="font-mono text-ink-900">{{ number_format($line['amount'], 2) }}</dd></div>
-                @endforeach
-                @if ($result['discount_amount'] > 0)
-                    <div class="flex justify-between"><dt class="text-ink-500">Discount</dt><dd class="font-mono text-status-delivered">−{{ number_format($result['discount_amount'], 2) }}</dd></div>
-                @endif
-                @if ($result['insurance_amount'] > 0)
-                    <div class="flex justify-between"><dt class="text-ink-500">Insurance</dt><dd class="font-mono text-ink-900">{{ number_format($result['insurance_amount'], 2) }}</dd></div>
-                @endif
-                <div class="flex justify-between"><dt class="text-ink-500">VAT</dt><dd class="font-mono text-ink-900">{{ number_format($result['vat_amount'], 2) }}</dd></div>
-                <div class="flex justify-between border-t border-line pt-1.5 text-base font-semibold"><dt class="text-ink-900">Total</dt><dd class="font-mono text-ink-900">{{ number_format($result['total_amount'], 2) }}</dd></div>
-            </dl>
-            <p class="mt-4 text-xs text-ink-500">No client selected, so no special discount is applied here — this is the standard price.</p>
-
-            <div class="mt-4 border-t border-line pt-4">
-                <div id="quote-generate-row" class="flex items-center justify-between gap-3">
-                    <p class="text-xs text-ink-500">Save this as a Quote ID so it can be entered straight into Create Shipment later, at this exact price.</p>
-                    <button type="button" id="generate-quote-btn" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">
-                        Generate Quote ID
-                    </button>
-                </div>
-                <div id="quote-generated-row" class="hidden items-center justify-between gap-3 rounded-md bg-[var(--brand-primary)]/5 px-3 py-2">
-                    <p class="text-sm text-ink-900">
-                        Quote ID: <span id="quote-number-value" class="font-mono font-semibold"></span>
-                        <span class="ml-2 text-xs text-ink-500">expires <span id="quote-expiry-value"></span></span>
-                    </p>
-                    <button type="button" id="copy-quote-btn" class="shrink-0 rounded-md border border-line px-2.5 py-1 text-xs font-medium text-ink-900 hover:bg-surface-50">Copy</button>
-                </div>
-                <p id="quote-error-row" class="hidden text-xs text-status-exception"></p>
-            </div>
-        </div>
-    @endif
 
     <script>
         // Live preview only — the real calculation happens server-side
@@ -607,8 +616,8 @@
                 }
             }
 
-            wireCascade('origin-state', 'origin-city', 'origin-district', @json(request('origin_city_id')), @json(request('origin_district_id')));
-            wireCascade('destination-state', 'destination-city', 'destination-district', @json(request('destination_city_id')), @json(request('destination_district_id')));
+            wireCascade('origin-state', 'origin-city', 'origin-district', @json(old('origin_city_id')), @json(old('origin_district_id')));
+            wireCascade('destination-state', 'destination-city', 'destination-district', @json(old('destination_city_id')), @json(old('destination_district_id')));
         })();
 
         // Same idea as wireCascade() above, simplified for the
@@ -639,64 +648,156 @@
             });
 
             if (stateSelect.value) {
-                populateCities(@json(request('origin_city_id')) || @json(request('destination_city_id')));
+                populateCities(@json(old('origin_city_id')) || @json(old('destination_city_id')));
             }
         })();
 
-        // Generate Quote ID — reposts the exact query the page was just
-        // loaded with (the same inputs that produced the result above) to
-        // the quote endpoint, which re-runs pricing server-side and
-        // freezes it. window.location.search already has everything
-        // since "Check rate" is itself a GET form.
+        // Load Quote ID — looks the quote up, then drives the exact
+        // same JS this page shares with Rate Checker (onRouteTypeChange,
+        // onTradeDirectionChoiceChange, syncFieldsForServiceType, the
+        // state->city->district cascades) to reproduce the same section
+        // visibility and field values a person would get by picking
+        // everything by hand. Fields stay editable afterwards — this is
+        // a starting point, not a lock.
         (function () {
-            const btn = document.getElementById('generate-quote-btn');
-            if (!btn) return;
+            const lookupInput = document.getElementById('quote-lookup-input');
+            const lookupBtn = document.getElementById('load-quote-btn');
+            const errorEl = document.getElementById('quote-lookup-error');
+            const successEl = document.getElementById('quote-lookup-success');
+            const quoteNumberField = document.getElementById('quote-number-field');
 
-            const generateRow = document.getElementById('quote-generate-row');
-            const generatedRow = document.getElementById('quote-generated-row');
-            const errorRow = document.getElementById('quote-error-row');
-            const numberEl = document.getElementById('quote-number-value');
-            const expiryEl = document.getElementById('quote-expiry-value');
-            const copyBtn = document.getElementById('copy-quote-btn');
+            function setSelectAndFireChange(id, value) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.value = value ?? '';
+                el.dispatchEvent(new Event('change'));
+            }
 
-            btn.addEventListener('click', function () {
-                btn.disabled = true;
-                btn.textContent = 'Generating…';
-                errorRow.classList.add('hidden');
+            function setValue(id, value) {
+                const el = document.getElementById(id);
+                if (el) el.value = value ?? '';
+            }
 
-                fetch('{{ route('quotes.store') }}' + window.location.search, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                        'Accept': 'application/json',
-                    },
+            function loadQuoteIntoForm(context, result) {
+                // 1. Billing model — only one is implemented, always this.
+                billingModelSelect.value = 'standard_billing';
+                syncModelSection();
+
+                // 2. Service type, and the route/trade radios that match it.
+                const serviceTypeId = String(context.service_type_id ?? '');
+                const matchingOption = serviceTypeOptions.find(function (o) { return o.value === serviceTypeId; });
+
+                if (matchingOption) {
+                    const routeType = matchingOption.dataset.routeType;
+                    const direction = matchingOption.dataset.tradeDirection;
+
+                    document.querySelectorAll('input[name="route_type"]').forEach(function (r) {
+                        r.checked = r.value === routeType;
+                    });
+                    onRouteTypeChange();
+
+                    if (routeType === 'international') {
+                        document.querySelectorAll('input[name="trade_direction"]').forEach(function (r) {
+                            r.checked = r.value === direction;
+                        });
+                        onTradeDirectionChoiceChange();
+                    }
+
+                    serviceTypeSelect.value = serviceTypeId;
+                    syncFieldsForServiceType();
+
+                    // 3. Location fields, matching the section just revealed.
+                    if (routeType === 'domestic') {
+                        setSelectAndFireChange('origin-state', context.origin_state_id);
+                        setSelectAndFireChange('origin-city', context.origin_city_id);
+                        setValue('origin-district', context.origin_district_id);
+
+                        setSelectAndFireChange('destination-state', context.destination_state_id);
+                        setSelectAndFireChange('destination-city', context.destination_city_id);
+                        setValue('destination-district', context.destination_district_id);
+                    } else if (direction === 'cross_trade') {
+                        setValue('ctp-origin-country', context.origin_country_id);
+                        setValue('ctp-destination-country', context.destination_country_id);
+                    } else {
+                        const isImport = direction === 'import';
+                        const nigeriaStateValue = isImport ? context.destination_state_id : context.origin_state_id;
+                        const nigeriaCityValue = isImport ? context.destination_city_id : context.origin_city_id;
+                        const foreignCountryValue = isImport ? context.origin_country_id : context.destination_country_id;
+
+                        setSelectAndFireChange('intl-nigeria-state', nigeriaStateValue);
+                        setValue('intl-nigeria-city', nigeriaCityValue);
+                        setValue('intl-foreign-country', foreignCountryValue);
+                    }
+                }
+
+                // 4. Weight & dimensions.
+                document.querySelector('input[name="weight_kg"]').value = context.weight_kg ?? '';
+                setValue('dim-length', context.length_cm);
+                setValue('dim-width', context.width_cm);
+                setValue('dim-height', context.height_cm);
+                document.getElementById('dim-length').dispatchEvent(new Event('input'));
+
+                // 5. Additional services already selected on the quote.
+                (context.additional_service_option_ids || []).forEach(function (optId) {
+                    document.querySelectorAll('select[name="additional_service_option_ids[]"] option[value="' + optId + '"]').forEach(function (opt) {
+                        opt.selected = true;
+                    });
+                });
+
+                quoteNumberField.value = lookupInput.value.trim().toUpperCase();
+            }
+
+            lookupBtn.addEventListener('click', function () {
+                const code = lookupInput.value.trim();
+                if (!code) return;
+
+                lookupBtn.disabled = true;
+                lookupBtn.textContent = 'Loading…';
+                errorEl.classList.add('hidden');
+                successEl.classList.add('hidden');
+
+                fetch('/quotes/' + encodeURIComponent(code), {
+                    headers: { 'Accept': 'application/json' },
                 })
                     .then(async function (res) {
                         const body = await res.json();
-                        if (!res.ok) throw new Error(body.message || 'Could not generate a quote.');
+                        if (!res.ok) throw new Error(body.message || 'Could not load that quote.');
                         return body;
                     })
                     .then(function (body) {
-                        numberEl.textContent = body.quote_number;
-                        expiryEl.textContent = body.expires_at_human;
-                        generateRow.classList.add('hidden');
-                        generatedRow.classList.remove('hidden');
-                        generatedRow.classList.add('flex');
+                        loadQuoteIntoForm(body.context, body.result);
+
+                        document.getElementById('loaded-quote-number').textContent = body.quote_number;
+                        document.getElementById('loaded-quote-total').textContent = Number(body.result.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        document.getElementById('loaded-quote-expiry').textContent = new Date(body.expires_at).toLocaleString();
+                        successEl.classList.remove('hidden');
                     })
                     .catch(function (err) {
-                        errorRow.textContent = err.message;
-                        errorRow.classList.remove('hidden');
-                        btn.disabled = false;
-                        btn.textContent = 'Generate Quote ID';
+                        errorEl.textContent = err.message;
+                        errorEl.classList.remove('hidden');
+                    })
+                    .finally(function () {
+                        lookupBtn.disabled = false;
+                        lookupBtn.textContent = 'Load quote';
                     });
             });
+        })();
 
-            copyBtn.addEventListener('click', function () {
-                navigator.clipboard.writeText(numberEl.textContent).then(function () {
-                    copyBtn.textContent = 'Copied';
-                    setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1500);
+        // Cash-on-delivery / insurance amount fields only make sense
+        // once their checkbox is on — disabled (not just visually
+        // hidden) so a stray leftover value never submits unintended.
+        (function () {
+            function wireToggle(checkboxId, fieldId) {
+                const checkbox = document.getElementById(checkboxId);
+                const field = document.getElementById(fieldId);
+                checkbox.addEventListener('change', function () {
+                    field.disabled = !checkbox.checked;
+                    if (!checkbox.checked) field.value = '';
                 });
-            });
+            }
+
+            wireToggle('is-cod', 'cod-amount');
+            wireToggle('is-insured', 'declared-value');
         })();
     </script>
 

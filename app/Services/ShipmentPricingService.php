@@ -137,7 +137,14 @@ class ShipmentPricingService
         return ['vatable' => $vatable, 'non_vatable' => $nonVatable, 'breakdown' => $breakdown];
     }
 
-    private function calculateInsurance(array $context): float
+    /**
+     * Public because ShipmentController also needs it standalone —
+     * declared_value/insured are entered at booking time and were never
+     * part of a Rate Checker quote's frozen context, so booking against
+     * a quote adds insurance on top of the frozen freight amount using
+     * this same formula rather than re-running the whole pipeline.
+     */
+    public function calculateInsurance(array $context): float
     {
         if (empty($context['insured']) || empty($context['declared_value'])) {
             return 0.0;

@@ -4475,3 +4475,98 @@ database/migrations_legacy/              (the original 92 files, kept for histor
 .env.example                             (DB_CONNECTION=mysql, sensible local defaults)
 config/database.php                      (default connection fallback: mysql)
 ```
+
+## Increment 86 — Create Shipment (Staff) + Rate Checker Quote IDs
+
+Two connected additions: a real "Create Shipment" page for staff (there
+wasn't one before — booking only existed via the API, for the client
+portal and integrations), and a Quote ID system tying it to Rate
+Checker.
+
+### Create Shipment
+
+New `shipments.create` / `shipments.store` routes (`can:shipments:create`),
+new `shipments/create.blade.php`. Deliberately shares its Route → Type →
+Service Type field structure and JS almost verbatim with Rate Checker's
+form — same field names, same cascading state→city→district selects,
+same live volumetric preview — so it's the same experience, not a
+lookalike. Adds what Rate Checker doesn't need: client selection
+(optional — blank means walk-in), origin/destination address text,
+COD, and insurance (declared value + 1%, entered here since it was
+never part of a Rate Checker quote).
+
+Booking works two ways, both supported (not an either/or):
+- **No Quote ID** — prices fresh at submit time, via the same
+  `PricingEngine` + `ShipmentPricingService` call the API's walk-in
+  booking already used. Can never drift from what Rate Checker would
+  have shown for the same inputs.
+- **Quote ID entered** — `QuoteController::show` looks it up, the
+  page's JS (`loadQuoteIntoForm`) drives the exact same
+  `onRouteTypeChange`/`syncFieldsForServiceType`/cascade functions Rate
+  Checker uses to reproduce the right section and field values, and
+  submitting books at the quote's *frozen* price — never
+  recalculated. Fields stay editable after loading, on purpose (a
+  quote is a starting point, not a lock); only the addresses/client/
+  COD/insurance actually need filling in per person's choice, since
+  those aren't part of what a quote captures.
+
+### Quote IDs
+
+New `quotes` table — `QT-XXXXXX`, holds a frozen snapshot of both the
+Rate Checker inputs (`context`) and the full pricing breakdown
+(`result`) at generation time. Generated from a "Generate Quote ID"
+button on Rate Checker's result panel once a rate's been checked
+(`POST /rate-checker/quote`) — re-runs pricing server-side rather than
+trusting whatever the browser already displayed, exactly like every
+other price in this app.
+
+`expires_at` is set from a new **Company Settings → Quote validity
+(days)** field (default 7), fixed at generation time — changing the
+setting later never reaches back and changes an already-issued
+quote's expiry. A quote is single-use: booking against one flips its
+status to `used` and links `used_by_shipment_id`; trying to reuse it,
+or use one past `expires_at`, is refused with a specific reason
+(expired vs. already used) rather than a bare failure.
+
+Insurance is the one thing a quote can't freeze — `declared_value` is
+entered at booking, not rate-check, time — so booking against a quote
+layers `ShipmentPricingService::calculateInsurance()` (now `public`,
+was `private`) on top of the frozen total rather than re-running the
+whole pipeline.
+
+`php artisan quotes:prune`, scheduled daily (`routes/console.php`),
+deletes quotes past `expires_at` — except `used` ones, which stay
+forever as the real record of what a booked shipment was priced at.
+
+### Verified
+
+The two new migrations (`quotes` table, `settings.quote_validity_days`)
+were hand-translated to raw SQL and run against the same live MySQL
+8.0 instance used to verify Increment 85 — both apply cleanly, foreign
+keys resolve correctly (`quotes.service_type_id → service_types`,
+`quotes.created_by → users`, `quotes.used_by_shipment_id → shipments`).
+All new/changed PHP files were brace/paren-balance checked. **Not**
+verified: no PHP runtime was available to actually load these
+controllers/views through Laravel, so route resolution, Blade
+compilation, and the JS prefill flow are unverified beyond static
+review — worth a manual click-through (both the no-quote and
+with-quote booking paths, plus a deliberately expired/reused quote ID)
+before relying on this.
+
+### Files
+
+```
+app/Models/Quote.php
+app/Http/Controllers/Web/QuoteController.php
+app/Http/Controllers/Web/ShipmentController.php   (create/store added)
+app/Console/Commands/PruneExpiredQuotes.php
+app/Services/ShipmentPricingService.php           (calculateInsurance now public)
+app/Models/Setting.php                            (quote_validity_days)
+database/migrations/2026_01_02_000001_create_quotes_table.php
+database/migrations/2026_01_02_000002_add_quote_validity_days_to_settings_table.php
+resources/views/shipments/create.blade.php        (new)
+resources/views/shipments/index.blade.php         (+ Create shipment button)
+resources/views/rate-checker/index.blade.php       (+ Generate Quote ID)
+resources/views/settings/edit.blade.php            (+ Quote validity field)
+routes/web.php, routes/console.php
+```
