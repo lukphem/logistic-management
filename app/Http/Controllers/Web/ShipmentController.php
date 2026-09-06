@@ -86,6 +86,7 @@ class ShipmentController extends Controller
             'districts' => District::with('city')->orderBy('name')->get(),
             'countries' => Country::where('code', '!=', 'NG')->orderBy('name')->get(),
             'volumetricDivisor' => Setting::current()->volumetric_divisor,
+            'vehicleTypes' => \App\Models\VehicleType::where('is_active', true)->orderBy('name')->get(),
             'additionalServices' => AdditionalService::where('is_active', true)
                 ->with(['options' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
                 ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),
@@ -122,6 +123,11 @@ class ShipmentController extends Controller
         }
 
         $data['base_amount'] = $quote['base_amount'];
+        // Same Fleet Billing surcharges merge as QuoteController/
+        // RateCheckerController - keeps this walk-in path priced
+        // identically to what Rate Checker would show for the same
+        // inputs, per this page's own guarantee.
+        $data['surcharges'] = array_merge($data['surcharges'] ?? [], $quote['surcharges'] ?? []);
 
         $billingProfile = ClientBillingProfile::resolveForClientUser($data['client_user_id'] ?? null);
         $pricing = $this->pricingService->priceShipment($data, $billingProfile);
@@ -238,6 +244,8 @@ class ShipmentController extends Controller
             'width_cm' => 'nullable|numeric',
             'height_cm' => 'nullable|numeric',
             'additional_service_option_ids' => 'nullable|array',
+            'vehicle_type_id' => 'nullable|exists:vehicle_types,id',
+            'is_empty_return' => 'sometimes|boolean',
             'is_cod' => 'sometimes|boolean',
             'cod_amount' => 'nullable|numeric',
             'insured' => 'sometimes|boolean',
@@ -251,6 +259,7 @@ class ShipmentController extends Controller
         $data = $validator->validated();
         $data['is_cod'] = $request->boolean('is_cod');
         $data['insured'] = $request->boolean('insured');
+        $data['is_empty_return'] = $request->boolean('is_empty_return');
 
         return $data;
     }

@@ -40,6 +40,12 @@ class QuoteController extends Controller
         }
 
         $context['base_amount'] = $quote['base_amount'];
+        // Fleet Billing computes its own labeled surcharges (fuel, empty
+        // return) as part of resolving the quote itself, since it needs
+        // the tariff to compute the amounts — merged in the same way
+        // RateCheckerController does, so a quote generated here prices
+        // identically to what Rate Checker would have shown.
+        $context['surcharges'] = array_merge($context['surcharges'] ?? [], $quote['surcharges'] ?? []);
         $breakdown = $this->pricingService->priceShipment($context);
 
         $result = [
@@ -122,6 +128,8 @@ class QuoteController extends Controller
             'origin_country_id' => $request->filled('origin_country_id') ? $request->integer('origin_country_id') : null,
             'destination_country_id' => $request->filled('destination_country_id') ? $request->integer('destination_country_id') : null,
             'additional_service_option_ids' => $request->input('additional_service_option_ids', []),
+            'vehicle_type_id' => $request->filled('vehicle_type_id') ? $request->integer('vehicle_type_id') : null,
+            'is_empty_return' => $request->boolean('is_empty_return'),
         ];
     }
 }
