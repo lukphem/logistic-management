@@ -4808,3 +4808,72 @@ resources/views/standard-billing/form.blade.php   (link text, missing-service-ty
 
 No migration needed — label-only change on top of Increment 91's
 schema.
+
+## Increment 93 — Standard Billing Becomes a Real Sidebar Sub-Menu
+
+Per explicit direction, restructures the sidebar itself, not just the
+page's internal tabs: **Standard Billing** is now an expandable
+sub-menu (mirroring the existing Setups → Billing / Location nesting
+pattern exactly), listing:
+
+```
+Standard Billing
+    Zoning and Weight
+    Origin to Destination
+    Fleet Billing (not built yet)
+```
+
+Every future billing model follows this same shape — added as another
+sub-menu entry here, not a new top-level page.
+
+### A real technical wrinkle: two sub-items, one shared route
+
+Zoning and Weight and Origin to Destination both point at
+`standard-billing.index` — they're tabs on one page (Increment 91), not
+separate pages — so `request()->routeIs()` alone can't tell them apart.
+Each sub-item also carries a `model` key, and active-state detection
+checks the `?model=` query parameter too (`request('model', 'standard')`,
+matching the page's own JS default of Zoning and Weight when no param
+is given).
+
+**Fleet Billing** is listed but shown disabled/grayed rather than as a
+real link — no billing model, schema, or logic exists for it yet, and
+no requirements have been given for what it actually needs. Kept
+visible now so the menu's eventual shape doesn't shift around when it
+is eventually built.
+
+### How this was actually verified
+
+Beyond the usual Blade-compile-and-lint check (confirmed zero syntax
+errors in the compiled output, not just brace-counting):
+
+- Built the project's actual frontend assets (`npm install && npm run
+  build`) to unblock full-page rendering through the real layout,
+  rather than testing content in isolation
+- Created a real test user with an actual `billing:read` permission via
+  Spatie's permission tables, logged them in, and rendered the complete
+  authenticated sidebar
+- Properly dispatched synthetic requests through Laravel's real router
+  (not just `Request::create()`, which leaves `routeIs()` non-functional
+  since no Route is attached without an actual dispatch) — confirmed
+  "Zoning and Weight" is active with no `?model=` param, and switches
+  correctly to "Origin to Destination" when `?model=origin-destination`
+  is present, in both directions
+- **Caught and corrected a false alarm from my own test methodology**
+  mid-verification: an early check appeared to show neither sub-item as
+  active, which turned out to be a wrong substring-search window in the
+  test itself, not an actual bug — re-verified with precise regex
+  extraction before concluding anything was wrong
+- Caught and reverted an unrelated testing artifact before committing:
+  `npm install` had modified `package-lock.json`'s package name to
+  match my sandbox directory rather than the project's actual name —
+  discarded before finalizing, confirmed via `git diff` showing zero
+  remaining changes to that file
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (Standard Billing restructured as a nested submenu with model-aware active-state detection)
+```
+
+No migration needed.

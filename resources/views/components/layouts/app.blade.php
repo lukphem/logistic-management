@@ -59,10 +59,26 @@
                         ['label' => 'Zones', 'route' => 'zones.index', 'icon' => 'layers', 'permission' => 'locations:read'],
                         ['label' => 'Onforwarding', 'route' => 'onforwarding-classifications.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Zone Mapping', 'route' => 'zone-mappings.index', 'icon' => 'layers', 'permission' => 'rates:read'],
-                        ['label' => 'Standard Billing', 'route' => 'standard-billing.index', 'icon' => 'sliders', 'permission' => 'billing:read'],
+                    ];
+
+                    $billingItemsAfterStandard = [
                         ['label' => 'Additional Services', 'route' => 'additional-services.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Invoice', 'route' => 'invoices.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Client Billing', 'route' => 'client-billing.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
+                    ];
+
+                    // Standard Billing is itself a submenu now, not a
+                    // single link — every billing MODEL (Zoning and
+                    // Weight, Origin to Destination, and whatever comes
+                    // next) lives here as a tab on one shared page
+                    // (standard-billing.index), switched via ?model=,
+                    // rather than getting its own top-level page. Fleet
+                    // Billing isn't built yet — kept visible so the
+                    // eventual shape is already right, shown disabled
+                    // until it actually exists.
+                    $standardBillingItems = [
+                        ['label' => 'Zoning and Weight', 'route' => 'standard-billing.index', 'model' => 'standard', 'icon' => 'sliders', 'permission' => 'billing:read'],
+                        ['label' => 'Origin to Destination', 'route' => 'standard-billing.index', 'model' => 'origin-destination', 'icon' => 'route', 'permission' => 'billing:read'],
                     ];
 
                     // Ordered by setup dependency. Location-related screens
@@ -96,6 +112,12 @@
                     $visibleBillingItems = collect($billingItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
+                    $visibleBillingItemsAfterStandard = collect($billingItemsAfterStandard)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $visibleStandardBillingItems = collect($standardBillingItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
                     $visibleLocationItems = collect($locationItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
@@ -104,7 +126,20 @@
                     );
                     $topSetupItemVisible = ! $topSetupItem['permission'] || auth()->user()->can($topSetupItem['permission']);
 
-                    $billingActive = collect($billingItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
+                    // Every Standard Billing sub-item shares the same
+                    // route (standard-billing.index) — they're tabs on
+                    // one page, not separate pages — so telling them
+                    // apart needs the ?model= query param too, not just
+                    // the route. Zoning and Weight is the default tab
+                    // (shown when no ?model= is given at all), matching
+                    // the page's own JS.
+                    $standardBillingItemActive = fn ($item) => request()->routeIs('standard-billing.index')
+                        && (request('model', 'standard') === $item['model']);
+                    $standardBillingActive = collect($standardBillingItems)->contains($standardBillingItemActive);
+
+                    $billingActive = collect($billingItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'))
+                        || collect($billingItemsAfterStandard)->contains(fn ($item) => request()->routeIs($item['route'] . '*'))
+                        || $standardBillingActive;
                     $locationActive = collect($locationItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
                     $setupsActive = $billingActive
                         || $locationActive
@@ -166,7 +201,7 @@
                                 </details>
                             @endif
 
-                            @if ($visibleBillingItems->isNotEmpty())
+                            @if ($visibleBillingItems->isNotEmpty() || $visibleStandardBillingItems->isNotEmpty() || $visibleBillingItemsAfterStandard->isNotEmpty())
                                 <details class="group/billing" @if($billingActive) open @endif>
                                     <summary class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white">
                                         <x-icon name="list-check" class="h-4 w-4 shrink-0" />
@@ -175,6 +210,44 @@
                                     </summary>
                                     <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
                                         @foreach ($visibleBillingItems as $item)
+                                            @php $active = request()->routeIs($item['route'] . '*'); @endphp
+                                            <a href="{{ route($item['route']) }}"
+                                               class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors
+                                                      {{ $active ? 'bg-white/10 text-white' : 'text-white/55 hover:bg-white/5 hover:text-white' }}">
+                                                <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0" />
+                                                {{ $item['label'] }}
+                                            </a>
+                                        @endforeach
+
+                                        @if ($visibleStandardBillingItems->isNotEmpty())
+                                            <details class="group/standard-billing" @if($standardBillingActive) open @endif>
+                                                <summary class="flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/55 transition-colors hover:bg-white/5 hover:text-white">
+                                                    <x-icon name="sliders" class="h-3.5 w-3.5 shrink-0" />
+                                                    <span class="flex-1">Standard Billing</span>
+                                                    <x-icon name="chevron" class="h-3 w-3 shrink-0 transition-transform group-open/standard-billing:rotate-180" />
+                                                </summary>
+                                                <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                                                    @foreach ($visibleStandardBillingItems as $item)
+                                                        @php $active = $standardBillingItemActive($item); @endphp
+                                                        <a href="{{ route($item['route'], ['model' => $item['model']]) }}"
+                                                           class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors
+                                                                  {{ $active ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white' }}">
+                                                            <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0" />
+                                                            {{ $item['label'] }}
+                                                        </a>
+                                                    @endforeach
+                                                    {{-- Not built yet — kept visible so the eventual menu shape is
+                                                         already right, rather than appearing later with everything
+                                                         shifting around. --}}
+                                                    <span class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white/25" title="Not built yet">
+                                                        <x-icon name="sliders" class="h-3.5 w-3.5 shrink-0" />
+                                                        Fleet Billing
+                                                    </span>
+                                                </div>
+                                            </details>
+                                        @endif
+
+                                        @foreach ($visibleBillingItemsAfterStandard as $item)
                                             @php $active = request()->routeIs($item['route'] . '*'); @endphp
                                             <a href="{{ route($item['route']) }}"
                                                class="flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors
