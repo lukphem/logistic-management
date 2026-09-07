@@ -118,6 +118,21 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\ClientBillingProfile::class, 'client_user_id');
     }
 
+    public function clientProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(\App\Models\ClientProfile::class, 'client_user_id');
+    }
+
+    public function serviceDiscounts(): HasMany
+    {
+        return $this->hasMany(\App\Models\ClientServiceDiscount::class, 'client_user_id');
+    }
+
+    public function specialTariffs(): HasMany
+    {
+        return $this->hasMany(\App\Models\ClientSpecialTariff::class, 'client_user_id');
+    }
+
     public function hub(): BelongsTo
     {
         return $this->belongsTo(Hub::class);

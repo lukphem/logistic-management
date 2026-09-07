@@ -55,6 +55,11 @@ class ClientController extends Controller
         }
 
         $data = $validator->validated();
+        // A logged-in client (not an API-key integrator) gets their own
+        // special tariff, if one's been set up for them - same context
+        // key PricingEngine's standardBilling() checks for staff-booked
+        // shipments.
+        $data['client_user_id'] = $request->user()?->id;
 
         try {
             $quote = $this->pricingEngine->quote($data);

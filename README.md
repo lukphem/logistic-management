@@ -5434,3 +5434,110 @@ Fixed with a raw `ALTER ... MODIFY` rather than
 the `max_weight_limit` migration's own note); a plain `MODIFY` has no
 such dependency. Verified against live MySQL by reproducing the exact
 failing INSERT from the error report and confirming it now succeeds.
+
+## Increment 101 — Client Account Creation (Individual/Organization) + Per-Client Billing
+
+### Client accounts
+
+`client_profiles` — one row per client `User`, holding what neither
+`users` nor `client_billing_profiles` covered: `account_type`
+(individual/organization), KYC for individuals (ID type + number),
+and company details for organizations (RC number, TIN, industry,
+contact person). A separate table on purpose — client-only data has
+no business on the same model as staff fields (`staff_id`, `hub_id`,
+`employment_type`).
+
+Individual → organization upgrade is a dedicated action
+(`ClientController::upgrade()`), not just editing the account type —
+requires the organization fields as part of the same request, and
+only works one direction (an org "downgrading" back to individual
+would lose its RC/TIN trail, so the UI doesn't offer it, though
+nothing at the DB level blocks it directly).
+
+New `clients.*` routes/views (list, create, edit) — separate from the
+existing `users.*` (staff-only) — plus a new `clients:*` permission
+module, given to Ops Manager, Finance (full), and Support (read-only).
+
+### Per-client billing — two genuinely different mechanisms
+
+By default, every client bills standard — nothing below applies until
+explicitly set up.
+
+**`client_service_discounts`** — a discount percentage per service
+type, additive alongside the existing `client_billing_profiles` flat
+discount rather than replacing it: a service type with its own row
+here takes priority; anything without one falls back to the flat
+discount (0 for a standard client). "Discount on each service type
+agreed and subscribed for," not a blanket discount from one
+agreement.
+
+**`client_special_tariffs`** + **`client_special_tariff_zone_prices`**
+— a genuinely separate, negotiated rate, not a discount on the
+standard one. Same shape as `standard_billing_tariffs` (min/max/
+max_weight_limit weight bands, its own zone pricing) but scoped to
+exactly one client. `PricingEngine::standardBilling()` now checks for
+a matching client special tariff *before* falling back to the shared
+standard tariff — same band-matching and "heavier than every
+configured band" fallback posture, just checked first. Falls through
+silently to standard pricing when the client has no special tariff,
+or has one but not for this exact zone/weight — a partially-set-up
+special rate never blocks a shipment from pricing.
+
+Both wired into every place pricing actually happens — not just
+staff-initiated bookings: `client_user_id` now flows into the pricing
+context from the staff Create Shipment page, the price-preview
+endpoint, and both client-portal self-service endpoints (a logged-in
+client's own quote/booking calls now pass their own ID through
+automatically), so a client's special tariff or discount applies
+consistently regardless of who's initiating.
+
+Both are deliberately scoped to Standard Billing only — Origin to
+Destination and Fleet Billing are unaffected, per "by default client
+uses the standard billing" from the request this was built for.
+
+### Management screen
+
+`clients.manage` — one page per client showing overall billing (links
+to the existing flat-discount screen), per-service discounts, and
+special rates together, since configuring one is very likely to mean
+configuring the other.
+
+### Verified
+
+All 4 new tables round-tripped the same way as every migration in
+this series: translated to raw DDL, run against a fresh MySQL 8.0
+database (97 statements total across every migration in the app, 0
+errors), foreign keys confirmed via `information_schema`. The special
+tariff's resolution query was additionally tested functionally with
+real seed data — a 3kg test shipment against a 0–5kg client-specific
+band correctly returned that band's own zone price, not the shared
+standard one.
+
+**Not verified**: no PHP runtime, so the actual Blade forms, the
+dynamic "add another zone" JS on the special-rate form, and the full
+create → upgrade → discount → special-tariff → book flow through
+Laravel itself haven't run end to end. Worth a full click-through
+once PHP is available — particularly booking a shipment for a client
+with both a per-service discount AND a special tariff configured, to
+confirm the special tariff (not the discount) is the one that applies
+for that service type, matching the "special tariff checked first"
+design.
+
+### Files
+
+```
+database/migrations/..._create_client_profiles_table.php
+database/migrations/..._create_client_service_discounts_table.php
+database/migrations/..._create_client_special_tariffs_table.php
+database/migrations/..._create_client_special_tariff_zone_prices_table.php
+app/Models/ClientProfile.php, ClientServiceDiscount.php, ClientSpecialTariff.php, ClientSpecialTariffZonePrice.php
+app/Models/User.php                       (clientProfile/serviceDiscounts/specialTariffs relations)
+app/Models/ClientBillingProfile.php       (discountFractionForServiceType())
+app/Services/PricingEngine.php            (client special tariff check in standardBilling())
+app/Services/ShipmentPricingService.php   (per-service-type discount)
+app/Http/Controllers/Web/ClientController.php   (new)
+app/Http/Controllers/Web/ShipmentController.php, Api/ShipmentController.php, Api/ClientController.php, Api/ClientShipmentController.php   (client_user_id threaded into pricing context)
+resources/views/clients/index.blade.php, form.blade.php, manage.blade.php   (new)
+database/seeders/RolePermissionSeeder.php   (clients module)
+routes/web.php
+```

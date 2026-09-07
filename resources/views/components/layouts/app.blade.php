@@ -109,6 +109,7 @@
                         ['label' => 'Scan Statuses', 'route' => 'scan-statuses.index', 'icon' => 'list-check', 'permission' => 'settings:update'],
                         ['label' => 'Roles & Permissions', 'route' => 'roles.index', 'icon' => 'setups', 'permission' => 'roles:read'],
                         ['label' => 'Staff Users', 'route' => 'users.index', 'icon' => 'building', 'permission' => 'users:read'],
+                        ['label' => 'Clients', 'route' => 'clients.index', 'icon' => 'building', 'permission' => 'clients:read'],
                     ];
 
                     $visibleBillingItems = collect($billingItems)->filter(

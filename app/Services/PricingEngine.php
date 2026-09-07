@@ -98,6 +98,43 @@ class PricingEngine
 
         $chargeableWeight = $this->resolveChargeableWeight($context);
 
+        // A client's own special tariff (Client → Special Rate) — a
+        // genuinely separate rate, not a discount on the standard one —
+        // takes priority over the shared standard_billing_tariffs
+        // entirely when one exists for this exact client + service
+        // type + zone. Falls through to standard pricing below when the
+        // client has no special tariff, or has one but not for this
+        // zone/weight — a partially-configured special rate should
+        // never block a shipment from pricing, just not apply to the
+        // part that isn't set up.
+        $clientUserId = $context['client_user_id'] ?? null;
+
+        if ($clientUserId) {
+            $special = $this->resolveClientSpecialTariff($clientUserId, $serviceType->id, $chargeableWeight, $zone->id);
+
+            if ($special) {
+                [$tariff, $zonePrice] = $special;
+
+                $result = $this->calculateWeightBasedCharge(
+                    (float) $zonePrice->charge,
+                    (float) $zonePrice->additional_charge,
+                    $chargeableWeight,
+                    (float) ($tariff->max_weight ?? $tariff->min_weight),
+                    (float) $tariff->max_weight_limit,
+                    (float) $tariff->additional_weight
+                );
+
+                return [
+                    'base_amount' => round($result['amount'], 2),
+                    'chargeable_weight_kg' => round($chargeableWeight, 2),
+                    'billed_weight_kg' => $result['billed_weight'],
+                    'transit_days' => $zonePrice->transit_days,
+                    'shipping_type' => $shippingType,
+                    'zone_id' => $zone->id,
+                ];
+            }
+        }
+
         // orderBy makes this deterministic if two tariffs for the same
         // service type ever have overlapping weight bands (a setup
         // mistake nothing currently prevents) — picks the narrowest/
@@ -359,6 +396,47 @@ class PricingEngine
             'zone_id' => null,
             'surcharges' => $surcharges,
         ];
+    }
+
+    /**
+     * Same band-matching + "heavier than every configured band falls
+     * back to the highest one" posture as the shared standard tariff
+     * lookup, scoped to exactly one client — and additionally requires
+     * a zone price to exist for THIS zone specifically, since unlike
+     * the standard tariff (which throws a specific "no price for this
+     * zone" error if missing), a client special tariff configured for
+     * some zones but not this one should silently fall through to
+     * standard pricing rather than block the shipment.
+     *
+     * @return array{0: \App\Models\ClientSpecialTariff, 1: \App\Models\ClientSpecialTariffZonePrice}|null
+     */
+    private function resolveClientSpecialTariff(int $clientUserId, int $serviceTypeId, float $chargeableWeight, int $zoneId): ?array
+    {
+        $tariff = \App\Models\ClientSpecialTariff::where('client_user_id', $clientUserId)
+            ->where('service_type_id', $serviceTypeId)
+            ->where('is_active', true)
+            ->where('min_weight', '<=', $chargeableWeight)
+            ->where('max_weight_limit', '>=', $chargeableWeight)
+            ->orderBy('min_weight')
+            ->first();
+
+        if (! $tariff) {
+            $tariff = \App\Models\ClientSpecialTariff::where('client_user_id', $clientUserId)
+                ->where('service_type_id', $serviceTypeId)
+                ->where('is_active', true)
+                ->orderByDesc('max_weight_limit')
+                ->first();
+        }
+
+        if (! $tariff) {
+            return null;
+        }
+
+        $zonePrice = \App\Models\ClientSpecialTariffZonePrice::where('client_special_tariff_id', $tariff->id)
+            ->where('zone_id', $zoneId)
+            ->first();
+
+        return $zonePrice ? [$tariff, $zonePrice] : null;
     }
 
     /**

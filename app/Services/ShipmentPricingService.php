@@ -34,7 +34,7 @@ class ShipmentPricingService
         $surcharges = $this->calculateSurcharges($context);
         $surchargeAmount = $surcharges['total'];
 
-        $discountFraction = $billingProfile?->discountFraction() ?? 0.0;
+        $discountFraction = $billingProfile?->discountFractionForServiceType((int) ($context['service_type_id'] ?? 0)) ?? 0.0;
         $discountAmount = round(($baseAmount + $surchargeAmount) * $discountFraction, 2);
 
         // Discount applies to freight + surcharges only — insurance and

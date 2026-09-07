@@ -132,6 +132,7 @@ class ShipmentController extends Controller
 
         $context = [
             'service_type_id' => $request->integer('service_type_id'),
+            'client_user_id' => $request->filled('client_user_id') ? $request->integer('client_user_id') : null,
             'weight_kg' => (float) $request->input('weight_kg'),
             'length_cm' => $request->filled('length_cm') ? (float) $request->input('length_cm') : null,
             'width_cm' => $request->filled('width_cm') ? (float) $request->input('width_cm') : null,

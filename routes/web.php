@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\Auth\LoginController;
 use App\Http\Controllers\Web\AdditionalServiceController;
 use App\Http\Controllers\Web\CityController;
 use App\Http\Controllers\Web\ClientBillingController;
+use App\Http\Controllers\Web\ClientController;
 use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\CountryRegionController;
 use App\Http\Controllers\Web\DashboardController;
@@ -259,6 +260,28 @@ Route::middleware(['auth', 'staff'])->group(function () {
     });
     Route::middleware('can:users:delete')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    });
+
+    // Client accounts (individual/organization) + per-client billing.
+    Route::middleware('can:clients:read')->group(function () {
+        Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
+        Route::get('/clients/{user}/manage', [ClientController::class, 'manage'])->name('clients.manage');
+    });
+    Route::middleware('can:clients:create')->group(function () {
+        Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');
+        Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
+    });
+    Route::middleware('can:clients:update')->group(function () {
+        Route::get('/clients/{user}/edit', [ClientController::class, 'edit'])->name('clients.edit');
+        Route::put('/clients/{user}', [ClientController::class, 'update'])->name('clients.update');
+        Route::post('/clients/{user}/upgrade', [ClientController::class, 'upgrade'])->name('clients.upgrade');
+        Route::post('/clients/{user}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
+        Route::delete('/clients/{user}/discounts/{discount}', [ClientController::class, 'destroyDiscount'])->name('clients.discounts.destroy');
+        Route::post('/clients/{user}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
+        Route::delete('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'destroySpecialTariff'])->name('clients.special-tariffs.destroy');
+    });
+    Route::middleware('can:clients:delete')->group(function () {
+        Route::delete('/clients/{user}', [ClientController::class, 'destroy'])->name('clients.destroy');
     });
 
     Route::middleware('can:roles:read')->group(function () {

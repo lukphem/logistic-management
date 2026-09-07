@@ -67,4 +67,26 @@ class ClientBillingProfile extends Model
 
         return $this->discount_percentage / 100;
     }
+
+    /**
+     * A per-service-type discount (client_service_discounts) takes
+     * priority over the flat discount above when one exists for this
+     * exact service type — "discount on each service type agreed and
+     * subscribed for", not a blanket discount just because one service
+     * type has one. Falls back to the flat discount for any service
+     * type without its own row, so an existing 'special' client with
+     * only the flat discount configured keeps working unchanged.
+     */
+    public function discountFractionForServiceType(int $serviceTypeId): float
+    {
+        $specific = ClientServiceDiscount::where('client_user_id', $this->client_user_id)
+            ->where('service_type_id', $serviceTypeId)
+            ->first();
+
+        if ($specific) {
+            return $specific->discount_percentage / 100;
+        }
+
+        return $this->discountFraction();
+    }
 }

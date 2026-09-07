@@ -79,6 +79,9 @@ class ClientShipmentController extends Controller
         }
 
         $data = $validator->validated();
+        // Same reasoning as Api\ClientController::quote() - a logged-in
+        // client gets their own special tariff applied automatically.
+        $data['client_user_id'] = $request->user()?->id;
 
         try {
             $quote = $this->pricingEngine->quote($data);
