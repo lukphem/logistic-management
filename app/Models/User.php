@@ -123,11 +123,6 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\ClientProfile::class, 'client_user_id');
     }
 
-    public function clientProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
-    {
-        return $this->hasOne(\App\Models\ClientProfile::class, 'client_user_id');
-    }
-
     /**
      * Sub-user PROFILES belonging to this organization - not the sub-
      * users themselves, since parent_client_user_id lives on
