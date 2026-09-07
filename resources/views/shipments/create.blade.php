@@ -868,7 +868,7 @@
                 successEl.classList.add('hidden');
 
                 fetch('/quotes/' + encodeURIComponent(code), {
-                    headers: { 'Accept': 'application/json' },
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 })
                     .then(async function (res) {
                         const body = await res.json();
@@ -950,6 +950,7 @@
                     headers: {
                         'X-CSRF-TOKEN': '{{ csrf_token() }}',
                         'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
                     },
                     body: new FormData(form),
                 })

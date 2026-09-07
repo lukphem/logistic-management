@@ -198,7 +198,14 @@ class ShipmentController extends Controller
         try {
             $quote = $this->pricingEngine->quote($data);
         } catch (PricingUnavailableException $e) {
-            return back()->withErrors(['service_type_id' => $e->getMessage()])->withInput();
+            // Explicit route, not back() - back() falls through to the
+            // site root when it can't resolve a previous URL (missing
+            // Referer header, session edge cases), and this app's root
+            // route redirects straight to the dashboard - silently
+            // swallowing this error message along the way. An explicit
+            // destination means the error is never lost regardless of
+            // why back() would have failed.
+            return redirect()->route('shipments.create')->withErrors(['service_type_id' => $e->getMessage()])->withInput();
         }
 
         $data['base_amount'] = $quote['base_amount'];
@@ -226,7 +233,7 @@ class ShipmentController extends Controller
         $quote = Quote::where('quote_number', strtoupper(trim($data['quote_number'])))->first();
 
         if (! $quote) {
-            return back()->withErrors(['quote_number' => "No quote found with ID \"{$data['quote_number']}\"."])->withInput();
+            return redirect()->route('shipments.create')->withErrors(['quote_number' => "No quote found with ID \"{$data['quote_number']}\"."])->withInput();
         }
 
         if (! $quote->isUsable()) {
@@ -234,7 +241,7 @@ class ShipmentController extends Controller
                 ? 'This quote has already been used to book a shipment.'
                 : 'This quote has expired — check the rate again to get a new one.';
 
-            return back()->withErrors(['quote_number' => $message])->withInput();
+            return redirect()->route('shipments.create')->withErrors(['quote_number' => $message])->withInput();
         }
 
         $context = $quote->context;
@@ -348,7 +355,10 @@ class ShipmentController extends Controller
         ]);
 
         if ($validator->fails()) {
-            abort(back()->withErrors($validator)->withInput());
+            // Same explicit-route reasoning as the two back() calls
+            // above - never rely on back()'s previous-URL resolution
+            // for a page the person needs to actually see the errors on.
+            abort(redirect()->route('shipments.create')->withErrors($validator)->withInput());
         }
 
         $data = $validator->validated();
