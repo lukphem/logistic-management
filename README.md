@@ -5541,3 +5541,91 @@ resources/views/clients/index.blade.php, form.blade.php, manage.blade.php   (new
 database/seeders/RolePermissionSeeder.php   (clients module)
 routes/web.php
 ```
+
+## Increment 102 — Client Hub: One Tabbed Page Per Client
+
+Restructures client management from scattered pages into one
+consolidated hub per client (`clients.show`), matching the tabbed
+layout of professional logistics platforms — Overview, Transactions,
+Tariff, Discount, Department, User, Service, Document, Security,
+Managerial services.
+
+### New
+
+- **Business Manager** — a staff member assigned to own a client
+  relationship day to day (`business_manager_id`), distinct from
+  `created_by` (who set the account up, never changes) — reassignable
+  as staffing changes without touching the historical creation record.
+- **Departments** (organizations) + **real sub-user logins** — a
+  department belongs to exactly one organization; a sub-user is a
+  genuine separate `User`/login (`client_profiles.parent_client_user_id`
+  points back to the organization), optionally assigned to one of that
+  organization's departments.
+- **Service access** (`client_service_subscriptions`) — separate from
+  pricing on purpose: a row here controls whether a client can use a
+  service type *at all*; `client_service_discounts` only ever matters
+  for a service type this doesn't restrict.
+- **Documents** — signed agreements and other uploads, stored per
+  client with type, uploader, and timestamp.
+- **Security / API access** — reuses the existing `ApiClient`/
+  `IpWhitelist`/`WebhookSubscription` system built for external
+  integration partners, linked to the client's own account instead of
+  duplicating it (`api_clients.client_user_id`). Adds a response
+  format setting (URL vs. base64) for how binary/file fields appear
+  in this client's API responses. Token generation shows the secret
+  in plaintext exactly once, at generation time, flashed to session
+  — never stored or displayed again after that.
+- **Managerial services** — warehouse access and COD as explicit
+  per-client toggles, plus standard logistics terms that didn't exist
+  anywhere before: insurance agreement (+ date, notes), invoice due
+  days, and SLA commitments (pickup/delivery windows).
+- **Overview fields** — account number (auto-generated at creation),
+  industry, country/state/town/territory, express center, business
+  objective — matching a professional client-profile layout.
+
+### Two real bugs caught before they could ship
+
+- Pre-computed every new foreign key/unique constraint name against
+  MySQL's 64-character identifier limit *before* writing any
+  migration this time (the lesson from `client_special_tariff_zone_prices`
+  earlier) — caught one more violation (the subscriptions table's
+  unique index) in advance.
+- `/clients/create` vs. the new bare `/clients/{user}` (show) route
+  have the same 2-segment shape — registration order would have sent
+  `/create` straight into route-model-binding as if "create" were a
+  user ID. Caught by checking route order explicitly, not assumed.
+- A form using `method="PUT"` directly — invalid HTML (browsers only
+  support GET/POST natively); fixed to `method="POST"` +
+  `@method('PUT')` spoofing, matching every other form on the page.
+- A duplicate `name="industry"` field across two sections of the
+  client form, which would have silently dropped one of the values on
+  submit — caught and removed before shipping.
+
+### Verified
+
+All 6 new/modified migrations for this increment round-tripped through
+the complete 129-statement migration set against fresh MySQL, 0 real
+errors (the sole reported error was a known translator limitation on
+explicit-named constraints, separately verified by hand). Every
+foreign key on `client_profiles` (9 relationships) confirmed correct
+via `information_schema`. Every touched file (controller, 5 models,
+2 large Blade views) balance-checked string/comment-aware.
+
+**Not verified**: no PHP runtime, so the actual tab-switching JS, file
+upload flow, and the full click-through (create client → add
+department → add sub-user → generate API access → upload document)
+haven't run through real Laravel. Worth a full pass once PHP is
+available.
+
+### Files
+
+```
+database/migrations/2026_02_26_*.php   (6 files)
+app/Models/Department.php, ClientServiceSubscription.php, ClientDocument.php   (new)
+app/Models/ApiClient.php, ClientProfile.php, User.php   (extended)
+app/Http/Controllers/Web/ClientController.php   (rewritten, ~830 lines)
+resources/views/clients/show.blade.php   (new — the tabbed hub)
+resources/views/clients/form.blade.php   (extended)
+resources/views/clients/manage.blade.php   (superseded by show.blade.php)
+routes/web.php
+```

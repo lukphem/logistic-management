@@ -265,20 +265,45 @@ Route::middleware(['auth', 'staff'])->group(function () {
     // Client accounts (individual/organization) + per-client billing.
     Route::middleware('can:clients:read')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
-        Route::get('/clients/{user}/manage', [ClientController::class, 'manage'])->name('clients.manage');
     });
     Route::middleware('can:clients:create')->group(function () {
         Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
     });
+    // /clients/{user} registered after /clients/create above - same
+    // 2-segment shape, so registration order decides which wins.
+    Route::middleware('can:clients:read')->group(function () {
+        Route::get('/clients/{user}', [ClientController::class, 'show'])->name('clients.show');
+    });
     Route::middleware('can:clients:update')->group(function () {
         Route::get('/clients/{user}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{user}', [ClientController::class, 'update'])->name('clients.update');
         Route::post('/clients/{user}/upgrade', [ClientController::class, 'upgrade'])->name('clients.upgrade');
+
         Route::post('/clients/{user}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
         Route::delete('/clients/{user}/discounts/{discount}', [ClientController::class, 'destroyDiscount'])->name('clients.discounts.destroy');
         Route::post('/clients/{user}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
         Route::delete('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'destroySpecialTariff'])->name('clients.special-tariffs.destroy');
+
+        Route::post('/clients/{user}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
+        Route::delete('/clients/{user}/departments/{department}', [ClientController::class, 'destroyDepartment'])->name('clients.departments.destroy');
+
+        Route::post('/clients/{user}/users', [ClientController::class, 'storeSubUser'])->name('clients.sub-users.store');
+        Route::delete('/clients/{user}/users/{subUser}', [ClientController::class, 'destroySubUser'])->name('clients.sub-users.destroy');
+
+        Route::post('/clients/{user}/services', [ClientController::class, 'storeServiceSubscription'])->name('clients.services.store');
+
+        Route::post('/clients/{user}/documents', [ClientController::class, 'storeDocument'])->name('clients.documents.store');
+        Route::delete('/clients/{user}/documents/{document}', [ClientController::class, 'destroyDocument'])->name('clients.documents.destroy');
+
+        Route::post('/clients/{user}/api-access', [ClientController::class, 'generateApiAccess'])->name('clients.api-access.generate');
+        Route::put('/clients/{user}/api-access', [ClientController::class, 'updateApiSettings'])->name('clients.api-access.update');
+        Route::post('/clients/{user}/ip-whitelist', [ClientController::class, 'storeIpWhitelist'])->name('clients.ip-whitelist.store');
+        Route::delete('/clients/{user}/ip-whitelist/{ipWhitelist}', [ClientController::class, 'destroyIpWhitelist'])->name('clients.ip-whitelist.destroy');
+        Route::post('/clients/{user}/webhooks', [ClientController::class, 'storeWebhook'])->name('clients.webhooks.store');
+        Route::delete('/clients/{user}/webhooks/{webhook}', [ClientController::class, 'destroyWebhook'])->name('clients.webhooks.destroy');
+
+        Route::put('/clients/{user}/managerial', [ClientController::class, 'updateManagerial'])->name('clients.managerial.update');
     });
     Route::middleware('can:clients:delete')->group(function () {
         Route::delete('/clients/{user}', [ClientController::class, 'destroy'])->name('clients.destroy');

@@ -13,8 +13,10 @@ class ApiClient extends Model
 
     protected $fillable = [
         'name',
+        'client_user_id',
         'api_key',
         'api_secret_hash',
+        'api_response_format',
         'is_active',
         'ip_whitelist_enabled',
         'rate_limit_per_minute',
@@ -27,6 +29,44 @@ class ApiClient extends Model
         'ip_whitelist_enabled' => 'boolean',
         'last_used_at' => 'datetime',
     ];
+
+    public function clientUser(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'client_user_id');
+    }
+
+    public function webhookSubscriptions(): HasMany
+    {
+        return $this->hasMany(WebhookSubscription::class);
+    }
+
+    /**
+     * Generates a fresh key + secret pair. The secret is returned only
+     * here, in plaintext, for one-time display to whoever just
+     * generated it (Security tab) - never stored or shown again after
+     * this, only its hash. Regenerating replaces both; any code the
+     * client had saved stops working immediately, same as rotating any
+     * other API credential.
+     *
+     * @return array{api_client: self, plaintext_secret: string}
+     */
+    public static function generateFor(?int $clientUserId, string $name): array
+    {
+        $apiKey = 'lm_' . \Illuminate\Support\Str::random(32);
+        $secret = \Illuminate\Support\Str::random(48);
+
+        $apiClient = static::updateOrCreate(
+            ['client_user_id' => $clientUserId],
+            [
+                'name' => $name,
+                'api_key' => $apiKey,
+                'api_secret_hash' => \Illuminate\Support\Facades\Hash::make($secret),
+                'is_active' => true,
+            ]
+        );
+
+        return ['api_client' => $apiClient, 'plaintext_secret' => $secret];
+    }
 
     public function ipWhitelists(): HasMany
     {

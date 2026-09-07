@@ -54,7 +54,7 @@
                             {{ $client->billingProfile?->billing_type === 'special' ? 'Special rate' : 'Standard' }}
                         </td>
                         <td class="px-5 py-3 text-right">
-                            <a href="{{ route('clients.manage', $client) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Billing</a>
+                            <a href="{{ route('clients.show', $client) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">View</a>
                             <span class="mx-1 text-ink-500">·</span>
                             <a href="{{ route('clients.edit', $client) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
                         </td>
