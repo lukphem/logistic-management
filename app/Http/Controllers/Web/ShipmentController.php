@@ -218,6 +218,14 @@ class ShipmentController extends Controller
         $billingProfile = ClientBillingProfile::resolveForClientUser($data['client_user_id'] ?? null);
         $pricing = $this->pricingService->priceShipment($data, $billingProfile);
 
+        // Same resolution PricingEngine/ShipmentPricingService already
+        // used to price this shipment (client_account_id if known,
+        // else that client's Default Account) - stamped onto the
+        // shipment itself so Shipment -> Account -> Business Manager
+        // is traceable later, for commission/performance reporting.
+        $data['client_account_id'] = $data['client_account_id']
+            ?? (! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null);
+
         $shipment = Shipment::create([
             ...$data,
             'shipping_type' => $quote['shipping_type'],
@@ -266,6 +274,7 @@ class ShipmentController extends Controller
 
         $shipment = Shipment::create([
             'client_user_id' => $data['client_user_id'] ?? null,
+            'client_account_id' => ! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null,
             'sender_name' => $data['sender_name'],
             'sender_phone' => $data['sender_phone'],
             'sender_email' => $data['sender_email'] ?? null,

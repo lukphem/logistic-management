@@ -39,11 +39,11 @@
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $client->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $client->email }}</td>
                         <td class="px-5 py-3">
-                            @if ($client->clientProfile?->isOrganization())
+                            @if ($client->defaultAccount?->isOrganization())
                                 <span class="inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2.5 py-0.5 text-xs font-medium text-[var(--brand-primary)]">
                                     Organization
                                 </span>
-                                <span class="block text-xs text-ink-500">{{ $client->clientProfile->company_name }}</span>
+                                <span class="block text-xs text-ink-500">{{ $client->defaultAccount->company_name }}</span>
                             @else
                                 <span class="inline-flex items-center rounded-full bg-ink-500/10 px-2.5 py-0.5 text-xs font-medium text-ink-500">
                                     Individual

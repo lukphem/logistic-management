@@ -24,9 +24,14 @@ class ShipmentPricingService
      *
      * $billingProfile is optional — pass the requester's
      * ClientBillingProfile (see ClientBillingProfile::resolveForRequest
-     * or ::resolveForClientUser) to apply a 'special' discount. Standard
-     * clients (the default, and anyone with no profile at all) pass null
-     * and get the plain price with no adjustment.
+     * or ::resolveForClientUser) as a fallback for a flat 'special'
+     * discount. It's a fallback, not the primary source: if $context
+     * carries client_account_id (or client_user_id, resolved to that
+     * client's Default Account) that Account's own
+     * discountFractionForServiceType() is checked FIRST — same
+     * resolveClientAccount() PricingEngine's special-tariff check uses,
+     * so there's exactly one answer to "which account, and what
+     * discount" everywhere pricing happens, not one path per caller.
      */
     public function priceShipment(array $context, ?ClientBillingProfile $billingProfile = null): array
     {
@@ -34,7 +39,11 @@ class ShipmentPricingService
         $surcharges = $this->calculateSurcharges($context);
         $surchargeAmount = $surcharges['total'];
 
-        $discountFraction = $billingProfile?->discountFractionForServiceType((int) ($context['service_type_id'] ?? 0)) ?? 0.0;
+        $serviceTypeId = (int) ($context['service_type_id'] ?? 0);
+        $account = $this->resolveClientAccount($context);
+        $discountFraction = $account
+            ? $account->discountFractionForServiceType($serviceTypeId)
+            : ($billingProfile?->discountFractionForServiceType($serviceTypeId) ?? 0.0);
         $discountAmount = round(($baseAmount + $surchargeAmount) * $discountFraction, 2);
 
         // Discount applies to freight + surcharges only — insurance and
@@ -204,5 +213,27 @@ class ShipmentPricingService
         }
 
         return 0.0;
+    }
+
+    /**
+     * Same resolution PricingEngine's standardBilling() uses for the
+     * special-tariff check — client_account_id directly if the caller
+     * already knows it, else that client's Default Account via
+     * client_user_id. Kept in sync deliberately: both are meant to
+     * agree on "which account" for the exact same booking.
+     */
+    private function resolveClientAccount(array $context): ?\App\Models\ClientAccount
+    {
+        if (! empty($context['client_account_id'])) {
+            return \App\Models\ClientAccount::find($context['client_account_id']);
+        }
+
+        if (! empty($context['client_user_id'])) {
+            return \App\Models\ClientAccount::where('client_user_id', $context['client_user_id'])
+                ->where('is_default', true)
+                ->first();
+        }
+
+        return null;
     }
 }

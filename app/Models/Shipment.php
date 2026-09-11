@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class Shipment extends Model
 {
     protected $fillable = [
-        'tracking_number', 'client_user_id', 'api_client_id', 'service_type_id', 'shipping_type',
+        'tracking_number', 'client_user_id', 'client_account_id', 'api_client_id', 'service_type_id', 'shipping_type',
         'sender_name', 'sender_phone', 'sender_email', 'receiver_name', 'receiver_phone', 'receiver_email',
         'package_description', 'special_instructions',
         'origin_address', 'origin_zone_id', 'origin_city_id', 'origin_district_id', 'destination_address', 'destination_zone_id', 'destination_city_id', 'destination_district_id', 'distance_km',
@@ -203,6 +203,11 @@ class Shipment extends Model
     public function clientUser(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'client_user_id');
+    }
+
+    public function clientAccount(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ClientAccount::class);
     }
 
     public function apiClient(): BelongsTo

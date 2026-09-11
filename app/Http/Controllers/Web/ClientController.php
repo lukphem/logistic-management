@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ApiClient;
 use App\Models\City;
+use App\Models\ClientAccount;
 use App\Models\ClientDocument;
 use App\Models\ClientProfile;
 use App\Models\ClientServiceDiscount;
@@ -27,12 +28,30 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\View\View;
 
+/**
+ * Client -> Account restructure: a Client (this controller's $user,
+ * user_type='client') can have multiple Accounts (Lagos, Abuja,
+ * E-commerce). Everything that's genuinely account-level — type,
+ * contact details, products, billing, Business Manager — lives on
+ * ClientAccount, not on the client login itself. This controller
+ * currently operates on each client's single "Default Account" for
+ * every account-level action (create/edit/discounts/special
+ * tariffs/departments/sub-users/service access/managerial settings) —
+ * full multi-account creation/switching UI is the next phase; this
+ * phase makes the underlying data model and resolution logic
+ * correctly account-based first, without changing what a single-
+ * account client experiences today.
+ *
+ * Documents and API access (Security tab) stay client-level, not
+ * per-account — a signed business agreement and an API integration
+ * belong to the company as a whole, not to one operational branch.
+ */
 class ClientController extends Controller
 {
     public function index(Request $request): View
     {
         $clients = User::where('user_type', 'client')
-            ->with('clientProfile')
+            ->with('defaultAccount')
             ->when($request->filled('search'), fn ($q) => $q->where(function ($q) use ($request) {
                 $q->where('name', 'like', "%{$request->search}%")
                     ->orWhere('email', 'like', "%{$request->search}%");
@@ -48,7 +67,8 @@ class ClientController extends Controller
     {
         return view('clients.form', [
             'user' => new User(),
-            'profile' => new ClientProfile(),
+            'account' => new ClientAccount(),
+            'profile' => new ClientAccount(), // view compatibility — clients/form.blade.php reads $profile
             'cities' => City::orderBy('name')->get(),
             'countries' => Country::orderBy('name')->get(),
             'states' => State::orderBy('name')->get(),
@@ -71,12 +91,19 @@ class ClientController extends Controller
             'account_status' => 'active',
         ]);
 
-        ClientProfile::create([
+        $account = ClientAccount::create([
             'client_user_id' => $user->id,
+            'account_name' => 'Default Account',
             'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
+            'is_default' => true,
             'created_by' => auth()->id(),
-            ...$this->profileData($data),
+            ...$this->accountData($data),
         ]);
+
+        // Links this login to its own Default Account — mirrors how a
+        // sub-user's ClientProfile links them to the account they work
+        // under, so both are reached the same way.
+        ClientProfile::create(['client_user_id' => $user->id, 'client_account_id' => $account->id]);
 
         return redirect()->route('clients.show', $user)->with('status', 'Client account created.');
     }
@@ -87,7 +114,8 @@ class ClientController extends Controller
 
         return view('clients.form', [
             'user' => $user,
-            'profile' => $user->clientProfile ?? new ClientProfile(),
+            'account' => $user->defaultAccount ?? new ClientAccount(),
+            'profile' => $user->defaultAccount ?? new ClientAccount(), // view compatibility — clients/form.blade.php reads $profile
             'cities' => City::orderBy('name')->get(),
             'countries' => Country::orderBy('name')->get(),
             'states' => State::orderBy('name')->get(),
@@ -109,10 +137,25 @@ class ClientController extends Controller
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
 
-        ClientProfile::updateOrCreate(
-            ['client_user_id' => $user->id],
-            $this->profileData($data)
-        );
+        $account = $user->defaultAccount;
+
+        if ($account) {
+            $account->update($this->accountData($data));
+        } else {
+            // Defensive — every client should already have a Default
+            // Account (auto-created at store() time, or by the
+            // Client -> Account restructure's backfill for anyone
+            // created before it existed).
+            $account = ClientAccount::create([
+                'client_user_id' => $user->id,
+                'account_name' => 'Default Account',
+                'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
+                'is_default' => true,
+                'created_by' => auth()->id(),
+                ...$this->accountData($data),
+            ]);
+            ClientProfile::updateOrCreate(['client_user_id' => $user->id], ['client_account_id' => $account->id]);
+        }
 
         return redirect()->route('clients.show', $user)->with('status', 'Client account updated.');
     }
@@ -124,26 +167,30 @@ class ClientController extends Controller
      * pages. Loads everything every tab could need up front (this page
      * is visited far less often than, say, the shipments list, so one
      * slightly heavier load beats N separate round trips as staff
-     * click between tabs).
+     * click between tabs). Currently shows the client's Default
+     * Account — an Accounts-list/switcher for genuine multi-account
+     * clients is the next phase.
      */
     public function show(User $user): View
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $profile = $user->clientProfile;
-        $isOrganization = $profile?->isOrganization() ?? false;
+        $account = $user->defaultAccount()->with('city', 'country', 'state', 'territory', 'createdBy', 'businessManager')->first();
+        $isOrganization = $account?->isOrganization() ?? false;
+        $accountId = $account?->id;
 
         return view('clients.show', [
-            'user' => $user->load('clientProfile.city', 'clientProfile.country', 'clientProfile.state', 'clientProfile.territory', 'clientProfile.createdBy', 'clientProfile.businessManager', 'billingProfile'),
-            'profile' => $profile,
+            'user' => $user->load('billingProfile'),
+            'account' => $account,
+            'profile' => $account, // kept for view compatibility during the transition
             'isOrganization' => $isOrganization,
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
-            'discounts' => ClientServiceDiscount::where('client_user_id', $user->id)->with('serviceType')->get()->keyBy('service_type_id'),
-            'specialTariffs' => ClientSpecialTariff::where('client_user_id', $user->id)->with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get(),
+            'discounts' => ClientServiceDiscount::where('client_account_id', $accountId)->with('serviceType')->get()->keyBy('service_type_id'),
+            'specialTariffs' => ClientSpecialTariff::where('client_account_id', $accountId)->with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get(),
             'zones' => Zone::where('applies_domestic', true)->orderBy('name')->get(),
-            'subscriptions' => ClientServiceSubscription::where('client_user_id', $user->id)->pluck('is_active', 'service_type_id'),
-            'departments' => $isOrganization ? Department::where('client_user_id', $user->id)->orderBy('name')->get() : collect(),
-            'subUsers' => $isOrganization ? User::whereHas('clientProfile', fn ($q) => $q->where('parent_client_user_id', $user->id))->with('clientProfile.department')->orderBy('name')->get() : collect(),
+            'subscriptions' => ClientServiceSubscription::where('client_account_id', $accountId)->pluck('is_active', 'service_type_id'),
+            'departments' => $isOrganization ? Department::where('client_account_id', $accountId)->orderBy('name')->get() : collect(),
+            'subUsers' => $isOrganization ? User::whereHas('clientProfile', fn ($q) => $q->where('client_account_id', $accountId))->with('clientProfile.department')->orderBy('name')->get() : collect(),
             'documents' => ClientDocument::where('client_user_id', $user->id)->latest()->get(),
             'apiClient' => ApiClient::where('client_user_id', $user->id)->with('ipWhitelists', 'webhookSubscriptions')->first(),
             'shipments' => \App\Models\Shipment::where('client_user_id', $user->id)->latest()->limit(25)->get(),
@@ -160,18 +207,19 @@ class ClientController extends Controller
     }
 
     /**
-     * Individual -> organization only, on purpose — see the
-     * client_profiles migration's note on why this doesn't go the other
-     * way in the UI (an org that "downgrades" would lose its RC/TIN
-     * trail). Requires the organization fields to actually be filled in
-     * as part of the same request, not just a bare status flip.
+     * Individual -> organization only, on purpose — see
+     * client_accounts' note on why this doesn't go the other way in
+     * the UI (an org that "downgrades" would lose its RC/TIN trail).
+     * Requires the organization fields as part of the same request.
+     * Same Account row — id, shipments, billing, Business Manager all
+     * preserved automatically since nothing is recreated, only updated.
      */
     public function upgrade(Request $request, User $user): RedirectResponse
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $profile = $user->clientProfile;
-        abort_if(! $profile || $profile->account_type === 'organization', 404);
+        $account = $user->defaultAccount;
+        abort_if(! $account || $account->account_type === 'organization', 404);
 
         $validator = Validator::make($request->all(), [
             'company_name' => 'required|string|max:255',
@@ -183,14 +231,14 @@ class ClientController extends Controller
         ]);
         $data = $validator->validate();
 
-        $profile->update([...$data, 'account_type' => 'organization']);
+        $account->update([...$data, 'account_type' => 'organization']);
 
         return redirect()->route('clients.show', $user)->with('status', "{$user->name} upgraded to an organization account.");
     }
 
     public function storeDiscount(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client', 404);
+        $account = $this->requireDefaultAccount($user);
 
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -199,8 +247,8 @@ class ClientController extends Controller
         $data = $validator->validate();
 
         ClientServiceDiscount::updateOrCreate(
-            ['client_user_id' => $user->id, 'service_type_id' => $data['service_type_id']],
-            ['discount_percentage' => $data['discount_percentage']]
+            ['client_account_id' => $account->id, 'service_type_id' => $data['service_type_id']],
+            ['client_user_id' => $user->id, 'discount_percentage' => $data['discount_percentage']]
         );
 
         return redirect()->route('clients.show', $user)->with('status', 'Discount saved.');
@@ -208,7 +256,7 @@ class ClientController extends Controller
 
     public function destroyDiscount(User $user, ClientServiceDiscount $discount): RedirectResponse
     {
-        abort_unless($discount->client_user_id === $user->id, 404);
+        abort_unless($discount->client_account_id === $user->defaultAccount?->id, 404);
 
         $discount->delete();
 
@@ -217,7 +265,7 @@ class ClientController extends Controller
 
     public function storeSpecialTariff(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client', 404);
+        $account = $this->requireDefaultAccount($user);
 
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -234,6 +282,7 @@ class ClientController extends Controller
         $data = $validator->validate();
 
         $tariff = ClientSpecialTariff::create([
+            'client_account_id' => $account->id,
             'client_user_id' => $user->id,
             'service_type_id' => $data['service_type_id'],
             'min_weight' => $data['min_weight'],
@@ -258,7 +307,7 @@ class ClientController extends Controller
 
     public function destroySpecialTariff(User $user, ClientSpecialTariff $tariff): RedirectResponse
     {
-        abort_unless($tariff->client_user_id === $user->id, 404);
+        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
 
         $tariff->delete();
 
@@ -271,20 +320,21 @@ class ClientController extends Controller
 
     public function storeDepartment(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client' && $user->clientProfile?->isOrganization(), 404);
+        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->isOrganization(), 404);
 
         $data = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
         ])->validate();
 
-        Department::create(['client_user_id' => $user->id, 'name' => $data['name']]);
+        Department::create(['client_account_id' => $account->id, 'name' => $data['name']]);
 
         return redirect()->route('clients.show', $user)->with('status', 'Department added.');
     }
 
     public function destroyDepartment(User $user, Department $department): RedirectResponse
     {
-        abort_unless($department->client_user_id === $user->id, 404);
+        abort_unless($department->client_account_id === $user->defaultAccount?->id, 404);
 
         $department->delete();
 
@@ -292,12 +342,14 @@ class ClientController extends Controller
     }
 
     // ---------------------------------------------------------------
-    // Sub-users (organization only) — real, separate logins
+    // Sub-users (organization only) — real, separate logins, scoped
+    // to the account they work under
     // ---------------------------------------------------------------
 
     public function storeSubUser(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client' && $user->clientProfile?->isOrganization(), 404);
+        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->isOrganization(), 404);
 
         $data = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
@@ -308,10 +360,9 @@ class ClientController extends Controller
         ])->validate();
 
         // A department picked here must actually belong to THIS
-        // organization — exists:departments,id alone can't enforce
-        // that, just that the id exists at all.
+        // account — exists:departments,id alone can't enforce that.
         if (! empty($data['department_id'])) {
-            abort_unless(Department::where('id', $data['department_id'])->where('client_user_id', $user->id)->exists(), 422);
+            abort_unless(Department::where('id', $data['department_id'])->where('client_account_id', $account->id)->exists(), 422);
         }
 
         $subUser = User::create([
@@ -326,10 +377,7 @@ class ClientController extends Controller
 
         ClientProfile::create([
             'client_user_id' => $subUser->id,
-            'account_number' => str_pad((string) $subUser->id, 10, '0', STR_PAD_LEFT),
-            'created_by' => auth()->id(),
-            'account_type' => 'individual',
-            'parent_client_user_id' => $user->id,
+            'client_account_id' => $account->id,
             'department_id' => $data['department_id'] ?? null,
         ]);
 
@@ -338,7 +386,7 @@ class ClientController extends Controller
 
     public function destroySubUser(User $user, User $subUser): RedirectResponse
     {
-        abort_unless($subUser->clientProfile?->parent_client_user_id === $user->id, 404);
+        abort_unless($subUser->clientProfile?->client_account_id === $user->defaultAccount?->id, 404);
 
         $subUser->delete();
 
@@ -351,7 +399,7 @@ class ClientController extends Controller
 
     public function storeServiceSubscription(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client', 404);
+        $account = $this->requireDefaultAccount($user);
 
         $data = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -359,15 +407,16 @@ class ClientController extends Controller
         ])->validate();
 
         ClientServiceSubscription::updateOrCreate(
-            ['client_user_id' => $user->id, 'service_type_id' => $data['service_type_id']],
-            ['is_active' => $request->boolean('is_active')]
+            ['client_account_id' => $account->id, 'service_type_id' => $data['service_type_id']],
+            ['client_user_id' => $user->id, 'is_active' => $request->boolean('is_active')]
         );
 
         return redirect()->route('clients.show', $user)->with('status', 'Service access updated.');
     }
 
     // ---------------------------------------------------------------
-    // Documents
+    // Documents — client-level, not per-account (a signed business
+    // agreement belongs to the company, not one operational branch)
     // ---------------------------------------------------------------
 
     public function storeDocument(Request $request, User $user): RedirectResponse
@@ -404,16 +453,16 @@ class ClientController extends Controller
     }
 
     // ---------------------------------------------------------------
-    // Security — API access (reuses the same ApiClient/IpWhitelist/
-    // WebhookSubscription system built for external integration
-    // partners, just linked to this client's own account instead)
+    // Security — API access, client-level (reuses the same
+    // ApiClient/IpWhitelist/WebhookSubscription system built for
+    // external integration partners)
     // ---------------------------------------------------------------
 
     public function generateApiAccess(Request $request, User $user): RedirectResponse
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $result = ApiClient::generateFor($user->id, $user->clientProfile?->company_name ?: $user->name);
+        $result = ApiClient::generateFor($user->id, $user->defaultAccount?->company_name ?: $user->name);
 
         // The plaintext secret only ever exists in this one response -
         // flashed to session for a single display, never persisted or
@@ -502,12 +551,12 @@ class ClientController extends Controller
 
     // ---------------------------------------------------------------
     // Managerial services — warehouse/COD access, insurance agreement,
-    // invoice terms, SLA commitments
+    // invoice terms, SLA commitments — account-level
     // ---------------------------------------------------------------
 
     public function updateManagerial(Request $request, User $user): RedirectResponse
     {
-        abort_unless($user->user_type === 'client', 404);
+        $account = $this->requireDefaultAccount($user);
 
         $data = Validator::make($request->all(), [
             'warehouse_access' => 'sometimes|boolean',
@@ -524,12 +573,27 @@ class ClientController extends Controller
         $data['cod_enabled'] = $request->boolean('cod_enabled');
         $data['insurance_agreement'] = $request->boolean('insurance_agreement');
 
-        ClientProfile::updateOrCreate(['client_user_id' => $user->id], $data);
+        $account->update($data);
 
         return redirect()->route('clients.show', $user)->with('status', 'Managerial settings updated.');
     }
 
-    private function profileData(array $data): array
+    /**
+     * Every action that targets "the" account (until multi-account
+     * selection UI exists) goes through this, so a client somehow
+     * missing a Default Account gets a clear error instead of a null
+     * pointer three lines into an update.
+     */
+    private function requireDefaultAccount(User $user): ClientAccount
+    {
+        abort_unless($user->user_type === 'client', 404);
+        $account = $user->defaultAccount;
+        abort_unless($account, 404, 'This client has no account set up yet.');
+
+        return $account;
+    }
+
+    private function accountData(array $data): array
     {
         return [
             'account_type' => $data['account_type'],

@@ -103,14 +103,21 @@ class PricingEngine
         // takes priority over the shared standard_billing_tariffs
         // entirely when one exists for this exact client + service
         // type + zone. Falls through to standard pricing below when the
-        // client has no special tariff, or has one but not for this
+        // account has no special tariff, or has one but not for this
         // zone/weight — a partially-configured special rate should
         // never block a shipment from pricing, just not apply to the
         // part that isn't set up.
-        $clientUserId = $context['client_user_id'] ?? null;
+        //
+        // client_account_id in context takes priority when a caller
+        // already knows which Account a booking belongs to; falling
+        // back to client_user_id's Default Account keeps every
+        // existing caller working unchanged during the Client ->
+        // Account restructure, since most callers only pass
+        // client_user_id today.
+        $clientAccountId = $this->resolveClientAccountId($context);
 
-        if ($clientUserId) {
-            $special = $this->resolveClientSpecialTariff($clientUserId, $serviceType->id, $chargeableWeight, $zone->id);
+        if ($clientAccountId) {
+            $special = $this->resolveClientSpecialTariff($clientAccountId, $serviceType->id, $chargeableWeight, $zone->id);
 
             if ($special) {
                 [$tariff, $zonePrice] = $special;
@@ -399,20 +406,44 @@ class PricingEngine
     }
 
     /**
+     * THE single place that turns whatever a caller happened to put in
+     * context into an Account — client_account_id directly if given
+     * (a caller that already knows which Account a booking is for),
+     * else that client's Default Account via client_user_id. Every
+     * billing resolution step (special tariff here, the discount in
+     * ShipmentPricingService) goes through this, so there's exactly
+     * one answer to "which account applies here," not one per module.
+     */
+    private function resolveClientAccountId(array $context): ?int
+    {
+        if (! empty($context['client_account_id'])) {
+            return (int) $context['client_account_id'];
+        }
+
+        if (! empty($context['client_user_id'])) {
+            return \App\Models\ClientAccount::where('client_user_id', $context['client_user_id'])
+                ->where('is_default', true)
+                ->value('id');
+        }
+
+        return null;
+    }
+
+    /**
      * Same band-matching + "heavier than every configured band falls
      * back to the highest one" posture as the shared standard tariff
-     * lookup, scoped to exactly one client — and additionally requires
+     * lookup, scoped to exactly one Account — and additionally requires
      * a zone price to exist for THIS zone specifically, since unlike
      * the standard tariff (which throws a specific "no price for this
-     * zone" error if missing), a client special tariff configured for
-     * some zones but not this one should silently fall through to
+     * zone" error if missing), an account's special tariff configured
+     * for some zones but not this one should silently fall through to
      * standard pricing rather than block the shipment.
      *
      * @return array{0: \App\Models\ClientSpecialTariff, 1: \App\Models\ClientSpecialTariffZonePrice}|null
      */
-    private function resolveClientSpecialTariff(int $clientUserId, int $serviceTypeId, float $chargeableWeight, int $zoneId): ?array
+    private function resolveClientSpecialTariff(int $clientAccountId, int $serviceTypeId, float $chargeableWeight, int $zoneId): ?array
     {
-        $tariff = \App\Models\ClientSpecialTariff::where('client_user_id', $clientUserId)
+        $tariff = \App\Models\ClientSpecialTariff::where('client_account_id', $clientAccountId)
             ->where('service_type_id', $serviceTypeId)
             ->where('is_active', true)
             ->where('min_weight', '<=', $chargeableWeight)
@@ -421,7 +452,7 @@ class PricingEngine
             ->first();
 
         if (! $tariff) {
-            $tariff = \App\Models\ClientSpecialTariff::where('client_user_id', $clientUserId)
+            $tariff = \App\Models\ClientSpecialTariff::where('client_account_id', $clientAccountId)
                 ->where('service_type_id', $serviceTypeId)
                 ->where('is_active', true)
                 ->orderByDesc('max_weight_limit')

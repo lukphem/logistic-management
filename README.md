@@ -5629,3 +5629,71 @@ resources/views/clients/form.blade.php   (extended)
 resources/views/clients/manage.blade.php   (superseded by show.blade.php)
 routes/web.php
 ```
+
+## Increment 103, Phase 4 — Billing Resolution Now Account-Based
+
+The most important part of the Client -> Account restructure, per
+the spec it was built from (section 16: "one reliable billing
+resolution mechanism... not different billing logic in different
+modules"). New `ClientAccount` model; `ClientController` rewritten
+to write through it (not the old `ClientProfile`) for every
+account-level action; `PricingEngine` and `ShipmentPricingService`
+both re-pointed to resolve billing through the Account layer.
+
+### One resolution, two entry points, same answer
+
+Both `PricingEngine::resolveClientAccountId()` and
+`ShipmentPricingService::resolveClientAccount()` follow the identical
+rule: `client_account_id` directly if a caller already knows it, else
+that client's Default Account via `client_user_id`. Every existing
+caller only ever passed `client_user_id` — none needed to change,
+since the fallback resolves the same account they were already
+(implicitly) billing against.
+
+New shipments now get `client_account_id` stamped on at booking time
+too (both the walk-in and quote-redemption paths), so
+`Shipment -> Account -> Business Manager` is traceable going forward,
+per the commission/performance-reporting requirement.
+
+### Two real bugs caught before shipping
+
+- `clients/index.blade.php` still called
+  `$client->clientProfile?->isOrganization()` — a method that no
+  longer exists on the slimmed `ClientProfile` (moved to
+  `ClientAccount`). Fixed to `$client->defaultAccount?->isOrganization()`.
+- Three related models (`ClientServiceDiscount`, `ClientSpecialTariff`,
+  `ClientServiceSubscription`) didn't have `client_account_id` in
+  their `$fillable` arrays yet — the controller was already writing
+  it, meaning Eloquent would have silently dropped it on every mass
+  assignment. Caught by explicitly checking every model the
+  controller writes to, not assumed correct because the migration
+  ran cleanly.
+
+### Verified
+
+The full resolution chain was tested against live MySQL with the same
+seeded data from Phase 1 (Jane's individual account, ABC Company's
+account with a sub-user): inserted a real special tariff on Jane's
+account, then ran the *exact* query `resolveClientAccountId()` +
+`resolveClientSpecialTariff()` perform when given only
+`client_user_id=1` — confirmed it resolves to her account and finds
+the tariff, proving the backward-compatible fallback works correctly
+end to end. Full repo balance check, and — after the earlier
+duplicate-`clientProfile()` incident — an explicit duplicate-method
+scan across every file in `app/`: clean.
+
+**Not verified**: no PHP runtime, so the actual click-through
+(edit a client, add a discount, book a shipment, confirm the right
+account/price is used) hasn't run through real Laravel.
+
+### Files
+
+```
+app/Models/ClientAccount.php   (new)
+app/Models/ClientProfile.php   (slimmed)
+app/Models/ClientServiceDiscount.php, ClientSpecialTariff.php, ClientServiceSubscription.php, Department.php, Shipment.php, User.php   (client_account_id + relations)
+app/Http/Controllers/Web/ClientController.php   (rewritten to write through ClientAccount)
+app/Http/Controllers/Web/ShipmentController.php   (stamps client_account_id on new shipments)
+app/Services/PricingEngine.php, ShipmentPricingService.php   (account-based resolution)
+resources/views/clients/index.blade.php   (fixed stale clientProfile call)
+```

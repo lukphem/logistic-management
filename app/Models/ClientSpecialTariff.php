@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClientSpecialTariff extends Model
 {
     protected $fillable = [
-        'client_user_id', 'service_type_id',
+        'client_user_id', 'client_account_id', 'service_type_id',
         'min_weight', 'max_weight', 'max_weight_limit', 'additional_weight',
         'is_active',
     ];
@@ -19,6 +19,11 @@ class ClientSpecialTariff extends Model
     public function clientUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'client_user_id');
+    }
+
+    public function clientAccount(): BelongsTo
+    {
+        return $this->belongsTo(ClientAccount::class);
     }
 
     public function serviceType(): BelongsTo

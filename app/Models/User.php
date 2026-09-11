@@ -123,20 +123,37 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\ClientProfile::class, 'client_user_id');
     }
 
-    /**
-     * Sub-user PROFILES belonging to this organization - not the sub-
-     * users themselves, since parent_client_user_id lives on
-     * client_profiles, not users directly. ->clientUser on each result
-     * gets to the actual User/login.
-     */
-    public function subUserProfiles(): HasMany
+    public function accounts(): HasMany
     {
-        return $this->hasMany(\App\Models\ClientProfile::class, 'parent_client_user_id');
+        return $this->hasMany(\App\Models\ClientAccount::class, 'client_user_id');
     }
 
-    public function departments(): HasMany
+    /**
+     * Every client has exactly one Default Account from the moment
+     * they're created (auto-created for existing clients during the
+     * Client -> Account restructure) — this is the account used
+     * everywhere multi-account selection isn't wired up yet.
+     */
+    public function defaultAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasMany(\App\Models\Department::class, 'client_user_id');
+        return $this->hasOne(\App\Models\ClientAccount::class, 'client_user_id')->where('is_default', true);
+    }
+
+    /**
+     * Sub-user PROFILES across every account this client has — reached
+     * through ClientAccount now (Client -> Account restructure), not
+     * directly, since a sub-user is scoped to a specific Account, not
+     * the client as a whole. ->clientUser on each result gets to the
+     * actual User/login.
+     */
+    public function subUserProfiles(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(\App\Models\ClientProfile::class, \App\Models\ClientAccount::class, 'client_user_id', 'client_account_id');
+    }
+
+    public function departments(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(\App\Models\Department::class, \App\Models\ClientAccount::class, 'client_user_id', 'client_account_id');
     }
 
     public function apiClient(): \Illuminate\Database\Eloquent\Relations\HasOne
