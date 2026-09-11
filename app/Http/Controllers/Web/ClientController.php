@@ -161,21 +161,35 @@ class ClientController extends Controller
     }
 
     /**
-     * The tabbed client hub — Overview, Transactions, Tariff, Discount,
-     * Department, User, Service, Document, Security, Managerial
-     * services, all in one place rather than scattered across separate
-     * pages. Loads everything every tab could need up front (this page
-     * is visited far less often than, say, the shipments list, so one
-     * slightly heavier load beats N separate round trips as staff
-     * click between tabs). Currently shows the client's Default
-     * Account — an Accounts-list/switcher for genuine multi-account
-     * clients is the next phase.
+     * The tabbed client hub — Overview, Accounts, Transactions, Tariff,
+     * Discount, Department, User, Service, Document, Security,
+     * Managerial services, all in one place rather than scattered
+     * across separate pages. Loads everything every tab could need up
+     * front (this page is visited far less often than, say, the
+     * shipments list, so one slightly heavier load beats N separate
+     * round trips as staff click between tabs).
+     *
+     * $account is optional — /clients/{user} shows the Default
+     * Account (unchanged); /clients/{user}/accounts/{account} shows
+     * any specific one directly, satisfying "view all accounts, view
+     * account-related information" without requiring a switch first.
+     * Only the account currently marked default is writable from this
+     * page (see $isViewingDefault in the view) — the write actions
+     * (storeDiscount, storeSpecialTariff, etc.) all still target
+     * whichever account is default, so viewing a non-default account
+     * here is read-only until it's switched to.
      */
-    public function show(User $user): View
+    public function show(User $user, ?ClientAccount $account = null): View
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $account = $user->defaultAccount()->with('city', 'country', 'state', 'territory', 'createdBy', 'businessManager')->first();
+        if ($account) {
+            abort_unless($account->client_user_id === $user->id, 404);
+            $account->load('city', 'country', 'state', 'territory', 'createdBy', 'businessManager');
+        } else {
+            $account = $user->defaultAccount()->with('city', 'country', 'state', 'territory', 'createdBy', 'businessManager')->first();
+        }
+
         $isOrganization = $account?->isOrganization() ?? false;
         $accountId = $account?->id;
 
@@ -184,6 +198,7 @@ class ClientController extends Controller
             'account' => $account,
             'profile' => $account, // kept for view compatibility during the transition
             'isOrganization' => $isOrganization,
+            'isViewingDefault' => $account?->is_default ?? true,
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
             'discounts' => ClientServiceDiscount::where('client_account_id', $accountId)->with('serviceType')->get()->keyBy('service_type_id'),
             'specialTariffs' => ClientSpecialTariff::where('client_account_id', $accountId)->with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get(),

@@ -5760,3 +5760,33 @@ app/Http/Controllers/Web/ClientController.php   (storeAccount, setDefaultAccount
 resources/views/clients/show.blade.php   (new Accounts tab)
 routes/web.php
 ```
+
+## Increment 103, Phase 6 — Direct Per-Account Viewing (Read-Only)
+
+Extends the switching MVP from Phase 5: `/clients/{user}/accounts/{account}`
+now shows any specific account directly — satisfying "view all
+accounts... view account-related information" without requiring a
+switch first. `/clients/{user}` (no account specified) keeps working
+exactly as before, showing the Default Account.
+
+Deliberately read-only when viewing a non-default account, not fully
+writable yet: every write action (add discount, add special rate, add
+department, add user, toggle service access, save managerial settings)
+still targets whichever account is marked default internally — making
+those writable per-viewed-account would mean touching every one of
+those methods to accept an explicit account rather than resolving it
+themselves, a larger change than this phase needed. Instead, viewing a
+non-default account shows a clear banner ("read-only... Add/Save
+actions are disabled") with a one-click "Switch to this account"
+action, and every write form is either hidden (replaced with a
+one-line explanation) or disabled outright (managerial services form
+wrapped in `<fieldset disabled>`, the Service tab's toggles individually
+disabled) — never silently present-but-pointed-at-the-wrong-account.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (show() accepts optional $account)
+resources/views/clients/show.blade.php   (read-only banner, View links, gated write forms)
+routes/web.php   (clients.accounts.show)
+```

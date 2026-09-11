@@ -46,6 +46,21 @@
         <div><p class="text-ink-500">Billing</p><p class="font-semibold text-ink-900">{{ $user->billingProfile?->billing_type === 'special' ? 'Special' : 'Standard' }}</p></div>
     </div>
 
+    @unless ($isViewingDefault)
+        <div class="mb-5 flex items-center justify-between rounded-xl border border-line bg-surface-50 px-4 py-3 text-sm">
+            <p class="text-ink-900">
+                Viewing <span class="font-semibold">{{ $account->account_name }}</span> — read-only.
+                Tabs below reflect this account, but Add/Save actions are disabled until you switch to it.
+            </p>
+            <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $account]) }}">
+                @csrf
+                <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">
+                    Switch to this account
+                </button>
+            </form>
+        </div>
+    @endunless
+
     <div class="border-b border-line">
         <nav class="-mb-px flex flex-wrap gap-4">
             @php
@@ -131,7 +146,9 @@
                             <td class="py-2 text-ink-500">{{ $acct->account_type === 'organization' ? 'Organization' : 'Individual' }}</td>
                             <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}</td>
                             <td class="py-2 text-right">
+                                <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
                                 @unless ($acct->is_default)
+                                    <span class="mx-1 text-ink-500">·</span>
                                     <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $acct]) }}" class="inline">
                                         @csrf
                                         <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Switch to this</button>
@@ -235,6 +252,7 @@
                 <p class="mb-4 text-sm text-ink-500">No special rates set up yet — this client bills standard everywhere.</p>
             @endforelse
 
+            @if ($isViewingDefault)
             <form method="POST" action="{{ route('clients.special-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
                 @csrf
                 <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
@@ -274,6 +292,9 @@
                     <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
                 </div>
             </form>
+            @else
+                <p class="border-t border-line pt-4 text-xs text-ink-500">Switch to this account (Accounts tab) to add a special rate.</p>
+            @endif
         </div>
     </div>
 
@@ -315,6 +336,7 @@
                 </table>
             @endif
 
+            @if ($isViewingDefault)
             <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex flex-wrap items-end gap-3">
                 @csrf
                 <div>
@@ -332,6 +354,9 @@
                 </div>
                 <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add / update</button>
             </form>
+            @else
+                <p class="text-xs text-ink-500">Switch to this account (Accounts tab) to add a discount.</p>
+            @endif
         </div>
     </div>
 
@@ -356,6 +381,7 @@
             @else
                 <p class="mb-4 text-sm text-ink-500">No departments set up yet.</p>
             @endif
+            @if ($isViewingDefault)
             <form method="POST" action="{{ route('clients.departments.store', $user) }}" class="flex items-end gap-3">
                 @csrf
                 <div class="flex-1">
@@ -364,6 +390,9 @@
                 </div>
                 <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add</button>
             </form>
+            @else
+                <p class="text-xs text-ink-500">Switch to this account (Accounts tab) to add a department.</p>
+            @endif
         </div>
     </div>
 
@@ -395,6 +424,7 @@
                 <p class="mb-4 text-sm text-ink-500">No sub-users yet.</p>
             @endif
 
+            @if ($isViewingDefault)
             <form method="POST" action="{{ route('clients.sub-users.store', $user) }}" class="space-y-3 border-t border-line pt-4">
                 @csrf
                 <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a user</p>
@@ -417,6 +447,9 @@
                     <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add user</button>
                 </div>
             </form>
+            @else
+                <p class="border-t border-line pt-4 text-xs text-ink-500">Switch to this account (Accounts tab) to add a user.</p>
+            @endif
         </div>
     </div>
     @endif
@@ -425,7 +458,7 @@
     <div id="tab-service" class="mt-5 max-w-2xl" style="display:none">
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <p class="mb-1 text-sm font-semibold text-ink-900">Service access</p>
-            <p class="mb-4 text-xs text-ink-500">Which service types this client can use. A service type with no toggle set below is available by default — this is for deliberately scoping a client down to a subset.</p>
+            <p class="mb-4 text-xs text-ink-500">Which service types this client can use. A service type with no toggle set below is available by default — this is for deliberately scoping a client down to a subset.@unless ($isViewingDefault) Switch to this account (Accounts tab) to change it. @endunless</p>
             <div class="divide-y divide-line">
                 @foreach ($serviceTypes as $serviceType)
                     <form method="POST" action="{{ route('clients.services.store', $user) }}" class="flex items-center justify-between py-2.5">
@@ -433,7 +466,7 @@
                         <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
                         <span class="text-sm text-ink-900">{{ $serviceType->name }}</span>
                         <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-500">
-                            <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()"
+                            <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()" {{ $isViewingDefault ? '' : 'disabled' }}
                                    @checked(!array_key_exists($serviceType->id, $subscriptions->toArray()) || $subscriptions[$serviceType->id]) class="rounded border-line">
                             Enabled
                         </label>
@@ -591,6 +624,10 @@
         <form method="POST" action="{{ route('clients.managerial.update', $user) }}" class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             @csrf
             @method('PUT')
+            <fieldset {{ $isViewingDefault ? '' : 'disabled' }} class="space-y-0">
+            @unless ($isViewingDefault)
+                <p class="mb-4 text-xs text-ink-500">Switch to this account (Accounts tab) to change these settings.</p>
+            @endunless
 
             <div class="mb-4 flex flex-wrap gap-6">
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
@@ -641,6 +678,7 @@
             <div class="flex justify-end">
                 <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Save</button>
             </div>
+            </fieldset>
         </form>
     </div>
 

@@ -274,6 +274,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     // 2-segment shape, so registration order decides which wins.
     Route::middleware('can:clients:read')->group(function () {
         Route::get('/clients/{user}', [ClientController::class, 'show'])->name('clients.show');
+        Route::get('/clients/{user}/accounts/{account}', [ClientController::class, 'show'])->name('clients.accounts.show');
     });
     Route::middleware('can:clients:update')->group(function () {
         Route::get('/clients/{user}/edit', [ClientController::class, 'edit'])->name('clients.edit');
