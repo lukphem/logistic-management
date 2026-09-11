@@ -5697,3 +5697,66 @@ app/Http/Controllers/Web/ShipmentController.php   (stamps client_account_id on n
 app/Services/PricingEngine.php, ShipmentPricingService.php   (account-based resolution)
 resources/views/clients/index.blade.php   (fixed stale clientProfile call)
 ```
+
+## Increment 103, Phase 5 — Company Billing Model Enforcement + Multi-Account UI
+
+### Caught before duplicating: company billing models were already built
+
+Went to add company-level billing-model enable/disable (spec section
+7) and found `settings.supported_billing_models` already existed —
+full UI (checkboxes in Company Settings), validation, provider wiring
+— just never actually *enforced* anywhere. Deleted the duplicate
+migration I'd started and fixed the real gap instead: Product
+(ServiceType) creation, Rate Checker, and Create Shipment all still
+offered every billing model unconditionally, regardless of what a
+company had actually enabled.
+
+New `Setting::supportedBillingModels()` — the one place that filters
+`BILLING_MODELS` down to what's enabled — now used everywhere a
+billing model can be picked. A product already using a since-disabled
+model still shows correctly on its own edit form (so editing never
+silently changes what's displayed), it just can't be newly assigned
+elsewhere.
+
+### Multi-account UI
+
+The part of the original request this phase was really building
+toward: a new **Accounts** tab lists every account under a client,
+lets staff create additional ones (Lagos, Abuja, E-commerce...), and
+switch which one every other tab (Overview, Tariff, Discount,
+Department, User, Service, Managerial services) operates on — that's
+what `is_default` actually means now: not "the only account," but
+"the one currently being configured." Switching never touches
+products, billing, or Business Manager on either account — nothing is
+copied or reset.
+
+Guardrails: the in-use account can't be deleted (must switch away
+first), and a client can never be left with zero accounts.
+
+**Known limitation, stated plainly**: this is a working MVP, not the
+full parameterized routing the request eventually wants
+(`/clients/{user}/accounts/{account}/...` viewing two accounts side by
+side without switching). Creating a second account currently gives it
+just a name + type; filling in its full details means switching to it
+first, then using the same Edit/Tariff/Discount flows already built.
+Full per-account nested routing is the natural next step if this MVP
+proves the workflow is right.
+
+### Verified
+
+Simulated the full create-second-account + switch-default flow
+against live MySQL with Phase 1's seeded client — confirmed only one
+account is ever marked in-use at a time, and switching correctly
+flips both rows in one transaction-equivalent pair of updates. Full
+repo balance check + duplicate-method scan: clean.
+
+### Files
+
+```
+app/Models/Setting.php   (supportedBillingModels())
+app/Http/Controllers/Web/ServiceTypeController.php, RateCheckerController.php, ShipmentController.php   (enforce supportedBillingModels())
+resources/views/service-types/form.blade.php   (only offers enabled models, preserves an already-selected disabled one)
+app/Http/Controllers/Web/ClientController.php   (storeAccount, setDefaultAccount, destroyAccount)
+resources/views/clients/show.blade.php   (new Accounts tab)
+routes/web.php
+```

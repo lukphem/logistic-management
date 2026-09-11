@@ -108,7 +108,7 @@ class RateCheckerController extends Controller
         return view('rate-checker.index', [
             'result' => $result,
             'error' => $error,
-            'billingModels' => Setting::BILLING_MODELS,
+            'billingModels' => Setting::current()->supportedBillingModels(),
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
             'states' => State::with('country')->orderBy('name')->get(),
             'cities' => City::with('state')->orderBy('name')->get(),

@@ -194,6 +194,7 @@ class ClientController extends Controller
             'documents' => ClientDocument::where('client_user_id', $user->id)->latest()->get(),
             'apiClient' => ApiClient::where('client_user_id', $user->id)->with('ipWhitelists', 'webhookSubscriptions')->first(),
             'shipments' => \App\Models\Shipment::where('client_user_id', $user->id)->latest()->limit(25)->get(),
+            'accounts' => $user->accounts()->with('businessManager')->orderByDesc('is_default')->orderBy('account_name')->get(),
         ]);
     }
 
@@ -204,6 +205,79 @@ class ClientController extends Controller
         $user->delete();
 
         return redirect()->route('clients.index')->with('status', 'Client account removed.');
+    }
+
+    /**
+     * Adds another operational Account under this Client (Lagos,
+     * Abuja, E-commerce...) — a minimal starting point (name + type),
+     * not the full profile form. Fill in address/contact/products/
+     * billing/Business Manager afterward by switching to it
+     * (setDefaultAccount) and using the same Edit/Tariff/Discount/etc.
+     * flows already built for the Default Account.
+     */
+    public function storeAccount(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($user->user_type === 'client', 404);
+
+        $data = Validator::make($request->all(), [
+            'account_name' => 'required|string|max:255',
+            'account_type' => 'required|in:individual,organization',
+        ])->validate();
+
+        ClientAccount::create([
+            'client_user_id' => $user->id,
+            'account_name' => $data['account_name'],
+            'account_number' => $this->generateAccountNumber(),
+            'is_default' => false,
+            'account_type' => $data['account_type'],
+            'created_by' => auth()->id(),
+        ]);
+
+        return redirect()->route('clients.show', $user)->with('status', "Account \"{$data['account_name']}\" created — switch to it below to configure its details, products, and billing.");
+    }
+
+    /**
+     * Every tab besides "Accounts" itself (Overview, Tariff, Discount,
+     * Department, User, Service, Managerial services) currently
+     * operates on whichever Account is_default=true — this is how
+     * staff choose which one that is. Products/billing/Business
+     * Manager already configured on the account being switched TO stay
+     * exactly as they were; nothing is copied or reset.
+     */
+    public function setDefaultAccount(User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        ClientAccount::where('client_user_id', $user->id)->update(['is_default' => false]);
+        $account->update(['is_default' => true]);
+
+        return redirect()->route('clients.show', $user)->with('status', "Now viewing \"{$account->account_name}\" — the tabs below reflect this account.");
+    }
+
+    public function destroyAccount(User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        if ($account->is_default) {
+            return redirect()->route('clients.show', $user)->with('status', "Can't remove \"{$account->account_name}\" while it's in use — switch to a different account first.");
+        }
+
+        if ($user->accounts()->count() <= 1) {
+            return redirect()->route('clients.show', $user)->with('status', 'A client must have at least one account.');
+        }
+
+        $account->delete();
+
+        return redirect()->route('clients.show', $user)->with('status', "Account \"{$account->account_name}\" removed.");
+    }
+
+    private function generateAccountNumber(): string
+    {
+        do {
+            $candidate = 'ACC' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
+        } while (ClientAccount::where('account_number', $candidate)->exists());
+
+        return $candidate;
     }
 
     /**

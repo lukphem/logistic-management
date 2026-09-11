@@ -42,6 +42,27 @@ class Setting extends Model
     ];
 
     /**
+     * The company-level master list BILLING_MODELS entries a company
+     * has actually chosen to use (Company Settings -> Billing models),
+     * filtered down from BILLING_MODELS — every place that lets
+     * someone pick a billing model (a new Product/ServiceType, Rate
+     * Checker, Create Shipment) should offer this, not the raw
+     * BILLING_MODELS constant, so a company that's disabled a model
+     * can't have it selected anywhere in the system. Null/empty
+     * supported_billing_models means "everything supported" (the only
+     * behavior possible before this setting existed), so an install
+     * that's never touched this setting sees no change.
+     */
+    public function supportedBillingModels(): array
+    {
+        if (empty($this->supported_billing_models)) {
+            return self::BILLING_MODELS;
+        }
+
+        return array_intersect_key(self::BILLING_MODELS, array_flip($this->supported_billing_models));
+    }
+
+    /**
      * Each key has a matching resources/views/auth/designs/{key}.blade.php
      * partial for the login page's left illustration panel.
      */

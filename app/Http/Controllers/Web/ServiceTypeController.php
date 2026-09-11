@@ -54,7 +54,7 @@ class ServiceTypeController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:service_types,code,' . $ignoreId,
-            'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
+            'billing_model' => 'nullable|in:' . implode(',', array_keys(\App\Models\Setting::current()->supportedBillingModels())),
             'route_type' => 'required|in:domestic,international',
             'trade_direction' => 'required_if:route_type,international|nullable|in:import,export,cross_trade',
             'is_active' => 'sometimes|boolean',

@@ -28,13 +28,25 @@
 
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+            @php
+                // Only billing models enabled at company level (Company
+                // Settings -> Billing models) can be newly assigned to a
+                // product — except the one this product is ALREADY using,
+                // if any, which always stays visible here even if it's
+                // since been disabled, so editing this form never
+                // silently changes what's shown as selected.
+                $availableModels = \App\Models\Setting::current()->supportedBillingModels();
+                if ($serviceType->billing_model && ! array_key_exists($serviceType->billing_model, $availableModels)) {
+                    $availableModels[$serviceType->billing_model] = \App\Models\Setting::BILLING_MODELS[$serviceType->billing_model] ?? $serviceType->billing_model;
+                }
+            @endphp
             <select name="billing_model" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">Not set — can't be quoted or booked yet</option>
-                @foreach (\App\Models\Setting::BILLING_MODELS as $key => $label)
+                @foreach ($availableModels as $key => $label)
                     <option value="{{ $key }}" @selected(old('billing_model', $serviceType->billing_model) === $key)>{{ $label }}</option>
                 @endforeach
             </select>
-            <p class="mt-1 text-xs text-ink-500">Which calculation model prices shipments booked under this service type.</p>
+            <p class="mt-1 text-xs text-ink-500">Which calculation model prices shipments booked under this service type. Only billing models enabled in Company Settings are offered here.</p>
         </div>
 
         <div>

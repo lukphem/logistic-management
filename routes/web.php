@@ -280,6 +280,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/clients/{user}', [ClientController::class, 'update'])->name('clients.update');
         Route::post('/clients/{user}/upgrade', [ClientController::class, 'upgrade'])->name('clients.upgrade');
 
+        Route::post('/clients/{user}/accounts', [ClientController::class, 'storeAccount'])->name('clients.accounts.store');
+        Route::post('/clients/{user}/accounts/{account}/set-default', [ClientController::class, 'setDefaultAccount'])->name('clients.accounts.set-default');
+        Route::delete('/clients/{user}/accounts/{account}', [ClientController::class, 'destroyAccount'])->name('clients.accounts.destroy');
+
         Route::post('/clients/{user}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
         Route::delete('/clients/{user}/discounts/{discount}', [ClientController::class, 'destroyDiscount'])->name('clients.discounts.destroy');
         Route::post('/clients/{user}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');

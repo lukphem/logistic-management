@@ -50,7 +50,7 @@
         <nav class="-mb-px flex flex-wrap gap-4">
             @php
                 $tabs = [
-                    'overview' => 'Overview', 'transactions' => 'Transactions', 'tariff' => 'Tariff',
+                    'overview' => 'Overview', 'accounts' => 'Accounts', 'transactions' => 'Transactions', 'tariff' => 'Tariff',
                     'discount' => 'Discount',
                 ];
                 if ($isOrganization) {
@@ -99,6 +99,72 @@
                 <div class="flex justify-between border-b border-line py-1.5 sm:col-span-2"><span class="text-ink-500">Address</span><span class="text-right text-ink-900">{{ $profile?->address ?? '—' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5 sm:col-span-2"><span class="text-ink-500">Billing address</span><span class="text-right text-ink-900">{{ $profile?->billing_address ?? 'Same as above' }}</span></div>
             </div>
+        </div>
+    </div>
+
+    {{-- ============ ACCOUNTS ============ --}}
+    <div id="tab-accounts" class="mt-5 max-w-3xl" style="display:none">
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <p class="mb-1 text-sm font-semibold text-ink-900">Accounts under {{ $user->name }}</p>
+            <p class="mb-4 text-xs text-ink-500">Every other tab (Overview, Tariff, Discount, Department, User, Service, Managerial services) reflects whichever account below is marked "In use" — switch to configure a different one. Products, billing, and Business Manager stay exactly as configured per account; nothing is shared or reset when switching.</p>
+
+            <table class="mb-4 w-full text-left text-sm">
+                <thead>
+                    <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                        <th class="py-2 font-medium">Account</th>
+                        <th class="py-2 font-medium">Number</th>
+                        <th class="py-2 font-medium">Type</th>
+                        <th class="py-2 font-medium">Business Manager</th>
+                        <th class="py-2"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($accounts as $acct)
+                        <tr class="border-b border-line last:border-0">
+                            <td class="py-2 text-ink-900">
+                                {{ $acct->account_name }}
+                                @if ($acct->is_default)
+                                    <span class="ml-2 inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)]">In use</span>
+                                @endif
+                            </td>
+                            <td class="py-2 text-ink-500">{{ $acct->account_number }}</td>
+                            <td class="py-2 text-ink-500">{{ $acct->account_type === 'organization' ? 'Organization' : 'Individual' }}</td>
+                            <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}</td>
+                            <td class="py-2 text-right">
+                                @unless ($acct->is_default)
+                                    <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $acct]) }}" class="inline">
+                                        @csrf
+                                        <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Switch to this</button>
+                                    </form>
+                                    <span class="mx-1 text-ink-500">·</span>
+                                    <form method="POST" action="{{ route('clients.accounts.destroy', [$user, $acct]) }}" class="inline" onsubmit="return confirm('Remove this account? This cannot be undone.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                    </form>
+                                @endunless
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+
+            <form method="POST" action="{{ route('clients.accounts.store', $user) }}" class="flex flex-wrap items-end gap-3 border-t border-line pt-4">
+                @csrf
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Account name</label>
+                    <input type="text" name="account_name" placeholder="e.g. Abuja Account" required class="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Account type</label>
+                    <select name="account_type" required class="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="individual">Individual</option>
+                        <option value="organization">Organization</option>
+                    </select>
+                </div>
+                <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
+            </form>
+            <p class="mt-2 text-xs text-ink-500">After adding, switch to it above, then use Edit / Tariff / Discount / etc. to fill in its details — same as configuring any account.</p>
         </div>
     </div>
 
