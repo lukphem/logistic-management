@@ -89,7 +89,7 @@
                     <label class="mb-1 block text-sm font-medium text-ink-900">ID type <x-required /></label>
                     <select name="id_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                         <option value="">Select ID type</option>
-                        @foreach (\App\Models\ClientProfile::ID_TYPES as $key => $label)
+                        @foreach (\App\Models\ClientAccount::ID_TYPES as $key => $label)
                             <option value="{{ $key }}" @selected(old('id_type', $profile->id_type) === $key)>{{ $label }}</option>
                         @endforeach
                     </select>
