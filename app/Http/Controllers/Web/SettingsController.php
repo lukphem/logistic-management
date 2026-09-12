@@ -32,6 +32,8 @@ class SettingsController extends Controller
             'volumetric_divisor' => 'required|integer|min:1',
             'quote_validity_days' => 'required|integer|min:1|max:365',
             'tracking_number_format' => 'nullable|string|max:255',
+            'account_number_format' => 'nullable|string|max:255',
+            'allow_manual_account_number' => 'sometimes|boolean',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
             'waybill_show_qr' => 'sometimes|boolean',
@@ -48,6 +50,7 @@ class SettingsController extends Controller
         unset($data['logo']);
 
         $data['waybill_show_qr'] = $request->boolean('waybill_show_qr');
+        $data['allow_manual_account_number'] = $request->boolean('allow_manual_account_number');
         $data['supported_billing_models'] = $data['supported_billing_models'] ?? [];
         $data['operating_regions'] = $request->filled('operating_regions')
             ? array_map('trim', explode(',', $request->operating_regions))

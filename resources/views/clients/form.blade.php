@@ -49,6 +49,14 @@
                     <input type="password" name="password" {{ $user->exists ? '' : 'required' }}
                            class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
+                @if (! $user->exists && ($allowManualAccountNumber ?? false))
+                    <div class="sm:col-span-2">
+                        <label class="mb-1 block text-sm font-medium text-ink-900">Account number <span class="text-xs font-normal text-ink-500">(optional — leave blank to auto-generate)</span></label>
+                        <input type="text" name="account_number" value="{{ old('account_number') }}"
+                               class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        <p class="mt-1 text-xs text-ink-500">Manual entry is enabled in Company Settings — use this to carry over a number from a previous system. Must be unique.</p>
+                    </div>
+                @endif
             </div>
         </div>
 

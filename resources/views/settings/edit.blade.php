@@ -155,6 +155,25 @@
                         </ul>
                     </div>
                 </div>
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Account number format <span class="text-xs font-normal text-ink-500">(optional — leave blank for the default)</span></label>
+                    <input type="text" name="account_number_format" value="{{ old('account_number_format', $settings->account_number_format) }}"
+                           placeholder="{state}{outlet}{staff}{seq:5}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <div class="mt-2 rounded-md bg-surface-50 p-3 text-xs text-ink-500">
+                        <p class="mb-1.5 font-medium text-ink-900">Available tokens — arrange in any order, combine freely:</p>
+                        <ul class="space-y-0.5">
+                            @foreach (\App\Models\Setting::ACCOUNT_NUMBER_TOKENS as $token => $description)
+                                <li><code class="rounded bg-surface-0 px-1 py-0.5 font-mono text-ink-900">{{ $token }}</code> — {{ $description }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <label class="mt-3 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" name="allow_manual_account_number" value="1" @checked(old('allow_manual_account_number', $settings->allow_manual_account_number)) class="rounded border-line">
+                        Allow staff to type an account number by hand
+                    </label>
+                    <p class="mt-1 text-xs text-ink-500">Off by default. Useful for onboarding an existing client whose account number needs to carry over from a previous system — otherwise every account number is generated using the format above.</p>
+                </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Currency (ISO code) <x-required /></label>
                     <input type="text" name="currency" maxlength="3" value="{{ old('currency', $settings->currency) }}"

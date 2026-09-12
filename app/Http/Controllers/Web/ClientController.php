@@ -75,6 +75,7 @@ class ClientController extends Controller
             'territories' => Territory::orderBy('name')->get(),
             'outlets' => \App\Models\Outlet::where('is_active', true)->orderBy('name')->get(),
             'staffUsers' => User::where('user_type', 'staff')->orderBy('name')->get(),
+            'allowManualAccountNumber' => \App\Models\Setting::current()->allow_manual_account_number,
         ]);
     }
 
