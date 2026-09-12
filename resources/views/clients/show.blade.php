@@ -23,43 +23,11 @@
         </div>
     @endif
 
-    <div class="mb-5 flex items-start justify-between">
-        <div class="flex items-center gap-4">
-            @if ($account?->logo_url)
-                <img src="{{ $account->logo_url }}" alt="{{ $account->company_name ?? $user->name }} logo" class="h-14 w-14 shrink-0 rounded-xl border border-line object-contain bg-surface-0 p-1">
-            @elseif ($isOrganization)
-                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-line bg-surface-50 text-lg font-semibold text-ink-500">
-                    {{ strtoupper(substr($account->company_name ?? $user->name, 0, 1)) }}
-                </div>
-            @endif
-            <div>
-                <p class="text-lg font-semibold text-ink-900">{{ $account?->company_name ?? $user->name }}</p>
-                <p class="text-sm text-ink-500">
-                    {{ $user->email }}
-                    <span class="mx-1">·</span>
-                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $user->account_status === 'active' ? 'bg-status-delivered/10 text-status-delivered' : 'bg-ink-500/10 text-ink-500' }}">
-                        {{ ucfirst($user->account_status) }}
-                    </span>
-                </p>
-            </div>
-        </div>
-        <a href="{{ route('clients.edit', $user) }}" class="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-900 shadow-sm transition hover:bg-surface-50">Edit</a>
-    </div>
-
-    <div class="mb-5 grid grid-cols-2 gap-x-8 gap-y-2 rounded-xl border border-line bg-surface-0 shadow-sm p-5 text-sm sm:grid-cols-4">
-        <div><p class="text-ink-500">Account Number</p><p class="font-semibold text-ink-900">{{ $profile?->account_number ?? '—' }}</p></div>
-        <div><p class="text-ink-500">Client Type</p><p class="font-semibold text-ink-900">{{ $isOrganization ? 'Organization' : 'Individual' }}</p></div>
-        <div><p class="text-ink-500">Company Name</p><p class="font-semibold text-ink-900">{{ $profile?->company_name ?? '—' }}</p></div>
-        <div><p class="text-ink-500">Created By</p><p class="font-semibold text-ink-900">{{ $profile?->createdBy?->name ?? '—' }}</p></div>
-        <div><p class="text-ink-500">Business Manager</p><p class="font-semibold text-ink-900">{{ $profile?->businessManager?->name ?? '—' }}</p></div>
-        <div><p class="text-ink-500">Billing</p><p class="font-semibold text-ink-900">{{ $user->billingProfile?->billing_type === 'special' ? 'Special' : 'Standard' }}</p></div>
-    </div>
-
     @unless ($isViewingDefault)
-        <div class="mb-5 flex items-center justify-between rounded-xl border border-line bg-surface-50 px-4 py-3 text-sm">
+        <div class="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface-50 px-4 py-3 text-sm">
             <p class="text-ink-900">
                 Viewing <span class="font-semibold">{{ $account->account_name }}</span> — read-only.
-                Tabs below reflect this account, but Add/Save actions are disabled until you switch to it.
+                Sections reflect this account, but Add/Save actions are disabled until you switch to it.
             </p>
             <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $account]) }}">
                 @csrf
@@ -70,58 +38,135 @@
         </div>
     @endunless
 
-    <div class="border-b border-line">
-        <nav class="-mb-px flex flex-wrap gap-4">
-            @php
-                $tabs = [
-                    'overview' => 'Overview', 'accounts' => 'Accounts', 'transactions' => 'Transactions', 'tariff' => 'Tariff',
-                    'discount' => 'Discount',
-                ];
-                if ($isOrganization) {
-                    $tabs['department'] = 'Department';
-                    $tabs['users'] = 'User';
-                }
-                $tabs += [
-                    'service' => 'Service', 'document' => 'Document', 'security' => 'Security',
-                    'managerial' => 'Managerial services',
-                ];
-            @endphp
-            @foreach ($tabs as $key => $label)
-                <button type="button" id="tab-btn-{{ $key }}" onclick="showClientTab('{{ $key }}')"
-                        class="border-b-2 px-1 py-2.5 text-sm font-medium transition {{ $loop->first ? 'border-[var(--brand-primary)] text-ink-900 font-semibold' : 'border-transparent text-ink-500 hover:text-ink-900' }}">
-                    {{ $label }}
-                </button>
-            @endforeach
-        </nav>
+    {{-- Top bar: identity + quick facts + quick action, stays fixed while sections change below --}}
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+        <div class="flex items-center gap-4">
+            @if ($account?->logo_url)
+                <img src="{{ $account->logo_url }}" alt="{{ $account->company_name ?? $user->name }} logo" class="h-12 w-12 shrink-0 rounded-xl border border-line object-contain bg-surface-0 p-1">
+            @elseif ($isOrganization)
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line bg-surface-50 text-base font-semibold text-ink-500">
+                    {{ strtoupper(substr($account->company_name ?? $user->name, 0, 1)) }}
+                </div>
+            @else
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line bg-surface-50 text-ink-500">
+                    <x-icon name="user" class="h-5 w-5" />
+                </div>
+            @endif
+            <div>
+                <p class="text-base font-semibold text-ink-900">{{ $account?->company_name ?? $user->name }}</p>
+                <p class="text-xs text-ink-500">
+                    {{ $user->email }}
+                    <span class="mx-1">·</span>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $user->account_status === 'active' ? 'bg-status-delivered/10 text-status-delivered' : 'bg-ink-500/10 text-ink-500' }}">
+                        {{ ucfirst($user->account_status) }}
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-ink-500">
+            <div><span class="block text-ink-500">Account #</span><span class="font-mono font-semibold text-ink-900">{{ $profile?->account_number ?? '—' }}</span></div>
+            <div><span class="block text-ink-500">Type</span><span class="font-semibold text-ink-900">{{ $isOrganization ? 'Organization' : 'Individual' }}</span></div>
+            <div><span class="block text-ink-500">Billing</span><span class="font-semibold text-ink-900">{{ $user->billingProfile?->billing_type === 'special' ? 'Special' : 'Standard' }}</span></div>
+            <a href="{{ route('clients.edit', $user) }}" class="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-900 shadow-sm transition hover:bg-surface-50">Edit</a>
+        </div>
     </div>
 
+    <div class="flex flex-col gap-5 lg:flex-row">
+        {{-- Left sidebar: persistent section nav --}}
+        <nav class="shrink-0 lg:w-56">
+            <ul class="space-y-0.5">
+                @php
+                    $sections = [
+                        'overview' => ['label' => 'Overview', 'icon' => 'dashboard'],
+                        'accounts' => ['label' => 'Accounts', 'icon' => 'building'],
+                        'transactions' => ['label' => 'Transactions', 'icon' => 'box'],
+                        'tariff' => ['label' => 'Tariff', 'icon' => 'sliders'],
+                        'discount' => ['label' => 'Discount', 'icon' => 'list-check'],
+                    ];
+                    if ($isOrganization) {
+                        $sections['department'] = ['label' => 'Department', 'icon' => 'layers'];
+                        $sections['users'] = ['label' => 'User', 'icon' => 'user'];
+                    }
+                    $sections += [
+                        'service' => ['label' => 'Service', 'icon' => 'package'],
+                        'document' => ['label' => 'Document', 'icon' => 'document'],
+                        'security' => ['label' => 'Security', 'icon' => 'shield'],
+                        'managerial' => ['label' => 'Managerial services', 'icon' => 'briefcase'],
+                    ];
+                @endphp
+                @foreach ($sections as $key => $section)
+                    <li>
+                        <button type="button" id="side-nav-{{ $key }}" onclick="showClientTab('{{ $key }}')"
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition {{ $loop->first ? 'bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]' : 'text-ink-500 hover:bg-surface-50 hover:text-ink-900' }}">
+                            <x-icon :name="$section['icon']" class="h-4 w-4 shrink-0" />
+                            {{ $section['label'] }}
+                        </button>
+                    </li>
+                @endforeach
+            </ul>
+        </nav>
+
+        {{-- Main content: one section visible at a time --}}
+        <div class="min-w-0 flex-1">
+
     {{-- ============ OVERVIEW ============ --}}
-    <div id="tab-overview" class="mt-5 max-w-3xl space-y-4">
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-3 text-sm font-semibold text-ink-900">Client information</p>
-            <div class="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Industry</span><span class="text-ink-900">{{ $profile?->industry ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Country</span><span class="text-ink-900">{{ $profile?->country?->name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">State</span><span class="text-ink-900">{{ $profile?->state?->name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Town</span><span class="text-ink-900">{{ $profile?->cityDisplayName() ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Territory</span><span class="text-ink-900">{{ $profile?->territory?->name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Outlet</span><span class="text-ink-900">{{ $profile?->outlet?->name ?? 'N/A' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Contact Person</span><span class="text-ink-900">{{ $profile?->contact_person_name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Designation</span><span class="text-ink-900">{{ $profile?->contact_person_role ?? 'N/A' }}</span></div>
+    <div id="tab-overview" class="space-y-5">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+                <p class="text-xs text-ink-500">Shipments</p>
+                <p class="mt-1 text-2xl font-semibold text-ink-900">{{ $shipments->count() }}</p>
             </div>
-            @if ($profile?->business_objective)
-                <p class="mt-3 text-xs font-medium uppercase tracking-wide text-ink-500">Business objective</p>
-                <p class="mt-1 text-sm text-ink-900">{{ $profile->business_objective }}</p>
-            @endif
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+                <p class="text-xs text-ink-500">Active discounts</p>
+                <p class="mt-1 text-2xl font-semibold text-ink-900">{{ $discounts->count() }}</p>
+            </div>
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+                <p class="text-xs text-ink-500">Special rates</p>
+                <p class="mt-1 text-2xl font-semibold text-ink-900">{{ $specialTariffs->count() }}</p>
+            </div>
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+                <p class="text-xs text-ink-500">Documents</p>
+                <p class="mt-1 text-2xl font-semibold text-ink-900">{{ $documents->count() }}</p>
+            </div>
         </div>
 
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-3 text-sm font-semibold text-ink-900">Contact</p>
-            <div class="grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Phone</span><span class="text-ink-900">{{ $user->phone_number ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Alternate phone</span><span class="text-ink-900">{{ $profile?->alternate_phone ?? 'N/A' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5 sm:col-span-2"><span class="text-ink-500">Address</span><span class="text-right text-ink-900">{{ $profile?->address ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5 sm:col-span-2"><span class="text-ink-500">Billing address</span><span class="text-right text-ink-900">{{ $profile?->billing_address ?? 'Same as above' }}</span></div>
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                <p class="mb-3 text-sm font-semibold text-ink-900">Client information</p>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Industry</dt><dd class="text-ink-900">{{ $profile?->industry ?? '—' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Country</dt><dd class="text-ink-900">{{ $profile?->country?->name ?? '—' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">State</dt><dd class="text-ink-900">{{ $profile?->state?->name ?? '—' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Town</dt><dd class="text-ink-900">{{ $profile?->cityDisplayName() ?? '—' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Territory</dt><dd class="text-ink-900">{{ $profile?->territory?->name ?? '—' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Outlet</dt><dd class="text-ink-900">{{ $profile?->outlet?->name ?? 'N/A' }}</dd></div>
+                    <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Contact Person</dt><dd class="text-ink-900">{{ $profile?->contact_person_name ?? '—' }}</dd></div>
+                    <div class="flex justify-between py-1.5"><dt class="text-ink-500">Designation</dt><dd class="text-ink-900">{{ $profile?->contact_person_role ?? 'N/A' }}</dd></div>
+                </dl>
+                @if ($profile?->business_objective)
+                    <p class="mt-3 text-xs font-medium uppercase tracking-wide text-ink-500">Business objective</p>
+                    <p class="mt-1 text-sm text-ink-900">{{ $profile->business_objective }}</p>
+                @endif
+            </div>
+
+            <div class="space-y-5">
+                <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                    <p class="mb-3 text-sm font-semibold text-ink-900">Contact</p>
+                    <dl class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Phone</dt><dd class="text-ink-900">{{ $user->phone_number ?? '—' }}</dd></div>
+                        <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Alternate phone</dt><dd class="text-ink-900">{{ $profile?->alternate_phone ?? 'N/A' }}</dd></div>
+                        <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Address</dt><dd class="text-right text-ink-900">{{ $profile?->address ?? '—' }}</dd></div>
+                        <div class="flex justify-between py-1.5"><dt class="text-ink-500">Billing address</dt><dd class="text-right text-ink-900">{{ $profile?->billing_address ?? 'Same as above' }}</dd></div>
+                    </dl>
+                </div>
+
+                <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                    <p class="mb-3 text-sm font-semibold text-ink-900">Account record</p>
+                    <dl class="space-y-2 text-sm">
+                        <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Created by</dt><dd class="text-ink-900">{{ $profile?->createdBy?->name ?? '—' }}</dd></div>
+                        <div class="flex justify-between py-1.5"><dt class="text-ink-500">Business manager</dt><dd class="text-ink-900">{{ $profile?->businessManager?->name ?? '—' }}</dd></div>
+                    </dl>
+                </div>
             </div>
         </div>
     </div>
@@ -691,17 +736,18 @@
         </form>
     </div>
 
+        </div>
+    </div>
+
     <script>
         function showClientTab(tab) {
-            document.querySelectorAll('[id^="tab-"]:not([id^="tab-btn-"])').forEach(function (el) {
+            document.querySelectorAll('[id^="tab-"]').forEach(function (el) {
                 el.style.display = el.id === 'tab-' + tab ? '' : 'none';
             });
-            document.querySelectorAll('[id^="tab-btn-"]').forEach(function (btn) {
-                const active = btn.id === 'tab-btn-' + tab;
-                btn.classList.toggle('border-[var(--brand-primary)]', active);
-                btn.classList.toggle('text-ink-900', active);
-                btn.classList.toggle('font-semibold', active);
-                btn.classList.toggle('border-transparent', !active);
+            document.querySelectorAll('[id^="side-nav-"]').forEach(function (btn) {
+                const active = btn.id === 'side-nav-' + tab;
+                btn.classList.toggle('bg-[var(--brand-primary)]/10', active);
+                btn.classList.toggle('text-[var(--brand-primary)]', active);
                 btn.classList.toggle('text-ink-500', !active);
             });
         }

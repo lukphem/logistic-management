@@ -6031,3 +6031,50 @@ app/Models/Setting.php   (ACCOUNT_NUMBER_TOKENS, fillable/casts)
 app/Http/Controllers/Web/ClientController.php   (resolveAccountNumber() — manual override + generation)
 database/seeders/BillingDemoSeeder.php   (FCT/Abuja name fixes, address fix — from this session's earlier bug fixes)
 ```
+
+## Increment 106 — Client Hub Redesign: Left Sidebar Navigation
+
+Replaced the horizontal tab bar (10 tabs crammed into one wrapping
+row) with a persistent left sidebar — the layout pattern Stripe,
+HubSpot, and most modern B2B admin panels use for a record with many
+sub-sections. A genuinely different structure, not a reskin of the
+same tab bar.
+
+- **Top bar**: identity (logo/initial, name, status), stays fixed —
+  account number, type, and billing now shown compactly here instead
+  of a separate summary grid.
+- **Left sidebar**: every section (Overview, Accounts, Transactions,
+  Tariff, Discount, Department, User, Service, Document, Security,
+  Managerial services) as a vertical list with icons — no wrapping,
+  no crowding, active section always visually clear.
+- **Overview rebuilt as an actual summary**, not a data dump: 4 stat
+  cards (shipment count, active discounts, special rates, documents)
+  up top, then the existing detail panels reorganized into a cleaner
+  2-column layout, with Created By/Business Manager consolidated into
+  their own "Account record" card instead of repeating in the top
+  summary grid.
+- Every other section's actual content (forms, tables, all the
+  working logic) was left untouched — only the outer shell and
+  Overview's content changed, to avoid re-risking sections that
+  already worked correctly.
+- 4 new icons added to the shared `<x-icon>` component (user,
+  document, shield, briefcase) rather than force-fitting mismatched
+  existing ones or building a one-off icon set for this page alone.
+
+### Verified
+
+Full balance check after the structural surgery — every `<div>` in
+the 774-line file confirmed to close exactly once (106 open, 106
+close), all other tags/directives balanced. Raw-byte backslash scan:
+clean, matching the earlier lesson about not trusting text-based
+checks alone for JS string bugs.
+
+**Not verified**: no PHP runtime, so the actual sidebar
+navigation/section-switching hasn't run through a real browser.
+
+### Files
+
+```
+resources/views/clients/show.blade.php   (restructured — sidebar layout, redesigned Overview)
+resources/views/components/icon.blade.php   (4 new icons)
+```
