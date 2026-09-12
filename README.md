@@ -6286,3 +6286,56 @@ app/Http/Controllers/Web/ClientController.php   (4 new actions, show() loads O2D
 resources/views/clients/show.blade.php   (Billing Setup tab replaces Tariff+Discount+Service)
 routes/web.php
 ```
+
+## Increment 111, Phase 1 — Standard/Special Genuinely Exclusive
+
+Fixes a real pricing bug: a client's discount was applying on top of
+a special rate whenever both happened to be configured for the same
+billing model, since they were computed at two independent stages of
+pricing with no awareness of each other. "Special" is now a real,
+explicit mode per (account, billing model) — not just implied by a
+special-rate row existing.
+
+New `client_accounts.special_billing_models` (JSON array, same
+pattern as `disabled_billing_models`). `ClientAccount::isSpecialFor()`
+checks it; `ShipmentPricingService::priceShipment()` now skips the
+discount entirely — before it's even computed — whenever the account
+has put that service type's billing model into Special mode. A
+partially-configured Special mode (switched on, but no rate covers
+this exact scenario) still doesn't fall back to a discount — the
+company's plain rate applies, undiscounted, matching the "never
+silently combine the two" principle this was built to enforce.
+
+New `updateBillingModelMode()` action, built to take the account
+explicitly (route-bound: `/clients/{user}/accounts/{account}/billing-mode`)
+rather than always resolving "the default account" — the first piece
+of the account-selector work planned for the next phase.
+
+Minimal UI added this phase so the backend fix is actually usable
+end to end: a Mode indicator + switch button per billing model
+section, and the discount column visibly disabled ("Off — Special
+mode") rather than silently doing nothing when clicked.
+
+### Verified
+
+New column confirmed to store/retrieve a JSON array correctly against
+live MySQL; the exclusivity check logic (`in_array` against the
+stored array) simulated and confirmed correct for both true and false
+cases. Full repo balance check, duplicate-method scan, raw-byte
+backslash scan: clean.
+
+**Not done yet** (later phases, per the agreed sequencing): the
+account selector, the 3-tab billing-model restructure, hiding
+unavailable options from Rate Checker/Create Shipment, bulk CSV
+import, and making special-rate rows editable.
+
+### Files
+
+```
+database/migrations/2026_03_04_000001_add_special_billing_models_to_client_accounts_table.php
+app/Models/ClientAccount.php   (special_billing_models, isSpecialFor())
+app/Services/ShipmentPricingService.php   (skips discount in Special mode)
+app/Http/Controllers/Web/ClientController.php   (updateBillingModelMode())
+resources/views/clients/show.blade.php   (mode toggle + disabled discount UI)
+routes/web.php
+```

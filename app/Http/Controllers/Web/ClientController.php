@@ -613,6 +613,36 @@ class ClientController extends Controller
         return redirect()->route('clients.show', $user)->with('status', 'Billing model availability updated.');
     }
 
+    /**
+     * Switches one billing model between Standard and Special for a
+     * SPECIFIC account — takes the account explicitly (route-bound),
+     * not via requireDefaultAccount(), so this doesn't require
+     * switching an account to "default" first to configure it. Special
+     * genuinely replaces Standard's discount for this model
+     * (ShipmentPricingService::priceShipment() checks
+     * ClientAccount::isSpecialFor()) — this is the one action that
+     * flips that switch.
+     */
+    public function updateBillingModelMode(Request $request, User $user, \App\Models\ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        $data = Validator::make($request->all(), [
+            'billing_model' => 'required|string|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
+            'mode' => 'required|in:standard,special',
+        ])->validate();
+
+        $special = collect($account->special_billing_models ?? [])->reject(fn ($m) => $m === $data['billing_model'])->values()->all();
+
+        if ($data['mode'] === 'special') {
+            $special[] = $data['billing_model'];
+        }
+
+        $account->update(['special_billing_models' => $special]);
+
+        return redirect()->route('clients.show', $user)->with('status', 'Billing mode updated.');
+    }
+
     // ---------------------------------------------------------------
     // Department
     // ---------------------------------------------------------------

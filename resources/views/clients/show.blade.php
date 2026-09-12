@@ -299,6 +299,27 @@
                 </div>
 
                 @if ($account->usesBillingModel($modelKey))
+                    @php $isSpecialMode = $account->isSpecialFor($modelKey); @endphp
+                    <div class="mb-4 flex items-center justify-between rounded-lg border border-line bg-surface-50 p-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Mode</p>
+                            <p class="text-sm text-ink-900">
+                                {{ $isSpecialMode ? 'Special — discount below is switched off, only the special rates apply' : 'Standard — discount below applies, special rates (if any) are ignored' }}
+                            </p>
+                        </div>
+                        @if ($isViewingDefault)
+                        <form method="POST" action="{{ route('clients.billing-mode.update', [$user, $account]) }}">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="billing_model" value="{{ $modelKey }}">
+                            <input type="hidden" name="mode" value="{{ $isSpecialMode ? 'standard' : 'special' }}">
+                            <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">
+                                Switch to {{ $isSpecialMode ? 'Standard' : 'Special' }}
+                            </button>
+                        </form>
+                        @endif
+                    </div>
+
                     {{-- Service types under this model: on/off + discount, one row each --}}
                     <table class="mb-4 w-full text-left text-sm">
                         <thead>
@@ -324,7 +345,9 @@
                                         </form>
                                     </td>
                                     <td class="py-2">
-                                        @if ($isViewingDefault)
+                                        @if ($isSpecialMode)
+                                            <span class="text-xs text-ink-500" title="Switched off — this billing model is in Special mode">Off (Special mode)</span>
+                                        @elseif ($isViewingDefault)
                                         <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex items-center gap-2">
                                             @csrf
                                             <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">

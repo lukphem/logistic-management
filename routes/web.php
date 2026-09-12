@@ -297,6 +297,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'destroyFleetTariff'])->name('clients.fleet-tariffs.destroy');
 
         Route::put('/clients/{user}/billing-models', [ClientController::class, 'updateDisabledBillingModels'])->name('clients.billing-models.update');
+        Route::put('/clients/{user}/accounts/{account}/billing-mode', [ClientController::class, 'updateBillingModelMode'])->name('clients.billing-mode.update');
 
         Route::post('/clients/{user}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
         Route::delete('/clients/{user}/departments/{department}', [ClientController::class, 'destroyDepartment'])->name('clients.departments.destroy');

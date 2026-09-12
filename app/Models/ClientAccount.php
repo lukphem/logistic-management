@@ -10,7 +10,7 @@ class ClientAccount extends Model
 {
     protected $fillable = [
         'client_user_id', 'account_name', 'account_number', 'is_default',
-        'account_type', 'disabled_billing_models', 'id_type', 'id_number',
+        'account_type', 'disabled_billing_models', 'special_billing_models', 'id_type', 'id_number',
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
         'alternate_phone', 'billing_address',
@@ -22,6 +22,7 @@ class ClientAccount extends Model
 
     protected $casts = [
         'disabled_billing_models' => 'array',
+        'special_billing_models' => 'array',
         'is_default' => 'boolean',
         'warehouse_access' => 'boolean',
         'cod_enabled' => 'boolean',
@@ -231,6 +232,23 @@ class ClientAccount extends Model
     public function usesBillingModel(string $billingModel): bool
     {
         return ! in_array($billingModel, $this->disabled_billing_models ?? [], true);
+    }
+
+    /**
+     * Whether this account has explicitly put a billing model into
+     * Special mode. This is what makes Standard/Special genuinely
+     * exclusive — when true, ShipmentPricingService skips this
+     * model's discount entirely at pricing time, regardless of
+     * whether a matching special rate actually exists for the
+     * specific shipment being priced. A partially-configured Special
+     * mode (switched on, but no rate covers this exact scenario) means
+     * the plain company rate applies, undiscounted — never a silent
+     * discount stacking on top of what Special mode was meant to
+     * replace.
+     */
+    public function isSpecialFor(string $billingModel): bool
+    {
+        return in_array($billingModel, $this->special_billing_models ?? [], true);
     }
 
     public function serviceSubscriptions(): HasMany

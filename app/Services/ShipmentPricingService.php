@@ -32,6 +32,13 @@ class ShipmentPricingService
      * resolveClientAccount() PricingEngine's special-tariff check uses,
      * so there's exactly one answer to "which account, and what
      * discount" everywhere pricing happens, not one path per caller.
+     *
+     * If the account has put this service type's billing model into
+     * Special mode (ClientAccount::isSpecialFor()), the discount is
+     * skipped entirely — Special genuinely replaces Standard for that
+     * model, not just in the UI. See that method's own note on why a
+     * partially-configured Special mode still doesn't fall back to a
+     * discount.
      */
     public function priceShipment(array $context, ?ClientBillingProfile $billingProfile = null): array
     {
@@ -41,9 +48,21 @@ class ShipmentPricingService
 
         $serviceTypeId = (int) ($context['service_type_id'] ?? 0);
         $account = $this->resolveClientAccount($context);
-        $discountFraction = $account
-            ? $account->discountFractionForServiceType($serviceTypeId)
-            : ($billingProfile?->discountFractionForServiceType($serviceTypeId) ?? 0.0);
+
+        // Special mode genuinely replaces Standard for that billing
+        // model — not a UI-only distinction. When the account has put
+        // this service type's own billing model into Special mode,
+        // the discount is skipped entirely here, before it's ever
+        // computed, so it can never silently stack on top of a special
+        // rate the way it could before this existed.
+        $billingModel = $serviceTypeId ? \App\Models\ServiceType::find($serviceTypeId)?->billing_model : null;
+        $isSpecialMode = $account && $billingModel && $account->isSpecialFor($billingModel);
+
+        $discountFraction = $isSpecialMode
+            ? 0.0
+            : ($account
+                ? $account->discountFractionForServiceType($serviceTypeId)
+                : ($billingProfile?->discountFractionForServiceType($serviceTypeId) ?? 0.0));
         $discountAmount = round(($baseAmount + $surchargeAmount) * $discountFraction, 2);
 
         // Discount applies to freight + surcharges only — insurance and
