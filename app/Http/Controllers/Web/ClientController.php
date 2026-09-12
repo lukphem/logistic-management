@@ -71,8 +71,9 @@ class ClientController extends Controller
             'profile' => new ClientAccount(), // view compatibility — clients/form.blade.php reads $profile
             'cities' => City::orderBy('name')->get(),
             'countries' => Country::orderBy('name')->get(),
-            'states' => State::orderBy('name')->get(),
+            'states' => State::with('territory')->orderBy('name')->get(),
             'territories' => Territory::orderBy('name')->get(),
+            'outlets' => \App\Models\Outlet::where('is_active', true)->orderBy('name')->get(),
             'staffUsers' => User::where('user_type', 'staff')->orderBy('name')->get(),
         ]);
     }
@@ -97,7 +98,7 @@ class ClientController extends Controller
             'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
             'is_default' => true,
             'created_by' => auth()->id(),
-            ...$this->accountData($data),
+            ...$this->accountData($request, $data, null),
         ]);
 
         // Links this login to its own Default Account — mirrors how a
@@ -118,8 +119,9 @@ class ClientController extends Controller
             'profile' => $user->defaultAccount ?? new ClientAccount(), // view compatibility — clients/form.blade.php reads $profile
             'cities' => City::orderBy('name')->get(),
             'countries' => Country::orderBy('name')->get(),
-            'states' => State::orderBy('name')->get(),
+            'states' => State::with('territory')->orderBy('name')->get(),
             'territories' => Territory::orderBy('name')->get(),
+            'outlets' => \App\Models\Outlet::where('is_active', true)->orderBy('name')->get(),
             'staffUsers' => User::where('user_type', 'staff')->orderBy('name')->get(),
         ]);
     }
@@ -140,7 +142,7 @@ class ClientController extends Controller
         $account = $user->defaultAccount;
 
         if ($account) {
-            $account->update($this->accountData($data));
+            $account->update($this->accountData($request, $data, $account));
         } else {
             // Defensive — every client should already have a Default
             // Account (auto-created at store() time, or by the
@@ -152,7 +154,7 @@ class ClientController extends Controller
                 'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
                 'is_default' => true,
                 'created_by' => auth()->id(),
-                ...$this->accountData($data),
+                ...$this->accountData($request, $data, null),
             ]);
             ClientProfile::updateOrCreate(['client_user_id' => $user->id], ['client_account_id' => $account->id]);
         }
@@ -682,29 +684,75 @@ class ClientController extends Controller
         return $account;
     }
 
-    private function accountData(array $data): array
+    /**
+     * $existingAccount is the account being updated (null when
+     * creating) — only used to know whether to delete an old logo
+     * file when a new one's uploaded, and to fall back to the
+     * account's own state_id when resolving a typed city (see
+     * resolveCity()).
+     */
+    private function accountData(Request $request, array $data, ?ClientAccount $existingAccount): array
     {
+        $stateId = $data['state_id'] ?? $existingAccount?->state_id;
+        [$cityId, $cityName] = $this->resolveCity($data['city_name'] ?? null, $stateId);
+
+        $logoPath = $existingAccount?->logo_path;
+        if ($request->hasFile('logo')) {
+            if ($logoPath) {
+                Storage::disk('public')->delete($logoPath);
+            }
+            $logoPath = $request->file('logo')->store('client-logos', 'public');
+        }
+
+        // Territory is derived from State, never chosen independently
+        // — every State already belongs to exactly one Territory, so
+        // letting someone pick a mismatched one would just be bad data.
+        $territoryId = $stateId ? \App\Models\State::find($stateId)?->territory_id : null;
+
         return [
             'account_type' => $data['account_type'],
             'id_type' => $data['account_type'] === 'individual' ? ($data['id_type'] ?? null) : null,
             'id_number' => $data['account_type'] === 'individual' ? ($data['id_number'] ?? null) : null,
             'company_name' => $data['account_type'] === 'organization' ? ($data['company_name'] ?? null) : null,
+            'logo_path' => $data['account_type'] === 'organization' ? $logoPath : null,
             'rc_number' => $data['account_type'] === 'organization' ? ($data['rc_number'] ?? null) : null,
             'tin' => $data['account_type'] === 'organization' ? ($data['tin'] ?? null) : null,
             'industry' => $data['industry'] ?? null,
             'contact_person_name' => $data['account_type'] === 'organization' ? ($data['contact_person_name'] ?? null) : null,
             'contact_person_role' => $data['account_type'] === 'organization' ? ($data['contact_person_role'] ?? null) : null,
             'address' => $data['address'] ?? null,
-            'city_id' => $data['city_id'] ?? null,
             'country_id' => $data['country_id'] ?? null,
-            'state_id' => $data['state_id'] ?? null,
-            'territory_id' => $data['territory_id'] ?? null,
-            'express_center' => $data['express_center'] ?? null,
+            'state_id' => $stateId,
+            'city_id' => $cityId,
+            'city_name' => $cityName,
+            'outlet_id' => $data['outlet_id'] ?? null,
+            'territory_id' => $territoryId,
             'business_objective' => $data['business_objective'] ?? null,
             'alternate_phone' => $data['alternate_phone'] ?? null,
             'billing_address' => $data['billing_address'] ?? null,
             'business_manager_id' => $data['business_manager_id'] ?? null,
         ];
+    }
+
+    /**
+     * A typed city that matches an existing row (by name, within the
+     * chosen State) resolves to that row's id — the real relationship;
+     * anything else is kept as free text (city_name) rather than
+     * blocking on the cities table already having their exact city.
+     *
+     * @return array{0: int|null, 1: string|null} [city_id, city_name]
+     */
+    private function resolveCity(?string $typed, ?int $stateId): array
+    {
+        $typed = trim((string) $typed);
+
+        if ($typed === '') {
+            return [null, null];
+        }
+
+        $match = City::where('state_id', $stateId)->whereRaw('LOWER(name) = ?', [strtolower($typed)])->first();
+
+        return $match ? [$match->id, null] : [null, $typed];
     }
 
     private function validateForm(Request $request, ?int $ignoreUserId = null): array
@@ -725,6 +773,7 @@ class ClientController extends Controller
             // Organization — compulsory only when creating an organization account directly.
             // (Upgrading an existing individual goes through upgrade() instead, not here.)
             'company_name' => $accountType === 'organization' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'logo' => 'nullable|image|max:2048',
             'rc_number' => $accountType === 'organization' ? 'required|string|max:255' : 'nullable|string|max:255',
             'tin' => 'nullable|string|max:255',
             'industry' => 'nullable|string|max:255',
@@ -732,17 +781,19 @@ class ClientController extends Controller
             'contact_person_role' => 'nullable|string|max:255',
 
             'address' => 'nullable|string|max:1000',
-            'city_id' => 'nullable|exists:cities,id',
             'country_id' => 'nullable|exists:countries,id',
             'state_id' => 'nullable|exists:states,id',
-            'territory_id' => 'nullable|exists:territories,id',
-            'express_center' => 'nullable|string|max:255',
+            'city_name' => 'nullable|string|max:255',
+            'outlet_id' => 'nullable|exists:outlets,id',
             'business_objective' => 'nullable|string|max:2000',
             'alternate_phone' => 'nullable|string|max:30',
             'billing_address' => 'nullable|string|max:1000',
             'business_manager_id' => 'nullable|exists:users,id',
         ]);
 
-        return $validator->validate();
+        $data = $validator->validate();
+        unset($data['logo']); // handled separately in accountData() — needs $request->file(), not the validated array
+
+        return $data;
     }
 }

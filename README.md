@@ -5790,3 +5790,84 @@ app/Http/Controllers/Web/ClientController.php   (show() accepts optional $accoun
 resources/views/clients/show.blade.php   (read-only banner, View links, gated write forms)
 routes/web.php   (clients.accounts.show)
 ```
+
+## Increment 103, Phase 7 — Restructured Client Form + Relational Location Fields + Logo
+
+### Form restructured into relational sections
+
+Rebuilt from one long undifferentiated list into clearly labeled
+cards, in relationship order: Account credentials (who logs in) →
+Account type (determines everything below) → Identity details
+(individual KYC or organization registration — heading/description
+change live with the toggle) → Location & Outlet → Staff assignment
+(an internal decision, made last).
+
+### Location fields are now genuinely relational, not independent
+
+Verified the actual schema relationships before building anything
+(not guessed): `State belongsTo Territory` is a strict 1:1 — every
+state already has exactly one territory, so Territory is now
+**auto-derived** the moment a State is picked, not an independently
+selectable dropdown (letting someone pick a mismatched one would just
+be bad data). `City belongsTo Hub` via `operational_hub_id`, and
+`Outlet belongsTo Hub` — so once a City is chosen, the Outlet dropdown
+is correctly filtered to outlets actually serving that city's
+designated hub. Country → State → City cascades exactly as requested
+(Nigeria → Nigeria's states → that state's cities), reusing the same
+pre-loaded/client-side-filtered technique already used on Rate
+Checker, not a new pattern.
+
+City itself is a text input with autocomplete suggestions (native
+HTML `<datalist>`) from the known cities for the selected state, but
+still freely typeable — a `city_name` fallback column holds the raw
+text when it doesn't match an existing city, so a client's location
+is never blocked on the cities table already having their exact city.
+A typed value that DOES match an existing city resolves to the real
+`city_id` relationship instead.
+
+"Express Center" renamed to "Outlet" throughout (form and Overview
+tab) and changed from a free-text field to a real relationship.
+
+### Logo
+
+Same mechanism as Company Settings' own logo (`logo_path` column,
+`Storage::disk('public')`, replaces the old file on re-upload) —
+organization accounts only. Shown on the Overview tab's header next
+to the client's name; individual clients (or organizations that
+haven't uploaded one yet) get a plain initial-letter badge instead of
+a broken image.
+
+### A real bug caught before shipping
+
+Wrote a JS string with a doubled backslash before an apostrophe
+(`city\\'s hub`) — which in real JavaScript would have terminated the
+string early and broken the *entire* script block, silently killing
+the cascading dropdowns along with it. Caught by dumping the file's
+raw bytes (`od -c`) rather than trusting a text search, since an
+earlier round of investigation showed regex/repr-based checks can
+themselves misreport what's actually in a file. Fixed by rewording to
+avoid the apostrophe entirely, then re-verified with the same raw
+byte scan across the whole file — clean.
+
+### Verified
+
+Full migration set (146 statements) re-run against fresh MySQL, 0
+real errors (the one reported failure is the same known translator
+limitation on explicit-named constraints already verified by hand
+elsewhere in this project). Both touched Blade files scanned at the
+raw-byte level for stray backslashes — clean. Full repo balance check
++ duplicate-method scan: clean.
+
+**Not verified**: no PHP runtime, so the actual cascading dropdown
+behavior in a real browser, the datalist's typeahead, and the logo
+upload/display flow haven't run through real Laravel.
+
+### Files
+
+```
+database/migrations/2026_02_29_000001_add_outlet_and_city_name_to_client_accounts_table.php
+app/Models/ClientAccount.php   (outlet(), cityDisplayName(), getLogoUrlAttribute(), city_name/outlet_id/logo_path fillable)
+app/Http/Controllers/Web/ClientController.php   (accountData() now resolves city + handles logo upload; create()/edit() pass outlets)
+resources/views/clients/form.blade.php   (rewritten — relational sections, cascading dropdowns, logo upload)
+resources/views/clients/show.blade.php   (logo in header, Outlet replaces Express Center, cityDisplayName())
+```

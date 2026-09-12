@@ -11,8 +11,8 @@ class ClientAccount extends Model
     protected $fillable = [
         'client_user_id', 'account_name', 'account_number', 'is_default',
         'account_type', 'id_type', 'id_number',
-        'company_name', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
-        'address', 'city_id', 'country_id', 'state_id', 'territory_id', 'express_center', 'business_objective',
+        'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
+        'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
         'alternate_phone', 'billing_address',
         'warehouse_access', 'cod_enabled',
         'insurance_agreement', 'insurance_agreement_date', 'insurance_agreement_notes',
@@ -38,6 +38,25 @@ class ClientAccount extends Model
     public function isOrganization(): bool
     {
         return $this->account_type === 'organization';
+    }
+
+    /**
+     * The city's real name when a known city was picked (city_id
+     * set), else whatever free text was typed for a city not yet in
+     * the system (city_name) - see the migration's note on why both
+     * columns exist.
+     */
+    public function cityDisplayName(): ?string
+    {
+        return $this->city?->name ?? $this->city_name;
+    }
+
+    public function getLogoUrlAttribute(): ?string
+    {
+        // Same root-relative reasoning as Setting::getLogoUrlAttribute()
+        // - resolves correctly regardless of which port the app is
+        // being viewed on locally.
+        return $this->logo_path ? '/storage/' . ltrim($this->logo_path, '/') : null;
     }
 
     public function client(): BelongsTo
@@ -73,6 +92,11 @@ class ClientAccount extends Model
     public function territory(): BelongsTo
     {
         return $this->belongsTo(Territory::class);
+    }
+
+    public function outlet(): BelongsTo
+    {
+        return $this->belongsTo(Outlet::class);
     }
 
     public function departments(): HasMany

@@ -24,15 +24,24 @@
     @endif
 
     <div class="mb-5 flex items-start justify-between">
-        <div>
-            <p class="text-lg font-semibold text-ink-900">{{ $user->name }}</p>
-            <p class="text-sm text-ink-500">
-                {{ $user->email }}
-                <span class="mx-1">·</span>
-                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $user->account_status === 'active' ? 'bg-status-delivered/10 text-status-delivered' : 'bg-ink-500/10 text-ink-500' }}">
-                    {{ ucfirst($user->account_status) }}
-                </span>
-            </p>
+        <div class="flex items-center gap-4">
+            @if ($account?->logo_url)
+                <img src="{{ $account->logo_url }}" alt="{{ $account->company_name ?? $user->name }} logo" class="h-14 w-14 shrink-0 rounded-xl border border-line object-contain bg-surface-0 p-1">
+            @elseif ($isOrganization)
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-line bg-surface-50 text-lg font-semibold text-ink-500">
+                    {{ strtoupper(substr($account->company_name ?? $user->name, 0, 1)) }}
+                </div>
+            @endif
+            <div>
+                <p class="text-lg font-semibold text-ink-900">{{ $account?->company_name ?? $user->name }}</p>
+                <p class="text-sm text-ink-500">
+                    {{ $user->email }}
+                    <span class="mx-1">·</span>
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $user->account_status === 'active' ? 'bg-status-delivered/10 text-status-delivered' : 'bg-ink-500/10 text-ink-500' }}">
+                        {{ ucfirst($user->account_status) }}
+                    </span>
+                </p>
+            </div>
         </div>
         <a href="{{ route('clients.edit', $user) }}" class="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-900 shadow-sm transition hover:bg-surface-50">Edit</a>
     </div>
@@ -94,9 +103,9 @@
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Industry</span><span class="text-ink-900">{{ $profile?->industry ?? '—' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Country</span><span class="text-ink-900">{{ $profile?->country?->name ?? '—' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">State</span><span class="text-ink-900">{{ $profile?->state?->name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Town</span><span class="text-ink-900">{{ $profile?->city?->name ?? '—' }}</span></div>
+                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Town</span><span class="text-ink-900">{{ $profile?->cityDisplayName() ?? '—' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Territory</span><span class="text-ink-900">{{ $profile?->territory?->name ?? '—' }}</span></div>
-                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Express Center</span><span class="text-ink-900">{{ $profile?->express_center ?? 'N/A' }}</span></div>
+                <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Outlet</span><span class="text-ink-900">{{ $profile?->outlet?->name ?? 'N/A' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Contact Person</span><span class="text-ink-900">{{ $profile?->contact_person_name ?? '—' }}</span></div>
                 <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Designation</span><span class="text-ink-900">{{ $profile?->contact_person_role ?? 'N/A' }}</span></div>
             </div>
