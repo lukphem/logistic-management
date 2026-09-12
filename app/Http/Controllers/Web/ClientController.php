@@ -222,8 +222,18 @@ class ClientController extends Controller
             'isOrganization' => $isOrganization,
             'isViewingDefault' => $account?->is_default ?? true,
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
+            'billingModels' => \App\Models\Setting::current()->supportedBillingModels(),
             'discounts' => ClientServiceDiscount::where('client_account_id', $accountId)->with('serviceType')->get()->keyBy('service_type_id'),
             'specialTariffs' => ClientSpecialTariff::where('client_account_id', $accountId)->with(['serviceType', 'zonePrices.zone'])->orderBy('service_type_id')->orderBy('min_weight')->get(),
+            'odTariffs' => \App\Models\ClientOriginDestinationTariff::where('client_account_id', $accountId)
+                ->with(['serviceType', 'originState', 'originCity', 'originCountry', 'destinationState', 'destinationCity', 'destinationCountry'])
+                ->orderBy('service_type_id')->get(),
+            'fleetTariffs' => \App\Models\ClientFleetBillingTariff::where('client_account_id', $accountId)
+                ->with(['serviceType', 'vehicleType', 'originState', 'originCity', 'originCountry', 'destinationState', 'destinationCity', 'destinationCountry'])
+                ->orderBy('service_type_id')->get(),
+            'vehicleTypes' => \App\Models\VehicleType::where('is_active', true)->orderBy('name')->get(),
+            'billingStates' => State::orderBy('name')->get(),
+            'billingCountries' => Country::orderBy('name')->get(),
             'zones' => Zone::where('applies_domestic', true)->orderBy('name')->get(),
             'subscriptions' => ClientServiceSubscription::where('client_account_id', $accountId)->pluck('is_active', 'service_type_id'),
             'departments' => $isOrganization ? Department::where('client_account_id', $accountId)->orderBy('name')->get() : collect(),
@@ -435,6 +445,172 @@ class ClientController extends Controller
         $tariff->delete();
 
         return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this weight band now bills standard for this client.');
+    }
+
+    public function storeOriginDestinationTariff(Request $request, User $user): RedirectResponse
+    {
+        $account = $this->requireDefaultAccount($user);
+
+        $data = Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_city_id' => 'nullable|exists:cities,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_city_id' => 'nullable|exists:cities,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
+            'base_charge' => 'required|numeric|min:0',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'additional_charge' => 'required|numeric|min:0',
+            'transit_days' => 'nullable|integer|min:0',
+        ])->validate();
+
+        // Same "state XOR country" clearing as the company-level form —
+        // a route is one or the other, never both.
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+            $data['origin_city_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+            $data['destination_city_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
+        \App\Models\ClientOriginDestinationTariff::create([
+            'client_account_id' => $account->id,
+            'client_user_id' => $user->id,
+            'service_type_id' => $data['service_type_id'],
+            'origin_state_id' => $data['origin_state_id'],
+            'origin_city_id' => $data['origin_city_id'] ?? null,
+            'origin_country_id' => $data['origin_country_id'],
+            'destination_state_id' => $data['destination_state_id'],
+            'destination_city_id' => $data['destination_city_id'] ?? null,
+            'destination_country_id' => $data['destination_country_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
+            'base_charge' => $data['base_charge'],
+            'additional_weight' => $data['additional_weight'],
+            'additional_charge' => $data['additional_charge'],
+            'transit_days' => $data['transit_days'] ?? null,
+            'is_active' => true,
+        ]);
+
+        return redirect()->route('clients.show', $user)->with('status', 'Special Origin-to-Destination rate added.');
+    }
+
+    public function destroyOriginDestinationTariff(User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
+    {
+        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
+
+        $tariff->delete();
+
+        return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this route now bills at the company rate for this client.');
+    }
+
+    public function storeFleetTariff(Request $request, User $user): RedirectResponse
+    {
+        $account = $this->requireDefaultAccount($user);
+
+        $data = Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'vehicle_type_id' => 'required|exists:vehicle_types,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_city_id' => 'nullable|exists:cities,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_city_id' => 'nullable|exists:cities,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
+            'base_charge' => 'required|numeric|min:0',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'additional_charge' => 'required|numeric|min:0',
+            'fuel_surcharge_percentage' => 'required|numeric|min:0|max:100',
+            'empty_return_charge_type' => 'required|in:flat,percentage',
+            'empty_return_charge_value' => 'required|numeric|min:0',
+            'transit_days' => 'nullable|integer|min:0',
+        ])->validate();
+
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+            $data['origin_city_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+            $data['destination_city_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
+        \App\Models\ClientFleetBillingTariff::create([
+            'client_account_id' => $account->id,
+            'client_user_id' => $user->id,
+            'service_type_id' => $data['service_type_id'],
+            'vehicle_type_id' => $data['vehicle_type_id'],
+            'origin_state_id' => $data['origin_state_id'],
+            'origin_city_id' => $data['origin_city_id'] ?? null,
+            'origin_country_id' => $data['origin_country_id'],
+            'destination_state_id' => $data['destination_state_id'],
+            'destination_city_id' => $data['destination_city_id'] ?? null,
+            'destination_country_id' => $data['destination_country_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
+            'base_charge' => $data['base_charge'],
+            'additional_weight' => $data['additional_weight'],
+            'additional_charge' => $data['additional_charge'],
+            'fuel_surcharge_percentage' => $data['fuel_surcharge_percentage'],
+            'empty_return_charge_type' => $data['empty_return_charge_type'],
+            'empty_return_charge_value' => $data['empty_return_charge_value'],
+            'transit_days' => $data['transit_days'] ?? null,
+            'is_active' => true,
+        ]);
+
+        return redirect()->route('clients.show', $user)->with('status', 'Special Fleet rate added.');
+    }
+
+    public function destroyFleetTariff(User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
+    {
+        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
+
+        $tariff->delete();
+
+        return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
+    }
+
+    /**
+     * Toggles which company-enabled billing models this account can
+     * actually use — "this client never uses Fleet at all." Checkboxes
+     * that are UNCHECKED (i.e. the model should be disabled) submit
+     * nothing, so the array of DISABLED models has to be built from
+     * which ones weren't checked, not read directly off the request.
+     */
+    public function updateDisabledBillingModels(Request $request, User $user): RedirectResponse
+    {
+        $account = $this->requireDefaultAccount($user);
+
+        $enabled = $request->input('enabled_billing_models', []);
+        $allModels = array_keys(\App\Models\Setting::current()->supportedBillingModels());
+        $disabled = array_values(array_diff($allModels, $enabled));
+
+        $account->update(['disabled_billing_models' => $disabled]);
+
+        return redirect()->route('clients.show', $user)->with('status', 'Billing model availability updated.');
     }
 
     // ---------------------------------------------------------------

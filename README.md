@@ -6228,3 +6228,61 @@ app/Models/ClientOriginDestinationTariff.php, ClientFleetBillingTariff.php   (ne
 app/Models/ClientAccount.php   (disabled_billing_models, usesBillingModel(), new relations)
 app/Services/PricingEngine.php   (client-specific O2D/Fleet resolution, assertBillingModelEnabledForAccount())
 ```
+
+## Increment 110, Phase 2 — Billing Setup Tab (Consolidated UI)
+
+Replaces the separate Tariff, Discount, and Service tabs with one
+**Billing Setup** tab, organized per billing model — matching what
+was actually asked for: "under each billing model, one or more
+service type can as well be turned on or off," with Standard/Special
+configured per model, not scattered across disconnected tabs.
+
+### Structure
+
+- A model-availability form at the top — checkboxes for every
+  company-enabled billing model, controlling `disabled_billing_models`.
+- One section per billing model the company has enabled. Each section:
+  - Lists every service type belonging to that model, each with its
+    own access toggle (existing `client_service_subscriptions`) and
+    discount field (existing `client_service_discounts`) side by side
+    in one row — no more hunting across two tabs for the same product.
+  - A "Special rates" area shaped to that specific model: the existing
+    zone-based form for Standard Billing, and two genuinely new forms
+    for Origin-to-Destination (route + weight + charge) and Fleet
+    (vehicle type + route + weight + charge + fuel surcharge + empty
+    return) — wired to the controller actions and `PricingEngine`
+    resolution built in Phase 1.
+  - A disabled model shows a clear "not set up to use this" message
+    instead of an empty, confusing section.
+
+### Controller
+
+Four new actions (`storeOriginDestinationTariff`/`destroyOriginDestinationTariff`,
+`storeFleetTariff`/`destroyFleetTariff`) mirroring the existing
+`storeSpecialTariff` pattern, plus `updateDisabledBillingModels` —
+built from which checkboxes were *unchecked* (unchecked checkboxes
+submit nothing, so the disabled list has to be computed as the
+difference from all company-enabled models, not read directly).
+
+### Two real bugs caught before shipping
+
+- The Origin-to-Destination/Fleet special-rate forms had a
+  State/Country type toggle with no JavaScript actually wired to it —
+  the dropdown would have sat there doing nothing. Fixed with a
+  generic, per-form-scoped toggle (not global by field name, since
+  the page has two such pairs in different forms).
+- A raw text-based balance check on the finished file reported an
+  imbalance that didn't actually exist — caused by a JS comment
+  containing the literal text "`<div>`" as documentation, which a
+  naive regex count mistook for real markup. Resolved by tracing
+  actual nesting depth line-by-line (which correctly showed the file
+  balanced throughout) rather than trusting the raw count, then
+  reworded the comment to remove the false trigger for future checks.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (4 new actions, show() loads O2D/Fleet tariffs)
+resources/views/clients/show.blade.php   (Billing Setup tab replaces Tariff+Discount+Service)
+routes/web.php
+```

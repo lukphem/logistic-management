@@ -290,6 +290,14 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
         Route::delete('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'destroySpecialTariff'])->name('clients.special-tariffs.destroy');
 
+        Route::post('/clients/{user}/od-tariffs', [ClientController::class, 'storeOriginDestinationTariff'])->name('clients.od-tariffs.store');
+        Route::delete('/clients/{user}/od-tariffs/{tariff}', [ClientController::class, 'destroyOriginDestinationTariff'])->name('clients.od-tariffs.destroy');
+
+        Route::post('/clients/{user}/fleet-tariffs', [ClientController::class, 'storeFleetTariff'])->name('clients.fleet-tariffs.store');
+        Route::delete('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'destroyFleetTariff'])->name('clients.fleet-tariffs.destroy');
+
+        Route::put('/clients/{user}/billing-models', [ClientController::class, 'updateDisabledBillingModels'])->name('clients.billing-models.update');
+
         Route::post('/clients/{user}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
         Route::delete('/clients/{user}/departments/{department}', [ClientController::class, 'destroyDepartment'])->name('clients.departments.destroy');
 

@@ -80,15 +80,13 @@
                         'overview' => ['label' => 'Overview', 'icon' => 'dashboard'],
                         'accounts' => ['label' => 'Accounts', 'icon' => 'building'],
                         'transactions' => ['label' => 'Transactions', 'icon' => 'box'],
-                        'tariff' => ['label' => 'Tariff', 'icon' => 'sliders'],
-                        'discount' => ['label' => 'Discount', 'icon' => 'list-check'],
+                        'billing' => ['label' => 'Billing Setup', 'icon' => 'sliders'],
                     ];
                     if ($isOrganization) {
                         $sections['department'] = ['label' => 'Department', 'icon' => 'layers'];
                         $sections['users'] = ['label' => 'User', 'icon' => 'user'];
                     }
                     $sections += [
-                        'service' => ['label' => 'Service', 'icon' => 'package'],
                         'document' => ['label' => 'Document', 'icon' => 'document'],
                         'security' => ['label' => 'Security', 'icon' => 'shield'],
                         'managerial' => ['label' => 'Managerial services', 'icon' => 'briefcase'],
@@ -270,148 +268,359 @@
     </div>
 
     {{-- ============ TARIFF (special rates) ============ --}}
-    <div id="tab-tariff" class="mt-5 max-w-3xl" style="display:none">
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-1 text-sm font-semibold text-ink-900">Special rates</p>
-            <p class="mb-4 text-xs text-ink-500">A genuinely separate, negotiated tariff for this client — its own weight bands and zone pricing, not a discount off the standard rate. Checked before the shared Standard Billing tariff whenever this client books.</p>
+    <div id="tab-billing" class="mt-5 max-w-4xl" style="display:none">
+        @if ($isViewingDefault)
+        <form method="PUT" action="{{ route('clients.billing-models.update', $user) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            @csrf
+            @method('PUT')
+            <p class="mb-1 text-sm font-semibold text-ink-900">Billing models available to this account</p>
+            <p class="mb-3 text-xs text-ink-500">Every billing model is Standard by default (company-wide rates) until a discount or special rate is set below. Turn a model off entirely if this client never uses it.</p>
+            <div class="flex flex-wrap gap-6">
+                @foreach ($billingModels as $key => $label)
+                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" name="enabled_billing_models[]" value="{{ $key }}" @checked($account->usesBillingModel($key)) class="rounded border-line">
+                        {{ $label }}
+                    </label>
+                @endforeach
+            </div>
+            <button type="submit" class="mt-3 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Save</button>
+        </form>
+        @endif
 
-            @forelse ($specialTariffs as $tariff)
-                <div class="mb-3 rounded-lg border border-line p-3">
-                    <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium text-ink-900">
-                            {{ $tariff->serviceType->name }} — {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
-                        </p>
-                        <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" onsubmit="return confirm('Remove this special rate?');">
-                            @csrf
-                            @method('DELETE')
-                            <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
-                        </form>
-                    </div>
-                    <p class="mt-1 text-xs text-ink-500">Overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg · {{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }} kg increments</p>
-                    <table class="mt-2 w-full text-left text-xs">
-                        <thead><tr class="text-ink-500"><th class="py-1 font-medium">Zone</th><th class="py-1 font-medium">Charge</th><th class="py-1 font-medium">Per increment</th><th class="py-1 font-medium">Transit</th></tr></thead>
+        @foreach ($billingModels as $modelKey => $modelLabel)
+            @php $modelServiceTypes = $serviceTypes->where('billing_model', $modelKey); @endphp
+            @if ($modelServiceTypes->isNotEmpty())
+            <div class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-sm font-semibold text-ink-900">{{ $modelLabel }}</p>
+                    @unless ($account->usesBillingModel($modelKey))
+                        <span class="inline-flex items-center rounded-full bg-ink-500/10 px-2.5 py-0.5 text-xs font-medium text-ink-500">Disabled for this account</span>
+                    @endunless
+                </div>
+
+                @if ($account->usesBillingModel($modelKey))
+                    {{-- Service types under this model: on/off + discount, one row each --}}
+                    <table class="mb-4 w-full text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
+                                <th class="py-2 font-medium">Service type</th>
+                                <th class="py-2 font-medium">Access</th>
+                                <th class="py-2 font-medium">Discount (Standard)</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            @foreach ($tariff->zonePrices as $zp)
-                                <tr>
-                                    <td class="py-1 text-ink-900">{{ $zp->zone->name }}</td>
-                                    <td class="py-1 text-ink-500">{{ number_format($zp->charge, 2) }}</td>
-                                    <td class="py-1 text-ink-500">{{ number_format($zp->additional_charge, 2) }}</td>
-                                    <td class="py-1 text-ink-500">{{ $zp->transit_days ?? '—' }}</td>
+                            @foreach ($modelServiceTypes as $serviceType)
+                                <tr class="border-b border-line last:border-0">
+                                    <td class="py-2 text-ink-900">{{ $serviceType->name }}</td>
+                                    <td class="py-2">
+                                        <form method="POST" action="{{ route('clients.services.store', $user) }}">
+                                            @csrf
+                                            <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
+                                            <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-500">
+                                                <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()" {{ $isViewingDefault ? '' : 'disabled' }}
+                                                       @checked(!array_key_exists($serviceType->id, $subscriptions->toArray()) || $subscriptions[$serviceType->id]) class="rounded border-line">
+                                                Enabled
+                                            </label>
+                                        </form>
+                                    </td>
+                                    <td class="py-2">
+                                        @if ($isViewingDefault)
+                                        <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex items-center gap-2">
+                                            @csrf
+                                            <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
+                                            <input type="number" step="0.01" min="0" max="100" name="discount_percentage"
+                                                   value="{{ $discounts[$serviceType->id]->discount_percentage ?? '' }}" placeholder="0"
+                                                   class="w-20 rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <span class="text-xs text-ink-500">%</span>
+                                            <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Save</button>
+                                            @if (isset($discounts[$serviceType->id]))
+                                                <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discounts[$serviceType->id]]) }}" onsubmit="return confirm('Remove this discount?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Clear</button>
+                                                </form>
+                                            @endif
+                                        </form>
+                                        @else
+                                            <span class="text-xs text-ink-500">{{ isset($discounts[$serviceType->id]) ? rtrim(rtrim(number_format($discounts[$serviceType->id]->discount_percentage, 2), '0'), '.') . '%' : '—' }}</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
-                </div>
-            @empty
-                <p class="mb-4 text-sm text-ink-500">No special rates set up yet — this client bills standard everywhere.</p>
-            @endforelse
 
-            @if ($isViewingDefault)
-            <form method="POST" action="{{ route('clients.special-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
-                @csrf
-                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
-                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Select…</option>
-                            @foreach ($serviceTypes as $serviceType)
-                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                    <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight (overage from)</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                    <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                    <div><label class="mb-1 block text-xs font-medium text-ink-900">Increment size (kg)</label><input type="number" step="0.01" min="0.01" name="additional_weight" value="1" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                </div>
-
-                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Zone pricing</p>
-                <div id="special-zone-rows" class="space-y-2">
-                    <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        <select name="zone_prices[0][zone_id]" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="">Zone…</option>
-                            @foreach ($zones as $zone)
-                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                            @endforeach
-                        </select>
-                        <input type="number" step="0.01" min="0" name="zone_prices[0][charge]" placeholder="Charge" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <input type="number" step="0.01" min="0" name="zone_prices[0][additional_charge]" placeholder="Per increment" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <input type="number" min="0" name="zone_prices[0][transit_days]" placeholder="Transit days" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    </div>
-                </div>
-                <button type="button" id="add-zone-row" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">+ Add another zone</button>
-
-                <div class="flex justify-end pt-2">
-                    <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
-                </div>
-            </form>
-            @else
-                <p class="border-t border-line pt-4 text-xs text-ink-500">Switch to this account (Accounts tab) to add a special rate.</p>
-            @endif
-        </div>
-    </div>
-
-    {{-- ============ DISCOUNT ============ --}}
-    <div id="tab-discount" class="mt-5 max-w-3xl" style="display:none">
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <div class="mb-4 flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-semibold text-ink-900">Overall billing</p>
-                    <p class="text-xs text-ink-500">Flat fallback discount for any service type without its own rate below.</p>
-                </div>
-                <a href="{{ route('client-billing.edit', ['type' => 'portal', 'id' => $user->id]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-            </div>
-            <p class="mb-4 text-sm text-ink-900">
-                Currently: {{ $user->billingProfile?->billing_type === 'special' ? 'Special (' . rtrim(rtrim(number_format($user->billingProfile->discount_percentage, 2), '0'), '.') . '% flat discount)' : 'Standard (no flat discount)' }}
-            </p>
-
-            <p class="mb-1 text-sm font-semibold text-ink-900">Per-service-type discounts</p>
-            <p class="mb-4 text-xs text-ink-500">A discount on a specific service type this client is agreed and subscribed for — takes priority over the flat discount above for that service type only.</p>
-
-            @if ($discounts->isNotEmpty())
-                <table class="mb-4 w-full text-left text-sm">
-                    <thead><tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500"><th class="py-2 font-medium">Service type</th><th class="py-2 font-medium">Discount</th><th class="py-2"></th></tr></thead>
-                    <tbody>
-                        @foreach ($discounts as $discount)
-                            <tr class="border-b border-line last:border-0">
-                                <td class="py-2 text-ink-900">{{ $discount->serviceType->name }}</td>
-                                <td class="py-2 text-ink-500">{{ rtrim(rtrim(number_format($discount->discount_percentage, 2), '0'), '.') }}%</td>
-                                <td class="py-2 text-right">
-                                    <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discount]) }}" onsubmit="return confirm('Remove this discount?');">
+                    {{-- ===== Special rates, shaped per billing model ===== --}}
+                    @if ($modelKey === 'standard_billing')
+                        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-500">Special rates (Zoning & Weight)</p>
+                        @forelse ($specialTariffs as $tariff)
+                            <div class="mb-3 rounded-lg border border-line p-3">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-sm font-medium text-ink-900">
+                                        {{ $tariff->serviceType->name }} — {{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg
+                                    </p>
+                                    <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" onsubmit="return confirm('Remove this special rate?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
                                     </form>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
+                                </div>
+                                <p class="mt-1 text-xs text-ink-500">Overage from {{ rtrim(rtrim(number_format($tariff->max_weight, 2), '0'), '.') }} kg · {{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }} kg increments</p>
+                                <table class="mt-2 w-full text-left text-xs">
+                                    <thead><tr class="text-ink-500"><th class="py-1 font-medium">Zone</th><th class="py-1 font-medium">Charge</th><th class="py-1 font-medium">Per increment</th><th class="py-1 font-medium">Transit</th></tr></thead>
+                                    <tbody>
+                                        @foreach ($tariff->zonePrices as $zp)
+                                            <tr>
+                                                <td class="py-1 text-ink-900">{{ $zp->zone->name }}</td>
+                                                <td class="py-1 text-ink-500">{{ number_format($zp->charge, 2) }}</td>
+                                                <td class="py-1 text-ink-500">{{ number_format($zp->additional_charge, 2) }}</td>
+                                                <td class="py-1 text-ink-500">{{ $zp->transit_days ?? '—' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @empty
+                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills standard everywhere for this model.</p>
+                        @endforelse
 
-            @if ($isViewingDefault)
-            <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex flex-wrap items-end gap-3">
-                @csrf
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                    <select name="service_type_id" required class="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">Select…</option>
-                        @foreach ($serviceTypes as $serviceType)
-                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Discount %</label>
-                    <input type="number" step="0.01" min="0" max="100" name="discount_percentage" required class="w-28 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add / update</button>
-            </form>
-            @else
-                <p class="text-xs text-ink-500">Switch to this account (Accounts tab) to add a discount.</p>
+                        @if ($isViewingDefault)
+                        <form method="POST" action="{{ route('clients.special-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                            @csrf
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select…</option>
+                                        @foreach ($modelServiceTypes as $serviceType)
+                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight (overage from)</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Increment size (kg)</label><input type="number" step="0.01" min="0.01" name="additional_weight" value="1" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Zone pricing</p>
+                            <div id="special-zone-rows" class="space-y-2">
+                                <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    <select name="zone_prices[0][zone_id]" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Zone…</option>
+                                        @foreach ($zones as $zone)
+                                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <input type="number" step="0.01" min="0" name="zone_prices[0][charge]" placeholder="Charge" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <input type="number" step="0.01" min="0" name="zone_prices[0][additional_charge]" placeholder="Per increment" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <input type="number" min="0" name="zone_prices[0][transit_days]" placeholder="Transit days" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                </div>
+                            </div>
+                            <button type="button" id="add-zone-row" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">+ Add another zone</button>
+                            <div class="flex justify-end pt-2">
+                                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
+                            </div>
+                        </form>
+                        @endif
+
+                    @elseif ($modelKey === 'origin_destination_billing')
+                        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-500">Special rates (Origin to Destination)</p>
+                        @forelse ($odTariffs as $tariff)
+                            <div class="mb-2 flex items-center justify-between rounded-lg border border-line p-3 text-sm">
+                                <div>
+                                    <p class="font-medium text-ink-900">{{ $tariff->serviceType->name }} — {{ $tariff->originCountry?->name ?? $tariff->originState?->name }} → {{ $tariff->destinationCountry?->name ?? $tariff->destinationState?->name }}</p>
+                                    <p class="text-xs text-ink-500">{{ rtrim(rtrim(number_format($tariff->min_weight, 2), '0'), '.') }}–{{ rtrim(rtrim(number_format($tariff->max_weight_limit, 2), '0'), '.') }} kg · {{ number_format($tariff->base_charge, 2) }} base + {{ number_format($tariff->additional_charge, 2) }}/{{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }}kg</p>
+                                </div>
+                                <form method="POST" action="{{ route('clients.od-tariffs.destroy', [$user, $tariff]) }}" onsubmit="return confirm('Remove this special rate?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="shrink-0 text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                </form>
+                            </div>
+                        @empty
+                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every route.</p>
+                        @endforelse
+
+                        @if ($isViewingDefault)
+                        <form method="POST" action="{{ route('clients.od-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                            @csrf
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select…</option>
+                                        @foreach ($modelServiceTypes as $serviceType)
+                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Origin</label>
+                                    <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="state">State</option>
+                                        <option value="country">Country</option>
+                                    </select>
+                                    <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select state…</option>
+                                        @foreach ($billingStates as $state)
+                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select country…</option>
+                                        @foreach ($billingCountries as $country)
+                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Destination</label>
+                                    <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="state">State</option>
+                                        <option value="country">Country</option>
+                                    </select>
+                                    <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select state…</option>
+                                        @foreach ($billingStates as $state)
+                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select country…</option>
+                                        @foreach ($billingCountries as $country)
+                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label><input type="number" min="0" name="transit_days" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Base charge</label><input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Per kg after</label><input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+                            <input type="hidden" name="additional_weight" value="1">
+                            <div class="flex justify-end pt-2">
+                                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
+                            </div>
+                        </form>
+                        @endif
+
+                    @elseif ($modelKey === 'fleet_billing')
+                        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-500">Special rates (Fleet)</p>
+                        @forelse ($fleetTariffs as $tariff)
+                            <div class="mb-2 flex items-center justify-between rounded-lg border border-line p-3 text-sm">
+                                <div>
+                                    <p class="font-medium text-ink-900">{{ $tariff->serviceType->name }} — {{ $tariff->vehicleType->name }} — {{ $tariff->originCountry?->name ?? $tariff->originState?->name }} → {{ $tariff->destinationCountry?->name ?? $tariff->destinationState?->name }}</p>
+                                    <p class="text-xs text-ink-500">{{ number_format($tariff->base_charge, 2) }} base + {{ number_format($tariff->additional_charge, 2) }}/{{ rtrim(rtrim(number_format($tariff->additional_weight, 2), '0'), '.') }}kg · {{ rtrim(rtrim(number_format($tariff->fuel_surcharge_percentage, 2), '0'), '.') }}% fuel</p>
+                                </div>
+                                <form method="POST" action="{{ route('clients.fleet-tariffs.destroy', [$user, $tariff]) }}" onsubmit="return confirm('Remove this special rate?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="shrink-0 text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                </form>
+                            </div>
+                        @empty
+                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every vehicle type/route.</p>
+                        @endforelse
+
+                        @if ($isViewingDefault)
+                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                            @csrf
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select…</option>
+                                        @foreach ($modelServiceTypes as $serviceType)
+                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Vehicle type</label>
+                                    <select name="vehicle_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select…</option>
+                                        @foreach ($vehicleTypes as $vehicleType)
+                                            <option value="{{ $vehicleType->id }}">{{ $vehicleType->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Origin</label>
+                                    <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="state">State</option>
+                                        <option value="country">Country</option>
+                                    </select>
+                                    <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select state…</option>
+                                        @foreach ($billingStates as $state)
+                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select country…</option>
+                                        @foreach ($billingCountries as $country)
+                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Destination</label>
+                                    <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="state">State</option>
+                                        <option value="country">Country</option>
+                                    </select>
+                                    <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select state…</option>
+                                        @foreach ($billingStates as $state)
+                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select country…</option>
+                                        @foreach ($billingCountries as $country)
+                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Base charge</label><input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Per kg after</label><input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Fuel surcharge %</label><input type="number" step="0.01" min="0" max="100" name="fuel_surcharge_percentage" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                <div>
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Empty return</label>
+                                    <select name="empty_return_charge_type" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="flat">Flat</option>
+                                        <option value="percentage">% of freight</option>
+                                    </select>
+                                </div>
+                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Empty return value</label><input type="number" step="0.01" min="0" name="empty_return_charge_value" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+                            <input type="hidden" name="additional_weight" value="1">
+                            <div class="flex justify-end pt-2">
+                                <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
+                            </div>
+                        </form>
+                        @endif
+                    @endif
+                @else
+                    <p class="text-sm text-ink-500">This account isn't set up to use {{ $modelLabel }} — enable it above to configure service access or special rates.</p>
+                @endif
+            </div>
             @endif
-        </div>
+        @endforeach
     </div>
 
     @if ($isOrganization)
@@ -507,28 +716,6 @@
         </div>
     </div>
     @endif
-
-    {{-- ============ SERVICE ============ --}}
-    <div id="tab-service" class="mt-5 max-w-2xl" style="display:none">
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-1 text-sm font-semibold text-ink-900">Service access</p>
-            <p class="mb-4 text-xs text-ink-500">Which service types this client can use. A service type with no toggle set below is available by default — this is for deliberately scoping a client down to a subset.@unless ($isViewingDefault) Switch to this account (Accounts tab) to change it. @endunless</p>
-            <div class="divide-y divide-line">
-                @foreach ($serviceTypes as $serviceType)
-                    <form method="POST" action="{{ route('clients.services.store', $user) }}" class="flex items-center justify-between py-2.5">
-                        @csrf
-                        <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
-                        <span class="text-sm text-ink-900">{{ $serviceType->name }}</span>
-                        <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-500">
-                            <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()" {{ $isViewingDefault ? '' : 'disabled' }}
-                                   @checked(!array_key_exists($serviceType->id, $subscriptions->toArray()) || $subscriptions[$serviceType->id]) class="rounded border-line">
-                            Enabled
-                        </label>
-                    </form>
-                @endforeach
-            </div>
-        </div>
-    </div>
 
     {{-- ============ DOCUMENT ============ --}}
     <div id="tab-document" class="mt-5 max-w-2xl" style="display:none">
@@ -740,6 +927,29 @@
     </div>
 
     <script>
+        // Each origin_type/destination_type select lives in the same
+        // wrapper element as its matching state/country selects — scoped
+        // per-select rather than by name globally, since the page can
+        // have more than one such pair (Origin-to-Destination form,
+        // Fleet form) with the same field names in different forms.
+        (function () {
+            document.querySelectorAll('select[name="origin_type"], select[name="destination_type"]').forEach(function (typeSelect) {
+                const prefix = typeSelect.name === 'origin_type' ? 'origin' : 'destination';
+                const wrapper = typeSelect.closest('div');
+                const stateSelect = wrapper.querySelector('select[name="' + prefix + '_state_id"]');
+                const countrySelect = wrapper.querySelector('select[name="' + prefix + '_country_id"]');
+
+                function sync() {
+                    const isCountry = typeSelect.value === 'country';
+                    stateSelect.classList.toggle('hidden', isCountry);
+                    countrySelect.classList.toggle('hidden', !isCountry);
+                }
+
+                typeSelect.addEventListener('change', sync);
+                sync();
+            });
+        })();
+
         function showClientTab(tab) {
             document.querySelectorAll('[id^="tab-"]').forEach(function (el) {
                 el.style.display = el.id === 'tab-' + tab ? '' : 'none';
