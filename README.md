@@ -6600,3 +6600,48 @@ balance check: clean.
 ```
 database/migrations/2026_03_05_000001_fix_client_service_unique_constraints_to_account_scope.php
 ```
+
+## Increment 113 — Special Mode Blocks Pricing When No Rate Matches
+
+Real gap in Phase 1's design, caught by direct feedback: an account
+in Special mode with no matching special rate for the specific
+weight/zone/route being priced was silently falling back to the
+**plain company rate** (undiscounted) — the exact same "charging a
+number nobody actually agreed to" problem the whole Special/Standard
+split was built to prevent in the first place.
+
+Fixed across all three billing models: once a client-specific
+special-rate lookup comes back empty, a new check
+(`PricingEngine::assertNotStuckInSpecialModeWithNoMatch()`) looks at
+whether the account is actually in Special mode for that billing
+model. If so, pricing is **blocked outright** with a clear message
+naming the account and billing model, rather than quietly falling
+through. Standard-mode accounts are completely unaffected — this
+check only ever fires inside the "special-tariff lookup already
+failed" branch.
+
+Reuses the existing `PricingUnavailableException` — already caught
+gracefully in Rate Checker, Create Shipment (both the booking path
+and the price-preview endpoint), and Quote generation, so this new
+rejection surfaces as a clean message everywhere pricing happens, with
+no additional wiring needed.
+
+Also fixed the Billing Setup tab's misleading empty-state message
+("No special rates — this client bills standard everywhere for this
+model") on all three billing models' special-rate sections — it
+described the *old*, now-incorrect fallback behavior. Now states
+plainly that shipments will be blocked until a rate is added.
+
+### Verified
+
+Full repo balance check, duplicate-method scan: clean. Confirmed via
+code inspection that all four pricing entry points already catch
+`PricingUnavailableException`, so this new rejection path needed no
+additional exception handling anywhere.
+
+### Files
+
+```
+app/Services/PricingEngine.php   (assertNotStuckInSpecialModeWithNoMatch(), wired into all 3 billing models)
+resources/views/clients/show.blade.php   (corrected empty-state messages)
+```

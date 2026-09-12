@@ -458,7 +458,7 @@
                                 </table>
                             </div>
                         @empty
-                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills standard everywhere for this model.</p>
+                            <p class="mb-3 text-sm text-status-exception">No special rates yet — shipments for this weight/zone will be <strong>blocked</strong> until one is added below (Special mode never falls back to the standard rate).</p>
                         @endforelse
 
                         @if (true)
@@ -525,7 +525,7 @@
                                 </form>
                             </div>
                         @empty
-                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every route.</p>
+                            <p class="mb-3 text-sm text-status-exception">No special rates yet — shipments on any route will be <strong>blocked</strong> until one is added below (Special mode never falls back to the company rate).</p>
                         @endforelse
 
                         @if (true)
@@ -620,7 +620,7 @@
                                 </form>
                             </div>
                         @empty
-                            <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every vehicle type/route.</p>
+                            <p class="mb-3 text-sm text-status-exception">No special rates yet — shipments on any vehicle type/route will be <strong>blocked</strong> until one is added below (Special mode never falls back to the company rate).</p>
                         @endforelse
 
                         @if (true)

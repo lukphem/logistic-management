@@ -145,6 +145,14 @@ class PricingEngine
                     'zone_id' => $zone->id,
                 ];
             }
+
+            // Special mode means Special IS the rate — not "Special,
+            // falling back to Standard's rate when nothing matches."
+            // Silently pricing at the plain company rate here would
+            // mean charging a number nobody actually agreed to, which
+            // is exactly the kind of invoice dispute this whole
+            // mode was built to prevent. Blocks explicitly instead.
+            $this->assertNotStuckInSpecialModeWithNoMatch($clientAccountId, 'standard_billing');
         }
 
         // orderBy makes this deterministic if two tariffs for the same
@@ -288,6 +296,8 @@ class PricingEngine
                     'zone_id' => null,
                 ];
             }
+
+            $this->assertNotStuckInSpecialModeWithNoMatch($clientAccountId, 'origin_destination_billing');
         }
 
         $tariff = $this->resolveOriginDestinationTariff(
@@ -458,6 +468,8 @@ class PricingEngine
                     'surcharges' => $surcharges,
                 ];
             }
+
+            $this->assertNotStuckInSpecialModeWithNoMatch($clientAccountId, 'fleet_billing');
         }
 
         $tariff = $this->resolveFleetBillingTariff(
@@ -559,6 +571,30 @@ class PricingEngine
         if ($account && ! $account->usesBillingModel($billingModel)) {
             $label = \App\Models\Setting::BILLING_MODELS[$billingModel] ?? $billingModel;
             throw new PricingUnavailableException("{$account->account_name} is not set up to use {$label}.");
+        }
+    }
+
+    /**
+     * Called only after a client-specific special-rate lookup has
+     * already come back empty. If the account has put this billing
+     * model into Special mode, that absence is a hard stop, not a
+     * signal to fall back to the shared company rate — Special mode
+     * means Special IS the rate for this model, so a gap in coverage
+     * (this exact weight/zone/route was never configured) should block
+     * the shipment from pricing at all rather than silently charge a
+     * number nobody agreed to. Standard-mode accounts never reach this
+     * check at all (the caller only calls it inside the `if
+     * ($clientAccountId)` branch after a Special-mode-only code path).
+     */
+    private function assertNotStuckInSpecialModeWithNoMatch(int $clientAccountId, string $billingModel): void
+    {
+        $account = \App\Models\ClientAccount::find($clientAccountId);
+
+        if ($account && $account->isSpecialFor($billingModel)) {
+            $label = \App\Models\Setting::BILLING_MODELS[$billingModel] ?? $billingModel;
+            throw new PricingUnavailableException(
+                "{$account->account_name} is in Special mode for {$label}, but no special rate covers this exact shipment yet — add one on the Billing Setup tab before booking."
+            );
         }
     }
 
