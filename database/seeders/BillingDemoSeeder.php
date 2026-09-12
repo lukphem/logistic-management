@@ -164,9 +164,9 @@ class BillingDemoSeeder extends Seeder
         $region = Region::firstOrCreate(['code' => 'NG-DEMO'], ['name' => 'Nigeria Operations']);
 
         $hubCities = [
-            'lagos' => ['state' => 'Lagos', 'city' => 'Ikeja', 'hub_name' => 'Lagos Hub', 'hub_code' => 'LOS-HUB'],
-            'abuja' => ['state' => 'Federal Capital Territory', 'city' => 'Abuja Municipal', 'hub_name' => 'Abuja Hub', 'hub_code' => 'ABV-HUB'],
-            'port_harcourt' => ['state' => 'Rivers', 'city' => 'Port Harcourt', 'hub_name' => 'Port Harcourt Hub', 'hub_code' => 'PHC-HUB'],
+            'lagos' => ['state' => 'Lagos', 'city' => 'Ikeja', 'hub_name' => 'Lagos Hub', 'hub_code' => 'LOS-HUB', 'address' => 'Lagos Hub, Ikeja, Lagos State'],
+            'abuja' => ['state' => 'Federal Capital Territory', 'city' => 'Abuja Municipal', 'hub_name' => 'Abuja Hub', 'hub_code' => 'ABV-HUB', 'address' => 'Abuja Hub, Abuja Municipal, FCT'],
+            'port_harcourt' => ['state' => 'Rivers', 'city' => 'Port Harcourt', 'hub_name' => 'Port Harcourt Hub', 'hub_code' => 'PHC-HUB', 'address' => 'Port Harcourt Hub, Port Harcourt, Rivers State'],
         ];
 
         $hubs = [];
@@ -178,7 +178,7 @@ class BillingDemoSeeder extends Seeder
 
             $hub = Hub::firstOrCreate(
                 ['code' => $data['hub_code']],
-                ['region_id' => $region->id, 'city_id' => $city?->id, 'name' => $data['hub_name'], 'is_active' => true]
+                ['region_id' => $region->id, 'city_id' => $city?->id, 'name' => $data['hub_name'], 'address' => $data['address'], 'is_active' => true]
             );
 
             if ($city && ! $city->operational_hub_id) {
@@ -187,7 +187,7 @@ class BillingDemoSeeder extends Seeder
 
             Outlet::firstOrCreate(
                 ['code' => $data['hub_code'] . '-1'],
-                ['hub_id' => $hub->id, 'name' => $data['hub_name'] . ' — Main Outlet', 'is_active' => true]
+                ['hub_id' => $hub->id, 'name' => $data['hub_name'] . ' — Main Outlet', 'address' => $data['address'], 'is_active' => true]
             );
 
             $hubs[$key] = $hub;
