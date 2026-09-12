@@ -270,7 +270,7 @@
     {{-- ============ TARIFF (special rates) ============ --}}
     <div id="tab-billing" class="mt-5 max-w-4xl" style="display:none">
         @if ($isViewingDefault)
-        <form method="PUT" action="{{ route('clients.billing-models.update', $user) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        <form method="POST" action="{{ route('clients.billing-models.update', $user) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             @csrf
             @method('PUT')
             <p class="mb-1 text-sm font-semibold text-ink-900">Billing models available to this account</p>
