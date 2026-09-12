@@ -103,6 +103,47 @@ class ShipmentController extends Controller
      * Nothing is persisted (no Quote row, no Shipment) - purely a
      * read of what the current form state would cost right now.
      */
+    /**
+     * Fetched via JS as soon as an account number is typed on Create
+     * Shipment, so the Billing model / Service type dropdowns can be
+     * filtered client-side to only what this specific account is
+     * actually set up to use — never offering something that would
+     * fail (or worse, silently price wrong) at booking time. Same
+     * "absence means available" semantics as Billing Setup and Rate
+     * Checker's server-side version of this same filtering.
+     */
+    public function accountBillingOptions(Request $request): JsonResponse
+    {
+        $account = $request->filled('account_number')
+            ? \App\Models\ClientAccount::where('account_number', $request->input('account_number'))->first()
+            : null;
+
+        if (! $account) {
+            return response()->json(['found' => false]);
+        }
+
+        $enabledModels = collect(\App\Models\Setting::current()->supportedBillingModels())
+            ->filter(fn ($label, $key) => $account->usesBillingModel($key))
+            ->keys()->values();
+
+        $disabledServiceTypeIds = \App\Models\ClientServiceSubscription::where('client_account_id', $account->id)
+            ->where('is_active', false)
+            ->pluck('service_type_id');
+
+        $allowedServiceTypeIds = \App\Models\ServiceType::where('is_active', true)
+            ->whereIn('billing_model', $enabledModels)
+            ->whereNotIn('id', $disabledServiceTypeIds)
+            ->pluck('id');
+
+        return response()->json([
+            'found' => true,
+            'account_name' => $account->account_name,
+            'client_name' => $account->client?->name,
+            'billing_models' => $enabledModels,
+            'service_type_ids' => $allowedServiceTypeIds,
+        ]);
+    }
+
     public function previewPrice(Request $request): JsonResponse
     {
         if ($request->filled('quote_number')) {

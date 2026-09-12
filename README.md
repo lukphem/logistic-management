@@ -6513,3 +6513,49 @@ editable special-rate rows (#8).
 ```
 resources/views/clients/show.blade.php   (sub-tab nav, mutually-exclusive Standard/Special views, first-enabled-model init)
 ```
+
+## Increment 111, Phase 4 — Hide Unavailable Billing Models/Service Types
+
+Closes points #5/#6: once a client account is identified, Rate
+Checker and Create Shipment never offer a billing model or service
+type that account isn't actually set up to use — removed from the
+dropdown entirely, not just rejected on submit.
+
+- **Rate Checker**: server-side filtering, reusing the account-number
+  resolution already built. Since the page fully reloads on submit
+  (it's a GET form) and `PricingEngine::assertBillingModelEnabledForAccount()`
+  already hard-rejects an unavailable combination regardless (Phase
+  1), the very first submission before a reload is still completely
+  safe — filtering here is about not *showing* the option, on top of
+  an enforcement layer that was already there.
+- **Create Shipment**: a new lightweight endpoint
+  (`GET /shipments/account-billing-options`) fetched via JS as soon
+  as the account number field loses focus. The Billing model and
+  Service type dropdowns are filtered client-side — options outside
+  what the account can use are hidden entirely (`display:none`, not
+  just disabled), and a previously-selected option that becomes
+  hidden is cleared rather than silently staying selected.
+- Both use the exact same "absence of a subscription row means
+  available" semantics as the Billing Setup tab, so there's one
+  consistent answer to "what can this account use" everywhere it's
+  asked, not a separate rule per screen.
+
+### Verified
+
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: clean. Route name uniqueness re-confirmed.
+
+**Not verified**: no PHP runtime, so the actual fetch/filter JS
+hasn't run through a real browser against a real account.
+
+**Still pending**: bulk CSV import for special rates, editable
+special-rate rows (points #7/#8).
+
+### Files
+
+```
+app/Http/Controllers/Web/RateCheckerController.php   (server-side filtering)
+app/Http/Controllers/Web/ShipmentController.php   (accountBillingOptions() endpoint)
+resources/views/shipments/create.blade.php   (fetch + client-side filter JS)
+routes/web.php
+```

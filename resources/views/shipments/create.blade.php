@@ -318,10 +318,11 @@
 
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">— or account number <span class="text-xs font-normal text-ink-500">(fetches that specific account's rate/discount, overrides the Client field above)</span></label>
-                <input type="text" name="account_number" value="{{ old('account_number') }}"
+                <input type="text" id="account-number-field" name="account_number" value="{{ old('account_number') }}"
                        placeholder="e.g. LALOSTSF00001"
                        class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 <p class="mt-1 text-xs text-ink-500">A client can have more than one account (Lagos, Abuja...) — use this to book against a specific one instead of always the default.</p>
+                <p id="account-number-status" class="mt-1 text-xs"></p>
             </div>
 
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -658,6 +659,70 @@
 
         syncFieldsForServiceType();
         syncModelSection(); // restores the right section on reload, e.g. after "Check rate"
+
+        // Filters Billing model / Service type to only what this
+        // specific account is actually set up to use, as soon as an
+        // account number resolves — never lets something get selected
+        // that would fail (or price wrong) at booking time. Options
+        // outside the account's list are hidden entirely (not just
+        // disabled), matching how Rate Checker's server-side version
+        // of this same filtering behaves.
+        (function () {
+            const field = document.getElementById('account-number-field');
+            const status = document.getElementById('account-number-status');
+            const billingModelSelect = document.getElementById('billing-model');
+            const serviceTypeSelect = document.getElementById('service-type');
+            if (!field) return;
+
+            function resetOptions() {
+                billingModelSelect.querySelectorAll('option').forEach(o => o.style.display = '');
+                serviceTypeSelect.querySelectorAll('option').forEach(o => o.style.display = '');
+            }
+
+            function applyFilter(data) {
+                billingModelSelect.querySelectorAll('option').forEach(function (opt) {
+                    if (!opt.value) return;
+                    opt.style.display = data.billing_models.includes(opt.value) ? '' : 'none';
+                });
+                serviceTypeSelect.querySelectorAll('option').forEach(function (opt) {
+                    if (!opt.value) return;
+                    opt.style.display = data.service_type_ids.includes(parseInt(opt.value, 10)) ? '' : 'none';
+                });
+                // A previously selected option that's now hidden would
+                // stay silently selected — clear it so the field
+                // visibly needs a fresh, valid pick instead.
+                if (billingModelSelect.selectedOptions[0]?.style.display === 'none') billingModelSelect.value = '';
+                if (serviceTypeSelect.selectedOptions[0]?.style.display === 'none') { serviceTypeSelect.value = ''; syncFieldsForServiceType(); }
+            }
+
+            field.addEventListener('blur', function () {
+                const value = field.value.trim();
+                if (!value) {
+                    resetOptions();
+                    status.textContent = '';
+                    return;
+                }
+                status.textContent = 'Looking up account…';
+                status.className = 'mt-1 text-xs text-ink-500';
+                fetch(@json(route('shipments.account-billing-options')) + '?account_number=' + encodeURIComponent(value))
+                    .then(r => r.json())
+                    .then(function (data) {
+                        if (!data.found) {
+                            resetOptions();
+                            status.textContent = 'No account found with that number.';
+                            status.className = 'mt-1 text-xs text-status-exception';
+                            return;
+                        }
+                        applyFilter(data);
+                        status.textContent = '✓ ' + data.client_name + ' — ' + data.account_name + ' (options below filtered to what this account can use)';
+                        status.className = 'mt-1 text-xs text-status-delivered';
+                    })
+                    .catch(function () {
+                        status.textContent = 'Could not look up this account — try again.';
+                        status.className = 'mt-1 text-xs text-status-exception';
+                    });
+            });
+        })();
 
         (function () {
             const citiesByState = @json($cities->groupBy('state_id')->map->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]));

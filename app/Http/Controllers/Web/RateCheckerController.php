@@ -126,12 +126,35 @@ class RateCheckerController extends Controller
             }
         }
 
+        // Once an account is identified, never offer a billing model or
+        // service type it isn't actually set up to use — this is what
+        // prevents a rate being checked (or a shipment later booked)
+        // against something that would fail or trigger a billing
+        // dispute at invoicing time. Absence of a subscription row
+        // means "available by default", matching the exact same
+        // semantics the Billing Setup tab already uses.
+        $billingModels = Setting::current()->supportedBillingModels();
+        $serviceTypes = ServiceType::where('is_active', true)->orderBy('name')->get();
+
+        if ($resolvedAccount) {
+            $billingModels = collect($billingModels)->filter(fn ($label, $key) => $resolvedAccount->usesBillingModel($key))->all();
+
+            $disabledServiceTypeIds = \App\Models\ClientServiceSubscription::where('client_account_id', $resolvedAccount->id)
+                ->where('is_active', false)
+                ->pluck('service_type_id');
+
+            $serviceTypes = $serviceTypes
+                ->filter(fn ($st) => $resolvedAccount->usesBillingModel($st->billing_model))
+                ->reject(fn ($st) => $disabledServiceTypeIds->contains($st->id))
+                ->values();
+        }
+
         return view('rate-checker.index', [
             'result' => $result,
             'error' => $error,
             'resolvedAccount' => $resolvedAccount,
-            'billingModels' => Setting::current()->supportedBillingModels(),
-            'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
+            'billingModels' => $billingModels,
+            'serviceTypes' => $serviceTypes,
             'states' => State::with('country')->orderBy('name')->get(),
             'cities' => City::with('state')->orderBy('name')->get(),
             'districts' => District::with('city')->orderBy('name')->get(),
