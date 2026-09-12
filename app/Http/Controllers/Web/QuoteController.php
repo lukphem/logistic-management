@@ -113,8 +113,13 @@ class QuoteController extends Controller
 
     private function contextFromRequest(Request $request): array
     {
+        $account = $request->filled('account_number')
+            ? \App\Models\ClientAccount::where('account_number', $request->input('account_number'))->first()
+            : null;
+
         return [
             'service_type_id' => $request->integer('service_type_id'),
+            'client_account_id' => $account?->id,
             'weight_kg' => (float) $request->input('weight_kg'),
             'length_cm' => $request->filled('length_cm') ? (float) $request->input('length_cm') : null,
             'width_cm' => $request->filled('width_cm') ? (float) $request->input('width_cm') : null,

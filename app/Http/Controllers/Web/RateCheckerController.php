@@ -44,13 +44,32 @@ class RateCheckerController extends Controller
     {
         $result = null;
         $error = null;
+        $resolvedAccount = null;
 
-        if ($request->filled('service_type_id') && $request->filled('weight_kg')) {
+        // A typed account number resolves directly to that specific
+        // Account — not just "this client's Default Account" the way
+        // picking a client from a list would. A client can have
+        // several accounts now (Lagos, Abuja, E-commerce...), each
+        // with its own special tariff/discount; this is the only way
+        // to check a NON-default one's rate without switching to it
+        // first on the Client Hub.
+        if ($request->filled('account_number')) {
+            $resolvedAccount = \App\Models\ClientAccount::where('account_number', $request->input('account_number'))
+                ->with('client')
+                ->first();
+
+            if (! $resolvedAccount) {
+                $error = "No client account found with number \"{$request->input('account_number')}\".";
+            }
+        }
+
+        if ($request->filled('service_type_id') && $request->filled('weight_kg') && ! $error) {
             try {
                 $serviceTypeId = $request->integer('service_type_id');
 
                 $context = [
                     'service_type_id' => $serviceTypeId,
+                    'client_account_id' => $resolvedAccount?->id,
                     'weight_kg' => (float) $request->weight_kg,
                     'length_cm' => $request->filled('length_cm') ? (float) $request->length_cm : null,
                     'width_cm' => $request->filled('width_cm') ? (float) $request->width_cm : null,
@@ -99,6 +118,8 @@ class RateCheckerController extends Controller
                         ? Country::find($request->destination_country_id)?->name
                         : $this->locationLabel($request->destination_state_id ?? null, $request->destination_city_id ?? null),
                     'weight_kg' => (float) $request->weight_kg,
+                    'account_name' => $resolvedAccount?->account_name,
+                    'account_client_name' => $resolvedAccount?->client?->name,
                 ];
             } catch (PricingUnavailableException $e) {
                 $error = $e->getMessage();
@@ -108,6 +129,7 @@ class RateCheckerController extends Controller
         return view('rate-checker.index', [
             'result' => $result,
             'error' => $error,
+            'resolvedAccount' => $resolvedAccount,
             'billingModels' => Setting::current()->supportedBillingModels(),
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
             'states' => State::with('country')->orderBy('name')->get(),

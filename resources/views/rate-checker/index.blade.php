@@ -7,6 +7,20 @@
 
     <form method="GET" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Client account number <span class="text-xs font-normal text-ink-500">(optional — fetches that account's special rate/discount instead of standard)</span></label>
+            <input type="text" name="account_number" value="{{ request('account_number') }}"
+                   placeholder="e.g. LALOSTSF00001"
+                   class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            @if (request('account_number'))
+                @if ($resolvedAccount)
+                    <p class="mt-1 text-xs text-status-delivered">✓ {{ $resolvedAccount->account_name }} — {{ $resolvedAccount->client?->name }}</p>
+                @elseif ($error)
+                    <p class="mt-1 text-xs text-status-exception">{{ $error }}</p>
+                @endif
+            @endif
+        </div>
+
+        <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <x-required /></label>
             <select id="billing-model" name="billing_model" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                 <option value="">Select a billing model</option>
@@ -286,6 +300,9 @@
     @elseif ($result)
         <div class="mt-6 max-w-2xl rounded-xl border border-line bg-surface-0 p-5 shadow-sm">
             <p class="mb-1 text-sm font-semibold text-ink-900">Quote</p>
+            @if ($result['account_name'])
+                <p class="mb-1 text-xs font-medium text-[var(--brand-primary)]">Priced for {{ $result['account_client_name'] }} — {{ $result['account_name'] }}</p>
+            @endif
             <p class="mb-4 text-sm text-ink-500">
                 {{ $result['service_type_name'] }} · {{ $result['origin_label'] ?? '—' }} → {{ $result['destination_label'] ?? '—' }} · {{ rtrim(rtrim(number_format($result['weight_kg'], 2), '0'), '.') }} kg
                 @if ($result['chargeable_weight_kg'] && $result['chargeable_weight_kg'] != $result['weight_kg'])

@@ -133,6 +133,9 @@ class ShipmentController extends Controller
         $context = [
             'service_type_id' => $request->integer('service_type_id'),
             'client_user_id' => $request->filled('client_user_id') ? $request->integer('client_user_id') : null,
+            'client_account_id' => $request->filled('account_number')
+                ? \App\Models\ClientAccount::where('account_number', $request->input('account_number'))->value('id')
+                : null,
             'weight_kg' => (float) $request->input('weight_kg'),
             'length_cm' => $request->filled('length_cm') ? (float) $request->input('length_cm') : null,
             'width_cm' => $request->filled('width_cm') ? (float) $request->input('width_cm') : null,
@@ -193,6 +196,24 @@ class ShipmentController extends Controller
 
         if (! empty($data['quote_number'])) {
             return $this->storeFromQuote($request, $data);
+        }
+
+        // A typed account number resolves directly to that specific
+        // Account and wins over whatever's in the client dropdown —
+        // same reasoning as Rate Checker/Quote generation: a client
+        // can have several accounts, each with its own special tariff/
+        // discount, and this is the only way to book against a
+        // NON-default one without switching to it first on the Client
+        // Hub.
+        if ($request->filled('account_number')) {
+            $account = \App\Models\ClientAccount::where('account_number', $request->input('account_number'))->first();
+
+            if (! $account) {
+                return redirect()->route('shipments.create')->withErrors(['account_number' => "No client account found with number \"{$request->input('account_number')}\"."])->withInput();
+            }
+
+            $data['client_account_id'] = $account->id;
+            $data['client_user_id'] = $account->client_user_id;
         }
 
         try {
@@ -272,9 +293,23 @@ class ShipmentController extends Controller
             $result['total_amount'] = round(($result['total_amount'] ?? 0) + $insuranceAmount + $vatOnInsurance, 2);
         }
 
+        // The quote's OWN frozen context is authoritative for which
+        // account the price was actually computed against — not
+        // whatever's selected in the booking form's client field.
+        // Falls back to that selection only when the quote itself
+        // never had an account resolved (no account-number lookup was
+        // used when it was generated), so this never contradicts the
+        // account whose special tariff/discount actually produced the
+        // frozen price being booked.
+        $resolvedClientAccountId = $context['client_account_id']
+            ?? (! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null);
+        $resolvedClientUserId = $resolvedClientAccountId
+            ? \App\Models\ClientAccount::find($resolvedClientAccountId)?->client_user_id
+            : ($data['client_user_id'] ?? null);
+
         $shipment = Shipment::create([
-            'client_user_id' => $data['client_user_id'] ?? null,
-            'client_account_id' => ! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null,
+            'client_user_id' => $resolvedClientUserId,
+            'client_account_id' => $resolvedClientAccountId,
             'sender_name' => $data['sender_name'],
             'sender_phone' => $data['sender_phone'],
             'sender_email' => $data['sender_email'] ?? null,
@@ -325,6 +360,7 @@ class ShipmentController extends Controller
             'quote_number' => 'nullable|string|max:32',
             'service_type_id' => 'required_without:quote_number|nullable|exists:service_types,id',
             'client_user_id' => 'nullable|exists:users,id',
+            'account_number' => 'nullable|string|max:255',
             'sender_name' => 'required|string|max:255',
             'sender_phone' => 'required|string|max:255',
             'sender_email' => 'nullable|email|max:255',

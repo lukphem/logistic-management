@@ -6078,3 +6078,60 @@ navigation/section-switching hasn't run through a real browser.
 resources/views/clients/show.blade.php   (restructured — sidebar layout, redesigned Overview)
 resources/views/components/icon.blade.php   (4 new icons)
 ```
+
+## Increment 108 — Account Number Lookup for Rate Checker & Create Shipment
+
+Lets staff type a client's account number directly on Rate Checker,
+Quote generation, and Create Shipment, resolving straight to that
+**specific** account rather than only ever the client's Default
+Account — the only way to check or book against a non-default account
+(Lagos, Abuja, E-commerce...) without switching to it first on the
+Client Hub.
+
+- **Rate Checker**: new "Client account number" field. When it
+  resolves, the quote result shows "Priced for {client} — {account
+  name}" so staff can confirm the right account's rate was actually
+  used, and an inline error if the number doesn't match anything.
+- **Quote generation** (`QuoteController::contextFromRequest()`):
+  reads the same field via the query string Rate Checker's "Generate
+  Quote ID" forwards, so a quote frozen from a Rate Checker session
+  using an account number correctly freezes that account's price.
+- **Create Shipment**: new "— or account number" field beneath the
+  existing Client dropdown, explicitly overriding it when filled.
+  Wired into the walk-in booking path, the price-preview endpoint,
+  and quote redemption.
+
+### A real inconsistency caught and fixed
+
+`storeFromQuote()` was determining the shipment's `client_account_id`
+from the *booking form's* client selection at redemption time — not
+from the account the quote was actually priced against when
+generated. If a quote was generated using an account-number lookup
+for a non-default account, but a different client (or none) was
+picked when actually booking, the shipment would record an account
+that never matched the price it was charged. Fixed to trust the
+quote's own frozen context first, falling back to the booking form's
+selection only when the quote never had an account resolved in the
+first place.
+
+### Verified
+
+The exact account-number lookup query (joining through to the
+client's name, matching what all three controllers now do) tested
+against live MySQL — confirmed it resolves the account and its owning
+client correctly in one query. Full repo balance check, duplicate-
+method scan, raw-byte backslash scan: all clean.
+
+**Not verified**: no PHP runtime, so the actual browser flow (typing
+an account number, seeing the confirmation, generating a quote,
+booking against it) hasn't run through real Laravel.
+
+### Files
+
+```
+app/Http/Controllers/Web/RateCheckerController.php   (account_number resolution + result confirmation)
+app/Http/Controllers/Web/QuoteController.php   (contextFromRequest() resolves account_number)
+app/Http/Controllers/Web/ShipmentController.php   (store(), previewPrice(), storeFromQuote() — account_number + frozen-context fix)
+resources/views/rate-checker/index.blade.php   (account number field + result confirmation)
+resources/views/shipments/create.blade.php   (account number field)
+```
