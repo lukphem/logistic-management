@@ -6559,3 +6559,44 @@ app/Http/Controllers/Web/ShipmentController.php   (accountBillingOptions() endpo
 resources/views/shipments/create.blade.php   (fetch + client-side filter JS)
 routes/web.php
 ```
+
+## Increment 112 — Fix Stale Multi-Account Unique Constraints
+
+`client_service_discounts` and `client_service_subscriptions` both
+still carried their original `client_user_id` + `service_type_id`
+unique constraint from before the Client → Account restructure — that
+restructure's own migration explicitly flagged this as deferred to "a
+final cleanup phase" that never actually landed for these two
+constraints. With a client able to have several accounts, this was
+wrong: two *different* accounts belonging to the same client
+subscribing to (or discounting) the same service type collided on
+`client_user_id` + `service_type_id`, even though the application code
+had already moved on to scoping everything by `client_account_id`.
+
+Checked every other table `client_account_id` was added to in that
+same restructure migration (`departments`, `client_special_tariffs`,
+`shipments`) for the identical pattern — confirmed isolated to just
+these two.
+
+Constraint replaced with `client_account_id` + `service_type_id` on
+both tables, matching what `ClientController::storeDiscount()`/
+`storeServiceSubscription()` actually query by. MySQL required a
+supporting index on `client_user_id` before the old constraint could
+be dropped (it was the only index satisfying that column's own
+foreign key) — added on both tables as part of the same migration.
+
+### Verified
+
+Reproduced the exact reported scenario against live MySQL: two
+different accounts for the same client, same service type — the
+second insert previously failed with the exact duplicate-entry error
+reported; now succeeds. Also confirmed a genuine duplicate (same
+account, same service type twice) is still correctly rejected — the
+constraint still does its real job, just scoped correctly. Full repo
+balance check: clean.
+
+### Files
+
+```
+database/migrations/2026_03_05_000001_fix_client_service_unique_constraints_to_account_scope.php
+```
