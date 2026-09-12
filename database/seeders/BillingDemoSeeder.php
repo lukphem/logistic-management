@@ -64,7 +64,7 @@ class BillingDemoSeeder extends Seeder
     private function assignTerritoriesAndAirports(): void
     {
         $territoryStates = [
-            'North Central' => ['Benue', 'Kogi', 'Kwara', 'Nasarawa', 'Niger', 'Plateau', 'Federal Capital Territory'],
+            'North Central' => ['Benue', 'Kogi', 'Kwara', 'Nasarawa', 'Niger', 'Plateau', 'FCT'],
             'North East' => ['Adamawa', 'Bauchi', 'Borno', 'Gombe', 'Taraba', 'Yobe'],
             'North West' => ['Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Sokoto', 'Zamfara'],
             'South East' => ['Abia', 'Anambra', 'Ebonyi', 'Enugu', 'Imo'],
@@ -86,7 +86,7 @@ class BillingDemoSeeder extends Seeder
         ];
 
         $airportStates = [
-            'Lagos', 'Federal Capital Territory', 'Kano', 'Rivers', 'Enugu', 'Kaduna',
+            'Lagos', 'FCT', 'Kano', 'Rivers', 'Enugu', 'Kaduna',
             'Oyo', 'Edo', 'Cross River', 'Imo', 'Sokoto', 'Borno', 'Adamawa', 'Plateau',
         ];
 
@@ -165,7 +165,7 @@ class BillingDemoSeeder extends Seeder
 
         $hubCities = [
             'lagos' => ['state' => 'Lagos', 'city' => 'Ikeja', 'hub_name' => 'Lagos Hub', 'hub_code' => 'LOS-HUB', 'address' => 'Lagos Hub, Ikeja, Lagos State'],
-            'abuja' => ['state' => 'Federal Capital Territory', 'city' => 'Abuja Municipal', 'hub_name' => 'Abuja Hub', 'hub_code' => 'ABV-HUB', 'address' => 'Abuja Hub, Abuja Municipal, FCT'],
+            'abuja' => ['state' => 'FCT', 'city' => 'Abuja', 'hub_name' => 'Abuja Hub', 'hub_code' => 'ABV-HUB', 'address' => 'Abuja Hub, Abuja, FCT'],
             'port_harcourt' => ['state' => 'Rivers', 'city' => 'Port Harcourt', 'hub_name' => 'Port Harcourt Hub', 'hub_code' => 'PHC-HUB', 'address' => 'Port Harcourt Hub, Port Harcourt, Rivers State'],
         ];
 
@@ -284,7 +284,7 @@ class BillingDemoSeeder extends Seeder
     private function seedOriginDestinationTariffs(ServiceType $serviceType): void
     {
         $lanes = [
-            ['origin' => 'Lagos', 'destination' => 'Federal Capital Territory', 'base' => 5500, 'per_kg' => 400, 'transit' => 2],
+            ['origin' => 'Lagos', 'destination' => 'FCT', 'base' => 5500, 'per_kg' => 400, 'transit' => 2],
             ['origin' => 'Lagos', 'destination' => 'Rivers', 'base' => 5000, 'per_kg' => 380, 'transit' => 2],
             ['origin' => 'Lagos', 'destination' => 'Kano', 'base' => 6500, 'per_kg' => 450, 'transit' => 3],
             ['origin' => 'Lagos', 'destination' => 'Oyo', 'base' => 3200, 'per_kg' => 250, 'transit' => 1],
