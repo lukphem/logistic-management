@@ -432,14 +432,14 @@
                                             </div>
                                             <span class="text-xs text-ink-500">%</span>
                                             <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Save</button>
-                                            @if (isset($discounts[$serviceType->id]))
-                                                <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discounts[$serviceType->id]]) }}" onsubmit="return confirm('Remove this discount?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Clear</button>
-                                                </form>
-                                            @endif
                                         </form>
+                                        @if (isset($discounts[$serviceType->id]))
+                                            <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discounts[$serviceType->id]]) }}" onsubmit="return confirm('Remove this discount?');" class="inline">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Clear</button>
+                                            </form>
+                                        @endif
                                         @else
                                             <span class="text-xs text-ink-500">{{ isset($discounts[$serviceType->id]) ? rtrim(rtrim(number_format($discounts[$serviceType->id]->discount_percentage, 2), '0'), '.') . '%' : '—' }}</span>
                                         @endif
@@ -534,20 +534,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.special-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
+                        <div class="flex items-center justify-between border-t border-line pt-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <button type="button" onclick="document.getElementById('import-standard-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                        </div>
+                        <div id="import-standard-{{ $account->id }}" class="hidden mb-3 rounded-lg border border-line bg-surface-50 p-3">
+                            <p class="mb-2 text-xs text-ink-500">One row per zone — several rows with the same product/weight range are combined into one rate with multiple zone prices. <a href="{{ route('clients.tariff-template', 'standard') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                            <form method="POST" action="{{ route('clients.special-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                @csrf
+                                <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                            </form>
+                        </div>
+                        <form method="POST" action="{{ route('clients.special-tariffs.store', [$user, $account]) }}" class="space-y-4">
                             @csrf
-                            <div class="flex items-center justify-between">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
-                                <button type="button" onclick="document.getElementById('import-standard-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
-                            </div>
-                            <div id="import-standard-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
-                                <p class="mb-2 text-xs text-ink-500">One row per zone — several rows with the same product/weight range are combined into one rate with multiple zone prices. <a href="{{ route('clients.tariff-template', 'standard') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
-                                <form method="POST" action="{{ route('clients.special-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
-                                    @csrf
-                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
-                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
-                                </form>
-                            </div>
                             @if ($errors->standardTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">
@@ -712,20 +712,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.od-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
+                        <div class="flex items-center justify-between border-t border-line pt-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <button type="button" onclick="document.getElementById('import-od-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                        </div>
+                        <div id="import-od-{{ $account->id }}" class="hidden mb-3 rounded-lg border border-line bg-surface-50 p-3">
+                            <p class="mb-2 text-xs text-ink-500">One row per route. <a href="{{ route('clients.tariff-template', 'od') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                            <form method="POST" action="{{ route('clients.od-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                @csrf
+                                <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                            </form>
+                        </div>
+                        <form method="POST" action="{{ route('clients.od-tariffs.store', [$user, $account]) }}" class="space-y-4">
                             @csrf
-                            <div class="flex items-center justify-between">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
-                                <button type="button" onclick="document.getElementById('import-od-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
-                            </div>
-                            <div id="import-od-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
-                                <p class="mb-2 text-xs text-ink-500">One row per route. <a href="{{ route('clients.tariff-template', 'od') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
-                                <form method="POST" action="{{ route('clients.od-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
-                                    @csrf
-                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
-                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
-                                </form>
-                            </div>
                             @if ($errors->odTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">
@@ -945,20 +945,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
+                        <div class="flex items-center justify-between border-t border-line pt-4">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <button type="button" onclick="document.getElementById('import-fleet-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                        </div>
+                        <div id="import-fleet-{{ $account->id }}" class="hidden mb-3 rounded-lg border border-line bg-surface-50 p-3">
+                            <p class="mb-2 text-xs text-ink-500">One row per vehicle type/route. <a href="{{ route('clients.tariff-template', 'fleet') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                            <form method="POST" action="{{ route('clients.fleet-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                @csrf
+                                <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                            </form>
+                        </div>
+                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', [$user, $account]) }}" class="space-y-4">
                             @csrf
-                            <div class="flex items-center justify-between">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
-                                <button type="button" onclick="document.getElementById('import-fleet-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
-                            </div>
-                            <div id="import-fleet-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
-                                <p class="mb-2 text-xs text-ink-500">One row per vehicle type/route. <a href="{{ route('clients.tariff-template', 'fleet') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
-                                <form method="POST" action="{{ route('clients.fleet-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
-                                    @csrf
-                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
-                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
-                                </form>
-                            </div>
                             @if ($errors->fleetTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">

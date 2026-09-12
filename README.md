@@ -6846,3 +6846,36 @@ app/Http/Controllers/Web/ClientController.php   (updateSpecialTariff(), updateOr
 resources/views/clients/show.blade.php   (Edit toggle + inline forms for all 3 models, generic zone-row JS, defensive origin/destination toggle fix)
 routes/web.php
 ```
+
+## Increment 117 — Fix: Nested `<form>` Elements Breaking the Billing Setup Tab
+
+Real, critical bug: the CSV import block I added inside each "Add a
+special rate" form (Standard/O2D/Fleet) put one `<form>` **inside**
+another. Nested `<form>` elements are invalid HTML — browsers
+flatten or misbehave with them unpredictably, which explains both
+"the CSV isn't working" and "the form is no longer working": the
+import file input and the add-rate fields were no longer reliably
+scoped to their own separate submissions.
+
+Fixed by moving each CSV import mini-form **out** of its surrounding
+Add-rate form entirely — they're now siblings, not parent/child, on
+all three billing models.
+
+### A second, pre-existing instance found and fixed
+
+While scanning the whole file programmatically for this exact
+pattern (rather than trusting that the three I'd just introduced were
+the only ones), found the discount row's "Clear" button was **also**
+nested inside its "Save" form — a bug that predates this session
+entirely. Fixed the same way: the two are now sibling forms in the
+same table cell instead of one wrapping the other.
+
+A full programmatic scan of the entire 1500+ line file (tracking
+`<form>`/`</form>` nesting depth end to end) confirms zero remaining
+nested forms anywhere on the page.
+
+### Files
+
+```
+resources/views/clients/show.blade.php
+```
