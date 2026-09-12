@@ -290,12 +290,15 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/clients/{user}/discounts/{discount}', [ClientController::class, 'destroyDiscount'])->name('clients.discounts.destroy');
         Route::post('/clients/{user}/accounts/{account}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
         Route::delete('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'destroySpecialTariff'])->name('clients.special-tariffs.destroy');
+        Route::put('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'updateSpecialTariff'])->name('clients.special-tariffs.update');
 
         Route::post('/clients/{user}/accounts/{account}/od-tariffs', [ClientController::class, 'storeOriginDestinationTariff'])->name('clients.od-tariffs.store');
         Route::delete('/clients/{user}/od-tariffs/{tariff}', [ClientController::class, 'destroyOriginDestinationTariff'])->name('clients.od-tariffs.destroy');
+        Route::put('/clients/{user}/od-tariffs/{tariff}', [ClientController::class, 'updateOriginDestinationTariff'])->name('clients.od-tariffs.update');
 
         Route::post('/clients/{user}/accounts/{account}/fleet-tariffs', [ClientController::class, 'storeFleetTariff'])->name('clients.fleet-tariffs.store');
         Route::delete('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'destroyFleetTariff'])->name('clients.fleet-tariffs.destroy');
+        Route::put('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'updateFleetTariff'])->name('clients.fleet-tariffs.update');
 
         Route::post('/clients/{user}/accounts/{account}/special-tariffs/import', [ClientController::class, 'importSpecialTariff'])->name('clients.special-tariffs.import');
         Route::post('/clients/{user}/accounts/{account}/od-tariffs/import', [ClientController::class, 'importOriginDestinationTariff'])->name('clients.od-tariffs.import');

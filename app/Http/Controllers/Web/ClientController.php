@@ -452,6 +452,56 @@ class ClientController extends Controller
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this weight band now bills standard for this client.');
     }
 
+    /**
+     * Reconciles zone_prices to exactly what was submitted — any
+     * existing zone price whose zone isn't in this submission gets
+     * removed, so taking a zone row out of the edit form actually
+     * removes that zone's pricing rather than leaving it stale.
+     */
+    public function updateSpecialTariff(Request $request, User $user, ClientSpecialTariff $tariff): RedirectResponse
+    {
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
+
+        $validator = Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|gt:min_weight',
+            'max_weight_limit' => 'required|numeric|min:0',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'zone_prices' => 'required|array|min:1',
+            'zone_prices.*.zone_id' => 'required|exists:zones,id',
+            'zone_prices.*.charge' => 'required|numeric|min:0',
+            'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
+            'zone_prices.*.transit_days' => 'nullable|integer|min:0',
+        ]);
+        $data = $this->validated($validator, $user, 'billing', 'standardTariff' . $tariff->id);
+
+        $tariff->update([
+            'service_type_id' => $data['service_type_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
+            'additional_weight' => $data['additional_weight'],
+        ]);
+
+        $submittedZoneIds = collect($data['zone_prices'])->pluck('zone_id');
+
+        foreach ($data['zone_prices'] as $zonePrice) {
+            ClientSpecialTariffZonePrice::updateOrCreate(
+                ['client_special_tariff_id' => $tariff->id, 'zone_id' => $zonePrice['zone_id']],
+                [
+                    'charge' => $zonePrice['charge'],
+                    'additional_charge' => $zonePrice['additional_charge'] ?? 0,
+                    'transit_days' => $zonePrice['transit_days'] ?? null,
+                ]
+            );
+        }
+
+        $tariff->zonePrices()->whereNotIn('zone_id', $submittedZoneIds)->delete();
+
+        return $this->redirectToTab($user, 'billing', 'Special rate updated.');
+    }
+
     public function storeOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
         abort_unless($account->client_user_id === $user->id, 404);
@@ -520,6 +570,62 @@ class ClientController extends Controller
         $tariff->delete();
 
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this route now bills at the company rate for this client.');
+    }
+
+    public function updateOriginDestinationTariff(Request $request, User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
+    {
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
+
+        $data = $this->validated(Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_city_id' => 'nullable|exists:cities,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_city_id' => 'nullable|exists:cities,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
+            'base_charge' => 'required|numeric|min:0',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'additional_charge' => 'required|numeric|min:0',
+            'transit_days' => 'nullable|integer|min:0',
+        ]), $user, 'billing', 'odTariff' . $tariff->id);
+
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+            $data['origin_city_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+            $data['destination_city_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
+        $tariff->update([
+            'service_type_id' => $data['service_type_id'],
+            'origin_state_id' => $data['origin_state_id'],
+            'origin_city_id' => $data['origin_city_id'] ?? null,
+            'origin_country_id' => $data['origin_country_id'],
+            'destination_state_id' => $data['destination_state_id'],
+            'destination_city_id' => $data['destination_city_id'] ?? null,
+            'destination_country_id' => $data['destination_country_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
+            'base_charge' => $data['base_charge'],
+            'additional_weight' => $data['additional_weight'],
+            'additional_charge' => $data['additional_charge'],
+            'transit_days' => $data['transit_days'] ?? null,
+        ]);
+
+        return $this->redirectToTab($user, 'billing', 'Special Origin-to-Destination rate updated.');
     }
 
     public function storeFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -596,6 +702,70 @@ class ClientController extends Controller
         $tariff->delete();
 
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
+    }
+
+    public function updateFleetTariff(Request $request, User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
+    {
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
+
+        $data = $this->validated(Validator::make($request->all(), [
+            'service_type_id' => 'required|exists:service_types,id',
+            'vehicle_type_id' => 'required|exists:vehicle_types,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_city_id' => 'nullable|exists:cities,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_city_id' => 'nullable|exists:cities,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
+            'min_weight' => 'required|numeric|min:0',
+            'max_weight' => 'required|numeric|min:0',
+            'max_weight_limit' => 'required|numeric|gt:min_weight',
+            'base_charge' => 'required|numeric|min:0',
+            'additional_weight' => 'required|numeric|min:0.01',
+            'additional_charge' => 'required|numeric|min:0',
+            'fuel_surcharge_percentage' => 'required|numeric|min:0|max:100',
+            'empty_return_charge_type' => 'required|in:flat,percentage',
+            'empty_return_charge_value' => 'required|numeric|min:0',
+            'transit_days' => 'nullable|integer|min:0',
+        ]), $user, 'billing', 'fleetTariff' . $tariff->id);
+
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+            $data['origin_city_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+            $data['destination_city_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
+        $tariff->update([
+            'service_type_id' => $data['service_type_id'],
+            'vehicle_type_id' => $data['vehicle_type_id'],
+            'origin_state_id' => $data['origin_state_id'],
+            'origin_city_id' => $data['origin_city_id'] ?? null,
+            'origin_country_id' => $data['origin_country_id'],
+            'destination_state_id' => $data['destination_state_id'],
+            'destination_city_id' => $data['destination_city_id'] ?? null,
+            'destination_country_id' => $data['destination_country_id'],
+            'min_weight' => $data['min_weight'],
+            'max_weight' => $data['max_weight'],
+            'max_weight_limit' => $data['max_weight_limit'],
+            'base_charge' => $data['base_charge'],
+            'additional_weight' => $data['additional_weight'],
+            'additional_charge' => $data['additional_charge'],
+            'fuel_surcharge_percentage' => $data['fuel_surcharge_percentage'],
+            'empty_return_charge_type' => $data['empty_return_charge_type'],
+            'empty_return_charge_value' => $data['empty_return_charge_value'],
+            'transit_days' => $data['transit_days'] ?? null,
+        ]);
+
+        return $this->redirectToTab($user, 'billing', 'Special Fleet rate updated.');
     }
 
     /**

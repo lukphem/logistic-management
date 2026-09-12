@@ -6776,3 +6776,73 @@ app/Http/Controllers/Web/ClientController.php   (3 import actions, downloadTarif
 resources/views/clients/show.blade.php   (reorganized forms, tooltips, CSV import UI on all 3 models)
 routes/web.php
 ```
+
+## Increment 116 — Special-Rate Rows Are Now Editable
+
+Closes the last item from the billing amendment request: every
+special-rate row across all three billing models now has an "Edit"
+option, not just Remove.
+
+### Backend
+
+Three new `update*Tariff()` actions, mirroring their `store*()`
+counterparts' validation exactly:
+- `updateSpecialTariff()` (Standard Billing) — the trickiest one,
+  since it has to **reconcile** the submitted zone prices against
+  what already exists: each submitted zone is `updateOrCreate()`'d,
+  and any existing zone price whose zone isn't in the submission gets
+  deleted — so removing a zone row in the edit form actually removes
+  that zone's pricing, not just leaves it stale.
+- `updateOriginDestinationTariff()` and `updateFleetTariff()` — single-
+  row updates with the same state/country normalization the store
+  actions already use.
+
+### UI
+
+Each existing rate gets an "Edit" toggle that reveals an inline form,
+pre-filled with its current values, submitting to the new update
+route. Named error bags scoped **per row** (`standardTariff{id}`,
+`odTariff{id}`, `fleetTariff{id}`) — with potentially several existing
+rows editable on the same page, plus the Add form, a shared bag would
+have made a validation failure on one row's edit incorrectly show on
+every other row too.
+
+### Two real bugs caught before shipping
+
+- The "+ Add another zone" mechanism only ever supported one instance
+  on the page (a single hardcoded element ID) — with an edit form now
+  possible per existing Standard Billing rate, there can be several
+  independent instances at once. Rewritten to be generic: every
+  button finds its own sibling row-container and keeps its own index,
+  so multiple instances coexist without their row names colliding.
+- The existing origin/destination State-vs-Country toggle script
+  assumed a type select's state/country siblings always live in the
+  same immediate wrapper `<div>` — true for the Add forms, not true
+  for the new edit forms (which spread those fields across two grid
+  rows). Would have thrown a JS error the moment the page loaded with
+  any existing O2D or Fleet rate. Fixed to scope by the enclosing
+  `<form>` instead, with a defensive check so a future layout change
+  can't throw here again either.
+
+### Verified
+
+Full balance check across every Blade construct and HTML tag pair in
+the 1500+ line file (`@if`, `@unless`, `@foreach`, `@forelse`, `@php`,
+`<div>`, `<form>`, `<select>`, `<table>`) — all matched. Full repo
+balance check, duplicate-method scan, raw-byte backslash scan: clean
+across 176 files.
+
+**Not directly execution-tested**: no PHP runtime available in this
+environment, so the dynamic error-bag property access
+(`$errors->{'standardTariff' . $tariff->id}`) — standard PHP syntax
+for calling `__get()` with a computed key, well-established but not
+run here — and the actual inline-edit browser flow haven't been
+exercised directly.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (updateSpecialTariff(), updateOriginDestinationTariff(), updateFleetTariff())
+resources/views/clients/show.blade.php   (Edit toggle + inline forms for all 3 models, generic zone-row JS, defensive origin/destination toggle fix)
+routes/web.php
+```
