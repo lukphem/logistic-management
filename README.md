@@ -6165,3 +6165,66 @@ resources/views/clients/show.blade.php, form.blade.php
 resources/views/outlets/form.blade.php, index.blade.php
 app/Http/Controllers/Web/OutletController.php
 ```
+
+## Increment 110, Phase 1 — Client-Specific O2D & Fleet Rates (Backend)
+
+Extends the "Special" rate mechanism (already working for Standard
+Billing via `client_special_tariffs`) to the other two billing
+models — closing the gap where a client could only ever get company-
+wide Origin-to-Destination and Fleet rates, with no way to give them
+a discount or a custom rate on either.
+
+### New tables
+
+`client_origin_destination_tariffs` and `client_fleet_billing_tariffs`
+— exact mirrors of their company-level counterparts
+(`origin_destination_tariffs`, `fleet_billing_tariffs`), scoped to one
+client account. Precomputed every constraint name against MySQL's
+64-char limit before writing anything this time — caught and fixed
+two more FK names landing dangerously close to the boundary before
+they became a repeat of an earlier incident.
+
+`client_accounts.disabled_billing_models` (JSON array, same pattern
+as `settings.supported_billing_models`) — a company-enabled billing
+model can be switched off for one specific account ("this client
+never uses Fleet at all"). Checked at the very start of each billing
+model's pricing method — a disabled model is a clear, explicit
+rejection, not a silent fallback to company rates.
+
+### PricingEngine — reused, not duplicated
+
+`resolveRouteTariff()` was already a generic, model-class-agnostic
+route matcher shared between Origin-to-Destination and Fleet Billing.
+Both new client-specific lookups reuse it directly — passing the new
+model classes and `client_account_id` as an extra condition — rather
+than duplicating the matching logic a third and fourth time. Same
+check-first-fall-through-silently posture already proven for Standard
+Billing: a client's own rate is checked first; its absence (or a gap
+for this specific route/weight) falls through to the company rate
+without blocking the shipment.
+
+### Verified
+
+Both new pricing paths tested against live MySQL: a client-specific
+Origin-to-Destination rate correctly resolves for a matching
+route/weight (confirmed exact base/additional charge and transit
+days), and `disabled_billing_models` confirmed to store/retrieve a
+JSON array correctly, matching the `usesBillingModel()` check logic.
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: all clean.
+
+**Not done yet**: controller actions for creating/removing these
+rates and toggling disabled models, and the actual "Billing Setup"
+tab UI consolidating Tariff + Discount + these new mechanisms,
+organized per billing model.
+
+### Files
+
+```
+database/migrations/2026_03_03_000001_create_client_origin_destination_tariffs_table.php
+database/migrations/2026_03_03_000002_create_client_fleet_billing_tariffs_table.php
+database/migrations/2026_03_03_000003_add_disabled_billing_models_to_client_accounts_table.php
+app/Models/ClientOriginDestinationTariff.php, ClientFleetBillingTariff.php   (new)
+app/Models/ClientAccount.php   (disabled_billing_models, usesBillingModel(), new relations)
+app/Services/PricingEngine.php   (client-specific O2D/Fleet resolution, assertBillingModelEnabledForAccount())
+```

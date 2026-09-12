@@ -90,6 +90,11 @@ class PricingEngine
      */
     private function standardBilling(ServiceType $serviceType, array $context): array
     {
+        // A whole billing model can be switched off for one specific
+        // account — see the fuller note on this in
+        // originDestinationBilling()/fleetBilling().
+        $this->assertBillingModelEnabledForAccount($context, 'standard_billing');
+
         [$zone, $shippingType] = $this->resolveZoneAndType($context);
 
         if (! $zone) {
@@ -239,6 +244,52 @@ class PricingEngine
 
         $chargeableWeight = $this->resolveChargeableWeight($context);
 
+        // A whole billing model can be switched off for one specific
+        // account ("this client never uses Fleet at all") — checked
+        // before anything else, so a disabled model is a clear,
+        // explicit rejection rather than silently falling through to
+        // company rates as if nothing were wrong.
+        $this->assertBillingModelEnabledForAccount($context, 'origin_destination_billing');
+
+        // A client account's own Origin-to-Destination rate — a
+        // genuinely separate tariff, not a discount off the company
+        // one — checked first via the exact same resolveRouteTariff()
+        // matching logic the company-wide lookup below uses, just
+        // scoped to this account's own client_origin_destination_tariffs
+        // rows instead.
+        $clientAccountId = $this->resolveClientAccountId($context);
+        if ($clientAccountId) {
+            $tariff = $this->resolveRouteTariff(
+                \App\Models\ClientOriginDestinationTariff::class, ['client_account_id' => $clientAccountId],
+                $serviceType->id, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+            ) ?? $this->resolveRouteTariff(
+                \App\Models\ClientOriginDestinationTariff::class, ['client_account_id' => $clientAccountId],
+                $serviceType->id, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, null
+            );
+
+            if ($tariff) {
+                $result = $this->calculateWeightBasedCharge(
+                    (float) $tariff->base_charge,
+                    (float) $tariff->additional_charge,
+                    $chargeableWeight,
+                    (float) $tariff->max_weight,
+                    (float) $tariff->max_weight_limit,
+                    (float) $tariff->additional_weight
+                );
+
+                return [
+                    'base_amount' => round($result['amount'], 2),
+                    'chargeable_weight_kg' => round($chargeableWeight, 2),
+                    'billed_weight_kg' => $result['billed_weight'],
+                    'transit_days' => $tariff->transit_days,
+                    'shipping_type' => $shippingType,
+                    'zone_id' => null,
+                ];
+            }
+        }
+
         $tariff = $this->resolveOriginDestinationTariff(
             $serviceType->id, $originStateId, $originCityId, $originCountryId,
             $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
@@ -353,6 +404,62 @@ class PricingEngine
             throw new PricingUnavailableException("This shipment ({$chargeableWeight}kg) exceeds {$vehicleType->name}'s capacity ({$vehicleType->max_weight_capacity}kg) — choose a larger vehicle type.");
         }
 
+        // A whole billing model can be switched off for one specific
+        // account — see the same check in originDestinationBilling().
+        $this->assertBillingModelEnabledForAccount($context, 'fleet_billing');
+
+        // A client account's own Fleet rate, checked first the same
+        // way Origin to Destination checks its client-specific table —
+        // via resolveRouteTariff(), scoped to this account.
+        $clientAccountId = $this->resolveClientAccountId($context);
+        if ($clientAccountId) {
+            $tariff = $this->resolveRouteTariff(
+                \App\Models\ClientFleetBillingTariff::class, ['client_account_id' => $clientAccountId, 'vehicle_type_id' => $vehicleTypeId],
+                $serviceType->id, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
+            ) ?? $this->resolveRouteTariff(
+                \App\Models\ClientFleetBillingTariff::class, ['client_account_id' => $clientAccountId, 'vehicle_type_id' => $vehicleTypeId],
+                $serviceType->id, $originStateId, $originCityId, $originCountryId,
+                $destinationStateId, $destinationCityId, $destinationCountryId, null
+            );
+
+            if ($tariff) {
+                $weightResult = $this->calculateWeightBasedCharge(
+                    (float) $tariff->base_charge,
+                    (float) $tariff->additional_charge,
+                    $chargeableWeight,
+                    (float) $tariff->max_weight,
+                    (float) $tariff->max_weight_limit,
+                    (float) $tariff->additional_weight
+                );
+
+                $freight = $weightResult['amount'];
+                $surcharges = [];
+
+                $fuelSurcharge = round($freight * ((float) $tariff->fuel_surcharge_percentage / 100), 2);
+                if ($fuelSurcharge > 0) {
+                    $surcharges['Fuel surcharge'] = $fuelSurcharge;
+                }
+
+                if (! empty($context['is_empty_return'])) {
+                    $emptyReturnCharge = $tariff->resolveEmptyReturnCharge($freight);
+                    if ($emptyReturnCharge > 0) {
+                        $surcharges['Empty return charge'] = $emptyReturnCharge;
+                    }
+                }
+
+                return [
+                    'base_amount' => round($freight, 2),
+                    'chargeable_weight_kg' => round($chargeableWeight, 2),
+                    'billed_weight_kg' => $weightResult['billed_weight'],
+                    'transit_days' => $tariff->transit_days,
+                    'shipping_type' => $shippingType,
+                    'zone_id' => null,
+                    'surcharges' => $surcharges,
+                ];
+            }
+        }
+
         $tariff = $this->resolveFleetBillingTariff(
             $serviceType->id, $vehicleTypeId, $originStateId, $originCityId, $originCountryId,
             $destinationStateId, $destinationCityId, $destinationCountryId, $chargeableWeight
@@ -427,6 +534,32 @@ class PricingEngine
         }
 
         return null;
+    }
+
+    /**
+     * "A whole billing model can be turned off for this account" — a
+     * company-enabled model isn't necessarily available to every
+     * client; checked at the very start of each billing model's
+     * pricing method, before any tariff lookup, so a disabled model is
+     * a clear, explicit rejection rather than silently falling through
+     * to company rates as if nothing were configured. No client
+     * resolved (a walk-in, non-client booking) is never restricted —
+     * this only ever narrows what a specific ACCOUNT can use.
+     */
+    private function assertBillingModelEnabledForAccount(array $context, string $billingModel): void
+    {
+        $clientAccountId = $this->resolveClientAccountId($context);
+
+        if (! $clientAccountId) {
+            return;
+        }
+
+        $account = \App\Models\ClientAccount::find($clientAccountId);
+
+        if ($account && ! $account->usesBillingModel($billingModel)) {
+            $label = \App\Models\Setting::BILLING_MODELS[$billingModel] ?? $billingModel;
+            throw new PricingUnavailableException("{$account->account_name} is not set up to use {$label}.");
+        }
     }
 
     /**

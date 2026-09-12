@@ -10,7 +10,7 @@ class ClientAccount extends Model
 {
     protected $fillable = [
         'client_user_id', 'account_name', 'account_number', 'is_default',
-        'account_type', 'id_type', 'id_number',
+        'account_type', 'disabled_billing_models', 'id_type', 'id_number',
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
         'alternate_phone', 'billing_address',
@@ -21,6 +21,7 @@ class ClientAccount extends Model
     ];
 
     protected $casts = [
+        'disabled_billing_models' => 'array',
         'is_default' => 'boolean',
         'warehouse_access' => 'boolean',
         'cod_enabled' => 'boolean',
@@ -205,6 +206,31 @@ class ClientAccount extends Model
     public function specialTariffs(): HasMany
     {
         return $this->hasMany(ClientSpecialTariff::class);
+    }
+
+    public function originDestinationTariffs(): HasMany
+    {
+        return $this->hasMany(ClientOriginDestinationTariff::class);
+    }
+
+    public function fleetBillingTariffs(): HasMany
+    {
+        return $this->hasMany(ClientFleetBillingTariff::class);
+    }
+
+    /**
+     * Whether a given billing model (Setting::BILLING_MODELS key) is
+     * available for THIS account — "might turn off some for the
+     * special" from the request this was built for: a company-enabled
+     * model can still be switched off for one specific account (e.g.
+     * this client never uses Fleet at all). Absence in
+     * disabled_billing_models means available, matching the same
+     * "null/empty = unrestricted" default used everywhere else in this
+     * project (supported_billing_models, account_number_format).
+     */
+    public function usesBillingModel(string $billingModel): bool
+    {
+        return ! in_array($billingModel, $this->disabled_billing_models ?? [], true);
     }
 
     public function serviceSubscriptions(): HasMany
