@@ -11,6 +11,7 @@ class Setting extends Model
         'color_primary', 'color_secondary', 'login_design',
         'vat_percentage', 'volumetric_divisor', 'quote_validity_days', 'currency',
         'tracking_number_format', 'next_tracking_sequence',
+        'account_number_format', 'allow_manual_account_number',
         'waybill_thermal_size', 'waybill_show_qr',
         'operating_regions', 'invoice_header', 'invoice_footer',
         'supported_billing_models',
@@ -23,6 +24,7 @@ class Setting extends Model
         'volumetric_divisor' => 'integer',
         'quote_validity_days' => 'integer',
         'next_tracking_sequence' => 'integer',
+        'allow_manual_account_number' => 'boolean',
         'supported_billing_models' => 'array',
     ];
 
@@ -114,6 +116,25 @@ class Setting extends Model
         '{destination_hub}' => 'Destination hub code (blank if unresolved)',
         '{date:FORMAT}' => 'Today\'s date — FORMAT is PHP date() syntax, e.g. {date:ymd} or {date:Y-m-d}',
         '{seq:N}' => 'A running counter, zero-padded to N digits, e.g. {seq:5} -> 00042 — never reset, never repeats',
+        '{random:N}' => 'N random uppercase letters/digits',
+    ];
+
+    /**
+     * Same token engine as tracking numbers, extended with the
+     * location tokens client account numbers need. {seq:N} here is
+     * NOT the same never-resets counter as tracking numbers — it
+     * resets separately for every distinct State+Outlet+Staff
+     * combination (see AccountNumberSequence), since that's what
+     * "location of business" numbering is meant to convey: the 1st,
+     * 2nd, 3rd... client that specific staff member set up at that
+     * specific outlet, not a number climbing across the whole company.
+     */
+    public const ACCOUNT_NUMBER_TOKENS = [
+        '{state}' => "The account's State short code (e.g. LA) — 'XX' if no State set",
+        '{outlet}' => "The account's Outlet short code (e.g. LOS) — 'XXX' if no Outlet set",
+        '{staff}' => 'Short code of the staff member who created the account',
+        '{seq:N}' => 'A counter zero-padded to N digits, resetting separately for each State+Outlet+Staff combination',
+        '{date:FORMAT}' => 'Today\'s date — FORMAT is PHP date() syntax',
         '{random:N}' => 'N random uppercase letters/digits',
     ];
 

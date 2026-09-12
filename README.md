@@ -5942,3 +5942,92 @@ verified by logic/field-correctness, not by an actual seed run.
 database/seeders/BillingDemoSeeder.php   (new)
 database/seeders/DatabaseSeeder.php   (calls it)
 ```
+
+## Increment 105 — Location-Based, Configurable Client Account Numbers
+
+Replaces the two inconsistent account-number schemes that existed
+before (a zero-padded User ID for a client's first account, a random
+`ACC1234567` for every additional one) with a single, consistent,
+**configurable** format — same architecture as the existing tracking
+number system (`Setting::TRACKING_NUMBER_TOKENS`), not a separate
+one-off mechanism.
+
+### Format
+
+Default (no custom format configured): `{state}{outlet}{staff}{seq:5}`
+— e.g. `LALOSTSF00001` for a Lagos client, Lagos Outlet, created by
+staff member "TSF", their 1st such account. New
+`Setting::ACCOUNT_NUMBER_TOKENS` documents every token; `{seq:N}`
+here resets separately for each State+Outlet+Staff combination
+(`AccountNumberSequence`, atomically claimed with `lockForUpdate()`
+the same way tracking sequences are), not a single company-wide
+counter — deliberately, since the number is meant to read as "the
+Nth client this staff member set up at this outlet," not a raw count
+across the whole company.
+
+Staff can override the format entirely from Company Settings
+(`account_number_format`), using the same token syntax as tracking
+numbers. `allow_manual_account_number` (off by default) additionally
+lets staff type an account number by hand instead — e.g. to carry
+over a number from a previous system when onboarding an existing
+client — validated for uniqueness the same as a generated one.
+
+New `outlets.short_code` and `users.staff_short_code` (3-char,
+auto-generated from the name, falls back to random on collision) —
+separate from the existing `staff_id` (`STF-XXXXXX`, random, 10
+characters), which was too long and non-memorable to embed in a
+compact account number.
+
+### Four real bugs caught and fixed during this build
+
+1. **Territory codes collided across all 6 territories** — a naive
+   "first 4 letters" scheme reduced North Central/East/West to the
+   same "NORT", South East/South/West to the same "SOUT". Fixed with
+   explicit codes (NC/NE/NW/SE/SS/SW).
+2. **`hubs.address` and `outlets.address`** are required with no
+   database default; the seeder omitted both. Checked every other
+   table the seeder touches for the same gap once this one was found
+   — nothing else was missing.
+3. **State/city name mismatches for FCT** — `BillingDemoSeeder` used
+   "Federal Capital Territory"/"Abuja Municipal", but `LocationSeeder`
+   actually names them "FCT"/"Abuja". Caught by cross-referencing
+   every state/city name programmatically against what's actually
+   seeded, not just the one name that happened to get noticed.
+4. **A sentinel `0` used for a missing state/outlet** would have
+   crashed immediately — both columns have real foreign key
+   constraints, and no row with id `0` exists. Fixed to use `NULL`
+   properly (Laravel's `where(col, null)` resolves to a real `IS
+   NULL` check), plus added retry logic for the rare case of two
+   simultaneous first-time claims for the same brand-new combination
+   colliding on the counter table's unique constraint.
+
+### Verified
+
+The token-substitution engine was simulated in Python before trusting
+the PHP (identical regex/cleanup logic) — confirmed the default
+format produces the expected result, a custom format with separators
+correctly collapses a doubled separator left behind by a missing
+token, and a date-token format resolves correctly. The full generation
+chain (state/outlet/staff codes + sequence claim) was independently
+verified against live MySQL, producing the exact expected
+`LALOSTSF00001`. Both new `settings` columns confirmed to store and
+retrieve a custom format correctly. Full repo balance check,
+duplicate-method scan, and raw-byte backslash scan: all clean.
+
+**Not verified**: no PHP runtime, so the actual token engine hasn't
+run through real Laravel, and the Settings UI / client-form manual-
+entry field for configuring this haven't been built yet — that's the
+next phase.
+
+### Files
+
+```
+database/migrations/2026_03_01_000001_add_account_number_sequence_support.php
+database/migrations/2026_03_02_000001_add_account_number_format_to_settings_table.php
+app/Models/AccountNumberSequence.php   (new)
+app/Models/ClientAccount.php   (generateAccountNumber() — configurable token engine)
+app/Models/Outlet.php, User.php   (short_code / staff_short_code generation)
+app/Models/Setting.php   (ACCOUNT_NUMBER_TOKENS, fillable/casts)
+app/Http/Controllers/Web/ClientController.php   (resolveAccountNumber() — manual override + generation)
+database/seeders/BillingDemoSeeder.php   (FCT/Abuja name fixes, address fix — from this session's earlier bug fixes)
+```

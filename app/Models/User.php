@@ -25,6 +25,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'staff_id',
+        'staff_short_code',
         'first_name',
         'last_name',
         'title',
@@ -101,6 +102,24 @@ class User extends Authenticatable
                 } while (static::where('staff_id', $candidate)->exists());
 
                 $user->staff_id = $candidate;
+            }
+
+            // Separate from staff_id above (that one's random and
+            // 10 characters — too long/unreadable to embed in a
+            // compact client account number). staff_short_code is
+            // purpose-built for that: first letters of the staff
+            // member's own name where possible, so it's at least
+            // somewhat recognizable, falling back to random on
+            // collision.
+            if ($user->user_type === 'staff' && ! $user->staff_short_code) {
+                $base = strtoupper(preg_replace('/[^A-Za-z]/', '', $user->name ?? ''));
+                $candidate = str_pad(substr($base, 0, 3), 3, 'X');
+
+                while (static::where('staff_short_code', $candidate)->exists()) {
+                    $candidate = strtoupper(\Illuminate\Support\Str::random(3));
+                }
+
+                $user->staff_short_code = $candidate;
             }
         });
     }

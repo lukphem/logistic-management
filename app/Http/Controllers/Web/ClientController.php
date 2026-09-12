@@ -92,13 +92,21 @@ class ClientController extends Controller
             'account_status' => 'active',
         ]);
 
+        $accountFields = $this->accountData($request, $data, null);
+        $creator = auth()->user();
+
         $account = ClientAccount::create([
             'client_user_id' => $user->id,
             'account_name' => 'Default Account',
-            'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
+            'account_number' => $this->resolveAccountNumber(
+                $request,
+                $accountFields['state_id'] ? State::find($accountFields['state_id']) : null,
+                $accountFields['outlet_id'] ? \App\Models\Outlet::find($accountFields['outlet_id']) : null,
+                $creator
+            ),
             'is_default' => true,
-            'created_by' => auth()->id(),
-            ...$this->accountData($request, $data, null),
+            'created_by' => $creator->id,
+            ...$accountFields,
         ]);
 
         // Links this login to its own Default Account — mirrors how a
@@ -142,19 +150,30 @@ class ClientController extends Controller
         $account = $user->defaultAccount;
 
         if ($account) {
+            // account_number is never regenerated on update — it's a
+            // fixed identifier once assigned, not something that
+            // should change just because the client's address changed.
             $account->update($this->accountData($request, $data, $account));
         } else {
             // Defensive — every client should already have a Default
             // Account (auto-created at store() time, or by the
             // Client -> Account restructure's backfill for anyone
             // created before it existed).
+            $accountFields = $this->accountData($request, $data, null);
+            $creator = auth()->user();
+
             $account = ClientAccount::create([
                 'client_user_id' => $user->id,
                 'account_name' => 'Default Account',
-                'account_number' => str_pad((string) $user->id, 10, '0', STR_PAD_LEFT),
+                'account_number' => $this->resolveAccountNumber(
+                    $request,
+                    $accountFields['state_id'] ? State::find($accountFields['state_id']) : null,
+                    $accountFields['outlet_id'] ? \App\Models\Outlet::find($accountFields['outlet_id']) : null,
+                    $creator
+                ),
                 'is_default' => true,
-                'created_by' => auth()->id(),
-                ...$this->accountData($request, $data, null),
+                'created_by' => $creator->id,
+                ...$accountFields,
             ]);
             ClientProfile::updateOrCreate(['client_user_id' => $user->id], ['client_account_id' => $account->id]);
         }
@@ -244,7 +263,7 @@ class ClientController extends Controller
         ClientAccount::create([
             'client_user_id' => $user->id,
             'account_name' => $data['account_name'],
-            'account_number' => $this->generateAccountNumber(),
+            'account_number' => $this->resolveAccountNumber($request, null, null, auth()->user()),
             'is_default' => false,
             'account_type' => $data['account_type'],
             'created_by' => auth()->id(),
@@ -288,13 +307,25 @@ class ClientController extends Controller
         return redirect()->route('clients.show', $user)->with('status', "Account \"{$account->account_name}\" removed.");
     }
 
-    private function generateAccountNumber(): string
+    /**
+     * Manual entry (Company Settings -> allow_manual_account_number)
+     * wins when it's turned on AND the requester actually supplied
+     * one — validated for uniqueness here since the field itself
+     * isn't part of the shared validateForm() rules (only relevant
+     * when this setting is on). Otherwise falls through to the
+     * normal generated number.
+     */
+    private function resolveAccountNumber(Request $request, ?State $state, ?\App\Models\Outlet $outlet, User $creator): string
     {
-        do {
-            $candidate = 'ACC' . str_pad((string) random_int(0, 9999999), 7, '0', STR_PAD_LEFT);
-        } while (ClientAccount::where('account_number', $candidate)->exists());
+        if (\App\Models\Setting::current()->allow_manual_account_number && $request->filled('account_number')) {
+            $manual = Validator::make($request->all(), [
+                'account_number' => 'required|string|max:255|unique:client_accounts,account_number',
+            ])->validate()['account_number'];
 
-        return $candidate;
+            return $manual;
+        }
+
+        return ClientAccount::generateAccountNumber($state, $outlet, $creator);
     }
 
     /**
