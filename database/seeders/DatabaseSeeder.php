@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ScanStatusSeeder::class);
         $this->call(LocationSeeder::class);
         $this->call(AdditionalServiceSeeder::class);
+        $this->call(BillingDemoSeeder::class);
 
         // User::factory(10)->create();
 

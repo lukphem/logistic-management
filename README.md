@@ -5871,3 +5871,74 @@ app/Http/Controllers/Web/ClientController.php   (accountData() now resolves city
 resources/views/clients/form.blade.php   (rewritten — relational sections, cascading dropdowns, logo upload)
 resources/views/clients/show.blade.php   (logo in header, Outlet replaces Express Center, cityDisplayName())
 ```
+
+## Increment 104 — Billing Demo Seeder (runs on every `migrate:fresh --seed`)
+
+Before this, a fresh database had nothing needed to actually price a
+shipment: no Territories assigned to states, no Hubs/Outlets, no
+Zones, no Zone Mappings, no Standard Billing Tariffs, no Service
+Types at all. New `BillingDemoSeeder`, wired into `DatabaseSeeder`,
+fixes that — every value in it is an explicit placeholder (confirmed
+over real pricing, which wasn't available yet), meant to be adjusted
+through the normal Billing screens afterward, not real rates.
+
+### What it sets up
+
+- **Territories**: Nigeria's 6 standard geopolitical zones, states
+  assigned accordingly; `has_airport` set on ~14 major states — this
+  feeds `ZoneMapping::determineDefaultZoneTier()`'s existing tier
+  logic (same state / same territory / cross-territory-with-airports /
+  cross-territory-without), not a new classification scheme.
+- **Zone Mappings**: every Nigerian state pair, generated with the
+  *exact same* idempotent logic `ZoneMappingController::generateDomestic()`
+  already uses — not reimplemented, just called the same way a staff
+  member clicking that screen's button would.
+- **Hubs/Outlets**: 3 placeholder hubs (Lagos, Abuja, Port Harcourt),
+  each city's `operational_hub_id` set so the Client form's Outlet
+  dropdown (built two increments ago) has something to resolve.
+- **Vehicle Types**: Bike, Van, Truck.
+- **Service Types**: one product per billing model at minimum —
+  Express + Standard (Standard Billing, different price tiers),
+  Interstate Freight (Origin-to-Destination), Fleet Delivery (Fleet
+  Billing) — so every billing model is actually bookable, not just
+  configured.
+- **Tariffs for all three billing models**: two weight bands × four
+  zone tiers for Standard Billing; four sample Lagos-anchored lanes
+  for Origin-to-Destination; one flat rate per vehicle type for
+  Fleet.
+- Company Settings' `supported_billing_models` set to all three.
+
+Everything uses `firstOrCreate`/`updateOrCreate` — safe to run
+repeatedly without creating duplicates.
+
+### A real bug caught before it could ship
+
+`OriginDestinationTariff`'s actual column is `base_charge`, not
+`charge` — I initially wrote `charge`, which Eloquent's mass-assignment
+protection would have silently dropped (not fillable), and since
+`base_charge` has no database default, every seeded Origin-to-
+Destination tariff would have failed to insert. Caught by checking
+the model's real `$fillable` list against the migration before
+trusting the seeder, not after.
+
+### Verified
+
+Both the trickiest resolution paths tested against live MySQL with
+data shaped exactly like the seeder produces: a 1kg Express shipment
+in Zone 1 correctly resolves to the seeded ₦1,500 base + ₦200/kg: a
+3kg Lagos→Abuja Interstate Freight shipment correctly resolves to the
+seeded ₦5,500 base + ₦400/kg after the `base_charge` fix. Full repo
+balance check, duplicate-method scan, and raw-byte backslash scan (per
+the earlier JS-escaping incident): all clean.
+
+**Not verified**: no PHP runtime, so the seeder itself hasn't actually
+been run through `php artisan db:seed` — the Fleet Billing path and
+the full zone-mapping generation loop (all ~700 state pairs) are
+verified by logic/field-correctness, not by an actual seed run.
+
+### Files
+
+```
+database/seeders/BillingDemoSeeder.php   (new)
+database/seeders/DatabaseSeeder.php   (calls it)
+```
