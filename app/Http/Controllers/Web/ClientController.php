@@ -221,6 +221,7 @@ class ClientController extends Controller
             'profile' => $account, // kept for view compatibility during the transition
             'isOrganization' => $isOrganization,
             'isViewingDefault' => $account?->is_default ?? true,
+            'activeTab' => request('tab', 'overview'),
             'serviceTypes' => ServiceType::where('is_active', true)->orderBy('name')->get(),
             'billingModels' => \App\Models\Setting::current()->supportedBillingModels(),
             'discounts' => ClientServiceDiscount::where('client_account_id', $accountId)->with('serviceType')->get()->keyBy('service_type_id'),
@@ -266,10 +267,10 @@ class ClientController extends Controller
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'account_name' => 'required|string|max:255',
             'account_type' => 'required|in:individual,organization',
-        ])->validate();
+        ]), $user, 'accounts');
 
         ClientAccount::create([
             'client_user_id' => $user->id,
@@ -280,7 +281,7 @@ class ClientController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', "Account \"{$data['account_name']}\" created — switch to it below to configure its details, products, and billing.");
+        return $this->redirectToTab($user, 'accounts', "Account \"{$data['account_name']}\" created — switch to it below to configure its details, products, and billing.");
     }
 
     /**
@@ -298,7 +299,7 @@ class ClientController extends Controller
         ClientAccount::where('client_user_id', $user->id)->update(['is_default' => false]);
         $account->update(['is_default' => true]);
 
-        return redirect()->route('clients.show', $user)->with('status', "Now viewing \"{$account->account_name}\" — the tabs below reflect this account.");
+        return $this->redirectToTab($user, 'accounts', "Now viewing \"{$account->account_name}\" — the tabs below reflect this account.");
     }
 
     public function destroyAccount(User $user, ClientAccount $account): RedirectResponse
@@ -306,16 +307,16 @@ class ClientController extends Controller
         abort_unless($account->client_user_id === $user->id, 404);
 
         if ($account->is_default) {
-            return redirect()->route('clients.show', $user)->with('status', "Can't remove \"{$account->account_name}\" while it's in use — switch to a different account first.");
+            return $this->redirectToTab($user, 'accounts', "Can't remove \"{$account->account_name}\" while it's in use — switch to a different account first.");
         }
 
         if ($user->accounts()->count() <= 1) {
-            return redirect()->route('clients.show', $user)->with('status', 'A client must have at least one account.');
+            return $this->redirectToTab($user, 'accounts', 'A client must have at least one account.');
         }
 
         $account->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', "Account \"{$account->account_name}\" removed.");
+        return $this->redirectToTab($user, 'accounts', "Account \"{$account->account_name}\" removed.");
     }
 
     /**
@@ -362,11 +363,11 @@ class ClientController extends Controller
             'contact_person_name' => 'required|string|max:255',
             'contact_person_role' => 'nullable|string|max:255',
         ]);
-        $data = $validator->validate();
+        $data = $this->validated($validator, $user, 'overview');
 
         $account->update([...$data, 'account_type' => 'organization']);
 
-        return redirect()->route('clients.show', $user)->with('status', "{$user->name} upgraded to an organization account.");
+        return $this->redirectToTab($user, 'overview', "{$user->name} upgraded to an organization account.");
     }
 
     public function storeDiscount(Request $request, User $user): RedirectResponse
@@ -377,14 +378,14 @@ class ClientController extends Controller
             'service_type_id' => 'required|exists:service_types,id',
             'discount_percentage' => 'required|numeric|min:0|max:100',
         ]);
-        $data = $validator->validate();
+        $data = $this->validated($validator, $user, 'billing');
 
         ClientServiceDiscount::updateOrCreate(
             ['client_account_id' => $account->id, 'service_type_id' => $data['service_type_id']],
             ['client_user_id' => $user->id, 'discount_percentage' => $data['discount_percentage']]
         );
 
-        return redirect()->route('clients.show', $user)->with('status', 'Discount saved.');
+        return $this->redirectToTab($user, 'billing', 'Discount saved.');
     }
 
     public function destroyDiscount(User $user, ClientServiceDiscount $discount): RedirectResponse
@@ -393,7 +394,7 @@ class ClientController extends Controller
 
         $discount->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Discount removed — this service type now bills standard for this client.');
+        return $this->redirectToTab($user, 'billing', 'Discount removed — this service type now bills standard for this client.');
     }
 
     public function storeSpecialTariff(Request $request, User $user): RedirectResponse
@@ -412,7 +413,7 @@ class ClientController extends Controller
             'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
             'zone_prices.*.transit_days' => 'nullable|integer|min:0',
         ]);
-        $data = $validator->validate();
+        $data = $this->validated($validator, $user, 'billing', 'standardTariff');
 
         $tariff = ClientSpecialTariff::create([
             'client_account_id' => $account->id,
@@ -435,7 +436,7 @@ class ClientController extends Controller
             ]);
         }
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special rate added.');
+        return $this->redirectToTab($user, 'billing', 'Special rate added.');
     }
 
     public function destroySpecialTariff(User $user, ClientSpecialTariff $tariff): RedirectResponse
@@ -444,14 +445,14 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this weight band now bills standard for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this weight band now bills standard for this client.');
     }
 
     public function storeOriginDestinationTariff(Request $request, User $user): RedirectResponse
     {
         $account = $this->requireDefaultAccount($user);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'origin_type' => 'required|in:state,country',
             'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
@@ -468,7 +469,7 @@ class ClientController extends Controller
             'additional_weight' => 'required|numeric|min:0.01',
             'additional_charge' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ])->validate();
+        ]), $user, 'billing', 'odTariff');
 
         // Same "state XOR country" clearing as the company-level form —
         // a route is one or the other, never both.
@@ -505,7 +506,7 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special Origin-to-Destination rate added.');
+        return $this->redirectToTab($user, 'billing', 'Special Origin-to-Destination rate added.');
     }
 
     public function destroyOriginDestinationTariff(User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
@@ -514,14 +515,14 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this route now bills at the company rate for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this route now bills at the company rate for this client.');
     }
 
     public function storeFleetTariff(Request $request, User $user): RedirectResponse
     {
         $account = $this->requireDefaultAccount($user);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'vehicle_type_id' => 'required|exists:vehicle_types,id',
             'origin_type' => 'required|in:state,country',
@@ -542,7 +543,7 @@ class ClientController extends Controller
             'empty_return_charge_type' => 'required|in:flat,percentage',
             'empty_return_charge_value' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ])->validate();
+        ]), $user, 'billing', 'fleetTariff');
 
         if ($data['origin_type'] === 'country') {
             $data['origin_state_id'] = null;
@@ -581,7 +582,7 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special Fleet rate added.');
+        return $this->redirectToTab($user, 'billing', 'Special Fleet rate added.');
     }
 
     public function destroyFleetTariff(User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
@@ -590,7 +591,7 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
     }
 
     /**
@@ -610,7 +611,7 @@ class ClientController extends Controller
 
         $account->update(['disabled_billing_models' => $disabled]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Billing model availability updated.');
+        return $this->redirectToTab($user, 'billing', 'Billing model availability updated.');
     }
 
     /**
@@ -627,10 +628,10 @@ class ClientController extends Controller
     {
         abort_unless($account->client_user_id === $user->id, 404);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'billing_model' => 'required|string|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
             'mode' => 'required|in:standard,special',
-        ])->validate();
+        ]), $user, 'billing');
 
         $special = collect($account->special_billing_models ?? [])->reject(fn ($m) => $m === $data['billing_model'])->values()->all();
 
@@ -640,7 +641,7 @@ class ClientController extends Controller
 
         $account->update(['special_billing_models' => $special]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Billing mode updated.');
+        return $this->redirectToTab($user, 'billing', 'Billing mode updated.');
     }
 
     // ---------------------------------------------------------------
@@ -652,13 +653,13 @@ class ClientController extends Controller
         $account = $this->requireDefaultAccount($user);
         abort_unless($account->isOrganization(), 404);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-        ])->validate();
+        ]), $user, 'department');
 
         Department::create(['client_account_id' => $account->id, 'name' => $data['name']]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Department added.');
+        return $this->redirectToTab($user, 'department', 'Department added.');
     }
 
     public function destroyDepartment(User $user, Department $department): RedirectResponse
@@ -667,7 +668,7 @@ class ClientController extends Controller
 
         $department->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Department removed.');
+        return $this->redirectToTab($user, 'department', 'Department removed.');
     }
 
     // ---------------------------------------------------------------
@@ -680,13 +681,13 @@ class ClientController extends Controller
         $account = $this->requireDefaultAccount($user);
         abort_unless($account->isOrganization(), 404);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'phone_number' => 'required|string|max:30',
             'password' => 'required|string|min:8',
             'department_id' => 'nullable|exists:departments,id',
-        ])->validate();
+        ]), $user, 'users');
 
         // A department picked here must actually belong to THIS
         // account — exists:departments,id alone can't enforce that.
@@ -710,7 +711,7 @@ class ClientController extends Controller
             'department_id' => $data['department_id'] ?? null,
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', "{$subUser->name} added as a user under {$user->name}.");
+        return $this->redirectToTab($user, 'users', "{$subUser->name} added as a user under {$user->name}.");
     }
 
     public function destroySubUser(User $user, User $subUser): RedirectResponse
@@ -719,7 +720,7 @@ class ClientController extends Controller
 
         $subUser->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'User removed.');
+        return $this->redirectToTab($user, 'users', 'User removed.');
     }
 
     // ---------------------------------------------------------------
@@ -730,17 +731,17 @@ class ClientController extends Controller
     {
         $account = $this->requireDefaultAccount($user);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'is_active' => 'sometimes|boolean',
-        ])->validate();
+        ]), $user, 'billing');
 
         ClientServiceSubscription::updateOrCreate(
             ['client_account_id' => $account->id, 'service_type_id' => $data['service_type_id']],
             ['client_user_id' => $user->id, 'is_active' => $request->boolean('is_active')]
         );
 
-        return redirect()->route('clients.show', $user)->with('status', 'Service access updated.');
+        return $this->redirectToTab($user, 'billing', 'Service access updated.');
     }
 
     // ---------------------------------------------------------------
@@ -752,10 +753,10 @@ class ClientController extends Controller
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'document_type' => 'required|in:' . implode(',', array_keys(ClientDocument::DOCUMENT_TYPES)),
             'file' => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx',
-        ])->validate();
+        ]), $user, 'document');
 
         $file = $request->file('file');
         $path = $file->store('client-documents/' . $user->id, 'public');
@@ -768,7 +769,7 @@ class ClientController extends Controller
             'uploaded_by' => auth()->id(),
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Document uploaded.');
+        return $this->redirectToTab($user, 'document', 'Document uploaded.');
     }
 
     public function destroyDocument(User $user, ClientDocument $document): RedirectResponse
@@ -778,7 +779,7 @@ class ClientController extends Controller
         Storage::disk('public')->delete($document->file_path);
         $document->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Document removed.');
+        return $this->redirectToTab($user, 'document', 'Document removed.');
     }
 
     // ---------------------------------------------------------------
@@ -796,8 +797,7 @@ class ClientController extends Controller
         // The plaintext secret only ever exists in this one response -
         // flashed to session for a single display, never persisted or
         // logged anywhere.
-        return redirect()->route('clients.show', $user)
-            ->with('status', 'API access generated — copy the secret now, it will not be shown again.')
+        return $this->redirectToTab($user, 'security', 'API access generated — copy the secret now, it will not be shown again.')
             ->with('plaintext_api_secret', $result['plaintext_secret']);
     }
 
@@ -805,11 +805,11 @@ class ClientController extends Controller
     {
         $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'api_response_format' => 'required|in:url,base64',
             'ip_whitelist_enabled' => 'sometimes|boolean',
             'rate_limit_per_minute' => 'required|integer|min:1|max:6000',
-        ])->validate();
+        ]), $user, 'security');
 
         $apiClient->update([
             'api_response_format' => $data['api_response_format'],
@@ -817,17 +817,17 @@ class ClientController extends Controller
             'rate_limit_per_minute' => $data['rate_limit_per_minute'],
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'API settings updated.');
+        return $this->redirectToTab($user, 'security', 'API settings updated.');
     }
 
     public function storeIpWhitelist(Request $request, User $user): RedirectResponse
     {
         $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'ip_or_cidr' => 'required|string|max:255',
             'label' => 'nullable|string|max:255',
-        ])->validate();
+        ]), $user, 'security');
 
         IpWhitelist::create([
             'api_client_id' => $apiClient->id,
@@ -836,7 +836,7 @@ class ClientController extends Controller
             'added_at' => now(),
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'IP added to whitelist.');
+        return $this->redirectToTab($user, 'security', 'IP added to whitelist.');
     }
 
     public function destroyIpWhitelist(User $user, IpWhitelist $ipWhitelist): RedirectResponse
@@ -845,18 +845,18 @@ class ClientController extends Controller
 
         $ipWhitelist->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'IP removed from whitelist.');
+        return $this->redirectToTab($user, 'security', 'IP removed from whitelist.');
     }
 
     public function storeWebhook(Request $request, User $user): RedirectResponse
     {
         $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'url' => 'required|url|max:500',
             'events' => 'required|array|min:1',
             'events.*' => 'string',
-        ])->validate();
+        ]), $user, 'security');
 
         WebhookSubscription::create([
             'api_client_id' => $apiClient->id,
@@ -866,7 +866,7 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Webhook added.');
+        return $this->redirectToTab($user, 'security', 'Webhook added.');
     }
 
     public function destroyWebhook(User $user, WebhookSubscription $webhook): RedirectResponse
@@ -875,7 +875,7 @@ class ClientController extends Controller
 
         $webhook->delete();
 
-        return redirect()->route('clients.show', $user)->with('status', 'Webhook removed.');
+        return $this->redirectToTab($user, 'security', 'Webhook removed.');
     }
 
     // ---------------------------------------------------------------
@@ -887,7 +887,7 @@ class ClientController extends Controller
     {
         $account = $this->requireDefaultAccount($user);
 
-        $data = Validator::make($request->all(), [
+        $data = $this->validated(Validator::make($request->all(), [
             'warehouse_access' => 'sometimes|boolean',
             'cod_enabled' => 'sometimes|boolean',
             'insurance_agreement' => 'sometimes|boolean',
@@ -896,7 +896,7 @@ class ClientController extends Controller
             'invoice_due_days' => 'nullable|integer|min:0|max:365',
             'sla_pickup_hours' => 'nullable|integer|min:0|max:720',
             'sla_delivery_days' => 'nullable|integer|min:0|max:90',
-        ])->validate();
+        ]), $user, 'managerial');
 
         $data['warehouse_access'] = $request->boolean('warehouse_access');
         $data['cod_enabled'] = $request->boolean('cod_enabled');
@@ -904,7 +904,61 @@ class ClientController extends Controller
 
         $account->update($data);
 
-        return redirect()->route('clients.show', $user)->with('status', 'Managerial settings updated.');
+        return $this->redirectToTab($user, 'managerial', 'Managerial settings updated.');
+    }
+
+    /**
+     * Every billing-related (and now every other) form on the Client
+     * Hub carries a hidden active_tab field so a save — success or
+     * failure — returns to whichever tab the person was actually
+     * working in, not always Overview. Used for SUCCESS redirects;
+     * see validated() for the matching FAILURE-path fix.
+     */
+    private function redirectToTab(User $user, string $tab, string $status): RedirectResponse
+    {
+        return redirect()->route('clients.show', ['user' => $user, 'tab' => $tab])->with('status', $status);
+    }
+
+    /**
+     * Replaces $validator->validate() everywhere on this page. On
+     * failure, sets an EXPLICIT redirect target on the
+     * ValidationException itself rather than relying on Laravel's
+     * default back()-based redirect — same reasoning as the earlier
+     * fix for Create Shipment's fragile back() behavior: an explicit
+     * destination can never be lost to a missing Referer header or a
+     * confused session state, which is exactly what was sending every
+     * failed save back to Overview regardless of which tab it came
+     * from. old() input and field-level $errors are still populated
+     * exactly the way Laravel's default validate() would — only WHERE
+     * the redirect lands changes.
+     *
+     * $errorBag: pass a name when this page has more than one form
+     * sharing the same field names (the three special-rate forms all
+     * have min_weight, base_charge, etc.) — without it, a failure in
+     * one form would light up the same-named field in the others too,
+     * since Laravel's default error bag is unnamed and shared.
+     */
+    private function validated(\Illuminate\Validation\Validator $validator, User $user, string $tab, ?string $errorBag = null): array
+    {
+        if ($validator->fails()) {
+            $exception = \Illuminate\Validation\ValidationException::withMessages($validator->errors()->toArray())
+                ->redirectTo(route('clients.show', ['user' => $user, 'tab' => $tab]));
+
+            // Named error bags matter here specifically because the
+            // Billing Setup tab has THREE special-rate forms (Standard/
+            // O2D/Fleet) sharing the same field names (min_weight,
+            // base_charge, etc.) on the same page — without a bag,
+            // Laravel's default unnamed $errors would make a failure in
+            // one form incorrectly light up the same-named field in the
+            // other two as well.
+            if ($errorBag) {
+                $exception->errorBag($errorBag);
+            }
+
+            throw $exception;
+        }
+
+        return $validator->validated();
     }
 
     /**

@@ -95,7 +95,7 @@
                 @foreach ($sections as $key => $section)
                     <li>
                         <button type="button" id="side-nav-{{ $key }}" onclick="showClientTab('{{ $key }}')"
-                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition {{ $loop->first ? 'bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]' : 'text-ink-500 hover:bg-surface-50 hover:text-ink-900' }}">
+                                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition text-ink-500 hover:bg-surface-50 hover:text-ink-900">
                             <x-icon :name="$section['icon']" class="h-4 w-4 shrink-0" />
                             {{ $section['label'] }}
                         </button>
@@ -108,7 +108,7 @@
         <div class="min-w-0 flex-1">
 
     {{-- ============ OVERVIEW ============ --}}
-    <div id="tab-overview" class="space-y-5">
+    <div id="tab-overview" class="space-y-5" style="display:none">
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-4">
                 <p class="text-xs text-ink-500">Shipments</p>
@@ -351,9 +351,16 @@
                                         <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex items-center gap-2">
                                             @csrf
                                             <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
-                                            <input type="number" step="0.01" min="0" max="100" name="discount_percentage"
-                                                   value="{{ $discounts[$serviceType->id]->discount_percentage ?? '' }}" placeholder="0"
-                                                   class="w-20 rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <div>
+                                                <input type="number" step="0.01" min="0" max="100" name="discount_percentage"
+                                                       value="{{ old('service_type_id') == $serviceType->id ? old('discount_percentage') : ($discounts[$serviceType->id]->discount_percentage ?? '') }}" placeholder="0"
+                                                       class="w-20 rounded-md border px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)] {{ old('service_type_id') == $serviceType->id && $errors->has('discount_percentage') ? 'border-status-exception' : 'border-line' }}">
+                                                @if (old('service_type_id') == $serviceType->id)
+                                                    @error('discount_percentage')
+                                                        <p class="mt-0.5 text-xs text-status-exception">{{ $message }}</p>
+                                                    @enderror
+                                                @endif
+                                            </div>
                                             <span class="text-xs text-ink-500">%</span>
                                             <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Save</button>
                                             @if (isset($discounts[$serviceType->id]))
@@ -411,6 +418,15 @@
                         <form method="POST" action="{{ route('clients.special-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            @if ($errors->standardTariff->any())
+                                <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
+                                    <ul class="list-disc space-y-0.5 pl-4">
+                                        @foreach ($errors->standardTariff->all() as $message)
+                                            <li>{{ $message }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
                             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
@@ -469,6 +485,15 @@
                         <form method="POST" action="{{ route('clients.od-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            @if ($errors->odTariff->any())
+                                <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
+                                    <ul class="list-disc space-y-0.5 pl-4">
+                                        @foreach ($errors->odTariff->all() as $message)
+                                            <li>{{ $message }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
                             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
@@ -555,6 +580,15 @@
                         <form method="POST" action="{{ route('clients.fleet-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            @if ($errors->fleetTariff->any())
+                                <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
+                                    <ul class="list-disc space-y-0.5 pl-4">
+                                        @foreach ($errors->fleetTariff->all() as $message)
+                                            <li>{{ $message }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
                             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div>
                                     <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
@@ -1001,6 +1035,17 @@
                 container.appendChild(clone);
                 index++;
             });
+        })();
+
+        // Reopens whichever tab a save was made from (see
+        // ClientController::redirectToTab()) instead of always
+        // defaulting to Overview — falls back safely if the requested
+        // tab doesn't exist for this account (e.g. an Individual
+        // account has no Department/User tabs).
+        (function () {
+            const requested = @json($activeTab);
+            const target = document.getElementById('tab-' + requested) ? requested : 'overview';
+            showClientTab(target);
         })();
     </script>
 

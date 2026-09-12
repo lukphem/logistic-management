@@ -6339,3 +6339,82 @@ app/Http/Controllers/Web/ClientController.php   (updateBillingModelMode())
 resources/views/clients/show.blade.php   (mode toggle + disabled discount UI)
 routes/web.php
 ```
+
+## Increment 111, Phase 2 — Save Stays on the Active Tab
+
+Fixes the core complaint: every save on the Client Hub — success or
+failure — was landing back on Overview regardless of which tab the
+work was actually done in.
+
+### Root cause
+
+Two separate bugs, not one: success redirects always pointed at
+`clients.show` with no tab context, and failure redirects relied on
+Laravel's default `ValidationException` handling, which falls back to
+`back()` — the same fragile pattern already fixed once before on
+Create Shipment.
+
+### Fix
+
+Two new controller helpers used across all 20 tab-scoped actions in
+`ClientController` (discounts, special tariffs for all three billing
+models, departments, sub-users, service access, documents, API/IP/
+webhook settings, managerial settings, accounts, billing model
+toggles):
+
+- `redirectToTab()` — every success redirect now explicitly carries
+  `?tab=`, reopening the right section.
+- `validated()` — replaces every `$validator->validate()`/inline
+  `->validate()` call. On failure, sets an **explicit** redirect
+  target on the `ValidationException` itself rather than trusting
+  `back()` — `old()` input and `$errors` are still populated exactly
+  as Laravel's default would, only *where* the redirect lands changes.
+
+`show()` now reads `?tab=` and passes it to the view; the page opens
+directly on the requested tab (falling back safely to Overview if the
+tab doesn't apply to this account, e.g. Department/User for an
+Individual).
+
+### Field-level errors — the part that needed extra care
+
+The Billing Setup tab has three separate special-rate forms (Standard/
+Origin-to-Destination/Fleet) that share field names (`min_weight`,
+`base_charge`, etc.). A plain `@error()` would have made a failure in
+one form incorrectly light up the same-named field in the other two —
+so `validated()` now accepts an optional **named error bag**
+(`standardTariff`/`odTariff`/`fleetTariff`), and each form shows its
+own scoped error list. The repeated-row discount form (one row per
+service type, same field name in every row) needed different
+handling — scoped by checking which specific row's `service_type_id`
+was actually submitted, so only the row that failed shows its error
+and preserved value, not all of them.
+
+### Known limitation, stated plainly
+
+`old()` input restoration for the three special-rate forms' shared
+field names isn't fully scoped the way the error bags are (Laravel's
+`old()` helper is global, not per-bag) — on a validation failure, a
+value could theoretically echo into the wrong form's matching field.
+The tab-persistence and field-scoped *error messages* are both
+correct; full old-value isolation across same-named fields in
+different forms would need a further pass if it proves to matter in
+practice.
+
+### Verified
+
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: all clean across 174 files. The large-scale transformation (17
+validation call sites, 22+ redirects) was done via a scripted,
+method-name-aware pass rather than manual edits at this volume, then
+spot-checked individually for correct syntax.
+
+**Not done yet**: the account selector, 3-tab billing-model
+restructure, hiding unavailable options from Rate Checker/Create
+Shipment, bulk CSV import, editable special-rate rows.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (redirectToTab(), validated(), all 20 actions updated)
+resources/views/clients/show.blade.php   (active-tab init, discount row error scoping, 3 special-rate error boxes)
+```
