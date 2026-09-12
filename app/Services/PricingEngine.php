@@ -143,6 +143,7 @@ class PricingEngine
                     'transit_days' => $zonePrice->transit_days,
                     'shipping_type' => $shippingType,
                     'zone_id' => $zone->id,
+                    'used_special_rate' => true,
                 ];
             }
 
@@ -294,6 +295,7 @@ class PricingEngine
                     'transit_days' => $tariff->transit_days,
                     'shipping_type' => $shippingType,
                     'zone_id' => null,
+                    'used_special_rate' => true,
                 ];
             }
 
@@ -466,6 +468,7 @@ class PricingEngine
                     'shipping_type' => $shippingType,
                     'zone_id' => null,
                     'surcharges' => $surcharges,
+                    'used_special_rate' => true,
                 ];
             }
 
@@ -590,12 +593,28 @@ class PricingEngine
     {
         $account = \App\Models\ClientAccount::find($clientAccountId);
 
-        if ($account && $account->isSpecialFor($billingModel)) {
-            $label = \App\Models\Setting::BILLING_MODELS[$billingModel] ?? $billingModel;
-            throw new PricingUnavailableException(
-                "{$account->account_name} is in Special mode for {$label}, but no special rate covers this exact shipment yet — add one on the Billing Setup tab before booking."
-            );
+        if (! $account || ! $account->isSpecialFor($billingModel)) {
+            return;
         }
+
+        // The one escape hatch from Special mode's default block — set
+        // per account, per billing model (ClientAccount::
+        // allowsFallbackToStandard()), off by default. When on, this
+        // returns without throwing, letting the caller fall through to
+        // the normal company-rate lookup below it — which is also
+        // exactly what makes the resulting quote NOT carry
+        // 'used_special_rate', so ShipmentPricingService correctly
+        // still applies the Standard discount to it rather than
+        // treating a fallback shipment as if a special rate had priced
+        // it.
+        if ($account->allowsFallbackToStandard($billingModel)) {
+            return;
+        }
+
+        $label = \App\Models\Setting::BILLING_MODELS[$billingModel] ?? $billingModel;
+        throw new PricingUnavailableException(
+            "{$account->account_name} is in Special mode for {$label}, but no special rate covers this exact shipment yet — add one on the Billing Setup tab before booking."
+        );
     }
 
     /**

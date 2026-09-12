@@ -6645,3 +6645,65 @@ additional exception handling anywhere.
 app/Services/PricingEngine.php   (assertNotStuckInSpecialModeWithNoMatch(), wired into all 3 billing models)
 resources/views/clients/show.blade.php   (corrected empty-state messages)
 ```
+
+## Increment 114 — Special Mode's Block Is Now Configurable Per Account, Per Model
+
+Increment 113 made Special mode block pricing outright when no
+special rate matches. This adds the requested escape hatch: per
+account, per billing model, whether that gap should **block** (the
+existing default) or **fall back to the Standard rate** instead.
+
+New `client_accounts.special_fallback_models` (JSON array, same
+pattern as `disabled_billing_models`/`special_billing_models`) —
+absence means "never fall back," the safer default. New
+`ClientAccount::allowsFallbackToStandard()`, checked by
+`PricingEngine` right before it would otherwise block: if fallback is
+allowed, it returns without throwing, letting the shipment price at
+the normal company rate for that model instead.
+
+### The part that needed real care: the discount
+
+Simply allowing a fallback wasn't enough on its own — the existing
+discount logic decided whether to apply a discount based on "is this
+account in Special mode," which would have meant a fallback shipment
+priced at the company rate but *without* its normal discount, which
+is wrong (a fallback shipment should behave exactly like Standard
+mode, discount included). Fixed by having `PricingEngine` tag every
+quote with whether a special rate was **actually used**
+(`used_special_rate`), and switching `ShipmentPricingService`'s
+discount gate to check that instead of the account's mode flag. This
+required threading the new flag through all four places pricing gets
+triggered — Rate Checker, Quote generation, Create Shipment's booking
+path, and its price-preview endpoint.
+
+New `updateBillingModelFallback()` action (kept separate from the
+mode switch — a different decision, only relevant once a model is
+already in Special mode) and a checkbox in the Billing Setup tab,
+shown only within a model's Special view.
+
+### Verified
+
+New column confirmed to store/retrieve a JSON array correctly against
+live MySQL. The full three-way discount/blocking decision (special
+rate used → no discount; Special mode, no match, fallback allowed →
+Standard rate with discount; Standard mode → Standard rate with
+discount) simulated in Python and confirmed correct for all three
+cases. Full repo balance check, duplicate-method scan, raw-byte
+backslash scan: all clean across 176 files.
+
+**Not verified**: no PHP runtime, so the actual browser flow (ticking
+the checkbox, then booking a shipment that falls back) hasn't run
+through real Laravel.
+
+### Files
+
+```
+database/migrations/2026_03_06_000001_add_special_fallback_models_to_client_accounts_table.php
+app/Models/ClientAccount.php   (special_fallback_models, allowsFallbackToStandard())
+app/Services/PricingEngine.php   (fallback check in all 3 billing models, used_special_rate flag)
+app/Services/ShipmentPricingService.php   (discount gated on used_special_rate, not the mode flag)
+app/Http/Controllers/Web/ClientController.php   (updateBillingModelFallback())
+app/Http/Controllers/Web/QuoteController.php, RateCheckerController.php, ShipmentController.php   (bridge used_special_rate into context)
+resources/views/clients/show.blade.php   (fallback checkbox in each model's Special view)
+routes/web.php
+```

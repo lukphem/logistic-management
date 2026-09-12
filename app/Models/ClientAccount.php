@@ -10,7 +10,7 @@ class ClientAccount extends Model
 {
     protected $fillable = [
         'client_user_id', 'account_name', 'account_number', 'is_default',
-        'account_type', 'disabled_billing_models', 'special_billing_models', 'id_type', 'id_number',
+        'account_type', 'disabled_billing_models', 'special_billing_models', 'special_fallback_models', 'id_type', 'id_number',
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
         'alternate_phone', 'billing_address',
@@ -23,6 +23,7 @@ class ClientAccount extends Model
     protected $casts = [
         'disabled_billing_models' => 'array',
         'special_billing_models' => 'array',
+        'special_fallback_models' => 'array',
         'is_default' => 'boolean',
         'warehouse_access' => 'boolean',
         'cod_enabled' => 'boolean',
@@ -249,6 +250,19 @@ class ClientAccount extends Model
     public function isSpecialFor(string $billingModel): bool
     {
         return in_array($billingModel, $this->special_billing_models ?? [], true);
+    }
+
+    /**
+     * For a billing model already in Special mode, whether a shipment
+     * with no matching special rate should fall back to the Standard
+     * rate (with its discount) instead of being blocked outright.
+     * Absence means false — Special mode blocks by default unless this
+     * is explicitly turned on for that model, never the other way
+     * around.
+     */
+    public function allowsFallbackToStandard(string $billingModel): bool
+    {
+        return in_array($billingModel, $this->special_fallback_models ?? [], true);
     }
 
     public function serviceSubscriptions(): HasMany

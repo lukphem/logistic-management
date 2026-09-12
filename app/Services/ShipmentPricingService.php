@@ -33,12 +33,17 @@ class ShipmentPricingService
      * so there's exactly one answer to "which account, and what
      * discount" everywhere pricing happens, not one path per caller.
      *
-     * If the account has put this service type's billing model into
-     * Special mode (ClientAccount::isSpecialFor()), the discount is
-     * skipped entirely — Special genuinely replaces Standard for that
-     * model, not just in the UI. See that method's own note on why a
-     * partially-configured Special mode still doesn't fall back to a
-     * discount.
+     * If a special rate was actually the thing that produced
+     * base_amount (PricingEngine sets $context['used_special_rate']
+     * when that happens), the discount is skipped entirely — Special
+     * genuinely replaces Standard for that specific quote, not just in
+     * the UI. This is keyed on whether a special rate was actually
+     * USED, not merely on whether the account is nominally in Special
+     * mode for this billing model — an account can be in Special mode
+     * with fallback-to-Standard allowed
+     * (ClientAccount::allowsFallbackToStandard()), in which case a gap
+     * in special-rate coverage prices via the normal company rate,
+     * discount included, exactly as Standard mode would.
      */
     public function priceShipment(array $context, ?ClientBillingProfile $billingProfile = null): array
     {
@@ -49,16 +54,13 @@ class ShipmentPricingService
         $serviceTypeId = (int) ($context['service_type_id'] ?? 0);
         $account = $this->resolveClientAccount($context);
 
-        // Special mode genuinely replaces Standard for that billing
-        // model — not a UI-only distinction. When the account has put
-        // this service type's own billing model into Special mode,
-        // the discount is skipped entirely here, before it's ever
-        // computed, so it can never silently stack on top of a special
-        // rate the way it could before this existed.
-        $billingModel = $serviceTypeId ? \App\Models\ServiceType::find($serviceTypeId)?->billing_model : null;
-        $isSpecialMode = $account && $billingModel && $account->isSpecialFor($billingModel);
+        // See this method's docblock — gated on whether a special rate
+        // actually priced this shipment, not on the account's Special
+        // mode flag alone, so a fallback-to-Standard quote still gets
+        // its discount.
+        $usedSpecialRate = ! empty($context['used_special_rate']);
 
-        $discountFraction = $isSpecialMode
+        $discountFraction = $usedSpecialRate
             ? 0.0
             : ($account
                 ? $account->discountFractionForServiceType($serviceTypeId)

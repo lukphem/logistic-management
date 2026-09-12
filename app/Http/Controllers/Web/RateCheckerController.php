@@ -89,6 +89,7 @@ class RateCheckerController extends Controller
 
                 $quote = $this->pricingEngine->quote($context);
                 $context['base_amount'] = $quote['base_amount'];
+                $context['used_special_rate'] = $quote['used_special_rate'] ?? false;
                 // Some billing models (currently only Fleet Billing)
                 // compute their own labeled surcharges — fuel, empty
                 // return — as part of resolving the quote itself, since

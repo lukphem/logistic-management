@@ -339,7 +339,10 @@
                 </div>
 
                 @if ($account->usesBillingModel($modelKey))
-                    @php $isSpecialMode = $account->isSpecialFor($modelKey); @endphp
+                    @php
+                        $isSpecialMode = $account->isSpecialFor($modelKey);
+                        $allowsFallback = $account->allowsFallbackToStandard($modelKey);
+                    @endphp
                     <div class="mb-4 flex items-center justify-between rounded-lg border border-line bg-surface-50 p-3">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Mode</p>
@@ -363,6 +366,27 @@
                         </form>
                         @endif
                     </div>
+
+                    @if ($isSpecialMode && true)
+                    <div class="mb-4 rounded-lg border border-line p-3">
+                        <form method="POST" action="{{ route('clients.billing-fallback.update', [$user, $account]) }}">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="billing_model" value="{{ $modelKey }}">
+                            <label class="flex cursor-pointer items-start gap-2 text-sm text-ink-900">
+                                <input type="checkbox" name="allow_fallback" value="1" onchange="this.form.submit()" @checked($allowsFallback) class="mt-0.5 rounded border-line">
+                                <span>
+                                    Fall back to the Standard rate when no special rate covers a shipment
+                                    <span class="block text-xs text-ink-500">
+                                        {{ $allowsFallback
+                                            ? 'On — a coverage gap prices at the Standard rate (with its discount) instead of being blocked.'
+                                            : 'Off (default) — a coverage gap blocks the shipment until a matching special rate is added.' }}
+                                    </span>
+                                </span>
+                            </label>
+                        </form>
+                    </div>
+                    @endif
 
                     @unless ($isSpecialMode)
                     {{-- Service types under this model: on/off + discount, one row each --}}

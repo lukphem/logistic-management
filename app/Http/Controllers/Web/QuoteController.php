@@ -40,6 +40,7 @@ class QuoteController extends Controller
         }
 
         $context['base_amount'] = $quote['base_amount'];
+        $context['used_special_rate'] = $quote['used_special_rate'] ?? false;
         // Fleet Billing computes its own labeled surcharges (fuel, empty
         // return) as part of resolving the quote itself, since it needs
         // the tariff to compute the amounts — merged in the same way

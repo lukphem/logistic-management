@@ -203,6 +203,7 @@ class ShipmentController extends Controller
         }
 
         $context['base_amount'] = $quote['base_amount'];
+        $context['used_special_rate'] = $quote['used_special_rate'] ?? false;
         $context['surcharges'] = array_merge($context['surcharges'] ?? [], $quote['surcharges'] ?? []);
 
         $billingProfile = ClientBillingProfile::resolveForClientUser($request->input('client_user_id'));
@@ -271,6 +272,7 @@ class ShipmentController extends Controller
         }
 
         $data['base_amount'] = $quote['base_amount'];
+        $data['used_special_rate'] = $quote['used_special_rate'] ?? false;
         // Same Fleet Billing surcharges merge as QuoteController/
         // RateCheckerController - keeps this walk-in path priced
         // identically to what Rate Checker would show for the same

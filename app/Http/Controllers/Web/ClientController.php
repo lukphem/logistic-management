@@ -644,6 +644,32 @@ class ClientController extends Controller
         return $this->redirectToTab($user, 'billing', 'Billing mode updated.');
     }
 
+    /**
+     * Separate from updateBillingModelMode() on purpose — this only
+     * ever matters once a model is already in Special mode, and is a
+     * genuinely different decision (whether a coverage gap blocks or
+     * falls back), not a variant of the mode switch itself.
+     */
+    public function updateBillingModelFallback(Request $request, User $user, \App\Models\ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        $data = $this->validated(Validator::make($request->all(), [
+            'billing_model' => 'required|string|in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
+            'allow_fallback' => 'sometimes|boolean',
+        ]), $user, 'billing');
+
+        $fallback = collect($account->special_fallback_models ?? [])->reject(fn ($m) => $m === $data['billing_model'])->values()->all();
+
+        if ($request->boolean('allow_fallback')) {
+            $fallback[] = $data['billing_model'];
+        }
+
+        $account->update(['special_fallback_models' => $fallback]);
+
+        return $this->redirectToTab($user, 'billing', 'Fallback setting updated.');
+    }
+
     // ---------------------------------------------------------------
     // Department
     // ---------------------------------------------------------------
