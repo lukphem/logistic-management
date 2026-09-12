@@ -6707,3 +6707,72 @@ app/Http/Controllers/Web/QuoteController.php, RateCheckerController.php, Shipmen
 resources/views/clients/show.blade.php   (fallback checkbox in each model's Special view)
 routes/web.php
 ```
+
+## Increment 115 — Bulk CSV Import + Reorganized Special-Rate Forms
+
+Closes the two remaining items from the billing amendment request:
+bulk CSV import for special rates, and better-organized forms with
+tooltips.
+
+### CSV import
+
+Mirrors the exact formats already proven at the company level
+(`StandardBillingController::importAll()`,
+`OriginDestinationTariffController::import()`,
+`FleetBillingTariffController::import()`), scoped to one client
+account instead of the whole company:
+
+- **Standard Billing**: one row per zone — several rows sharing the
+  same product/weight range combine into one special rate with
+  multiple zone prices, matching the company-level combined format
+  exactly.
+- **Origin-to-Destination**: one row per route.
+- **Fleet**: one row per vehicle type/route.
+
+Each is a collapsible "Bulk import (CSV)" section above its Add form,
+with a downloadable template (headers + one sample row) so staff
+never have to reverse-engineer column names — `downloadTariffTemplate()`
+serves all three from one action.
+
+### Real gap avoided by reusing the existing pattern
+
+The company-level import actions for O2D and Fleet both use `back()`
+for their redirect — the same fragile pattern already fixed twice
+elsewhere in this project. The new client-specific versions were
+written from scratch using `redirectToTab()` instead, so this doesn't
+get reintroduced a third time even though the logic they're based on
+still has it.
+
+### Form reorganization + tooltips
+
+All three "Add a special rate" forms restructured into labeled
+sections (Product & weight range / Zone pricing; Product & route /
+Weight & pricing; Product, vehicle & route / Weight & base pricing /
+Surcharges) instead of one flat grid. Non-obvious fields — the
+Max weight vs. Max weight limit distinction, what "Increment size"
+actually controls, Fleet's Empty return charge — get a small (ⓘ) with
+an explanatory tooltip; self-explanatory fields (Min weight, Service
+type) were left alone rather than adding a tooltip to everything.
+
+### Verified
+
+The trickiest part of the CSV import — Standard Billing's row-per-zone
+grouping into one tariff — tested directly against live MySQL: two
+rows sharing a product/weight range correctly produced exactly one
+tariff with both zone prices correctly attached to it, not two
+separate tariffs. Every client-specific model's fillable fields
+cross-checked against the exact column names used in the import
+logic before trusting it. Full repo balance check (every Blade
+construct and HTML tag pair), duplicate-method scan, raw-byte
+backslash scan: all clean across 176 files.
+
+**Not done yet**: making existing special-rate rows editable (still
+remove-and-recreate only) — the one item left from the original list.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (3 import actions, downloadTariffTemplate(), CsvService injected)
+resources/views/clients/show.blade.php   (reorganized forms, tooltips, CSV import UI on all 3 models)
+routes/web.php
+```

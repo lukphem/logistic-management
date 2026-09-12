@@ -297,6 +297,11 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/accounts/{account}/fleet-tariffs', [ClientController::class, 'storeFleetTariff'])->name('clients.fleet-tariffs.store');
         Route::delete('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'destroyFleetTariff'])->name('clients.fleet-tariffs.destroy');
 
+        Route::post('/clients/{user}/accounts/{account}/special-tariffs/import', [ClientController::class, 'importSpecialTariff'])->name('clients.special-tariffs.import');
+        Route::post('/clients/{user}/accounts/{account}/od-tariffs/import', [ClientController::class, 'importOriginDestinationTariff'])->name('clients.od-tariffs.import');
+        Route::post('/clients/{user}/accounts/{account}/fleet-tariffs/import', [ClientController::class, 'importFleetTariff'])->name('clients.fleet-tariffs.import');
+        Route::get('/clients/tariff-template/{type}', [ClientController::class, 'downloadTariffTemplate'])->name('clients.tariff-template');
+
         Route::put('/clients/{user}/accounts/{account}/billing-models', [ClientController::class, 'updateDisabledBillingModels'])->name('clients.billing-models.update');
         Route::put('/clients/{user}/accounts/{account}/billing-mode', [ClientController::class, 'updateBillingModelMode'])->name('clients.billing-mode.update');
         Route::put('/clients/{user}/accounts/{account}/billing-fallback', [ClientController::class, 'updateBillingModelFallback'])->name('clients.billing-fallback.update');

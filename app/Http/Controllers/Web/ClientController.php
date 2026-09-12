@@ -48,6 +48,10 @@ use Illuminate\View\View;
  */
 class ClientController extends Controller
 {
+    public function __construct(private \App\Services\CsvService $csv)
+    {
+    }
+
     public function index(Request $request): View
     {
         $clients = User::where('user_type', 'client')
@@ -592,6 +596,254 @@ class ClientController extends Controller
         $tariff->delete();
 
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
+    }
+
+    /**
+     * Same combined format as StandardBillingController::importAll()
+     * and its own note on why — rows sharing the same (service type,
+     * weight range) build up one special tariff's several zone prices.
+     * Scoped to this account throughout: an exact-match tariff for
+     * THIS account is reused (re-importing an amended export updates
+     * rather than duplicates); a genuinely new weight range never
+     * checks for overlap against other accounts' tariffs, only this
+     * one's.
+     */
+    public function importSpecialTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $tariffCache = [];
+        $tariffsCreated = 0;
+        $pricesSaved = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $serviceType = ServiceType::where('code', strtoupper(trim($row['service_type_code'] ?? '')))->first();
+            $minWeight = $row['min_weight'] ?? null;
+            $maxWeightLimit = $row['max_weight_limit'] ?? null;
+
+            if (! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
+                $skipped++;
+                continue;
+            }
+
+            $cacheKey = "{$serviceType->id}:{$minWeight}:{$maxWeightLimit}";
+
+            if (! isset($tariffCache[$cacheKey])) {
+                $tariff = ClientSpecialTariff::where('client_account_id', $account->id)
+                    ->where('service_type_id', $serviceType->id)
+                    ->where('min_weight', $minWeight)->where('max_weight_limit', $maxWeightLimit)->first();
+
+                if (! $tariff) {
+                    $tariff = ClientSpecialTariff::create([
+                        'client_account_id' => $account->id,
+                        'client_user_id' => $user->id,
+                        'service_type_id' => $serviceType->id,
+                        'min_weight' => $minWeight,
+                        'max_weight' => is_numeric($row['max_weight'] ?? null) ? $row['max_weight'] : $minWeight,
+                        'max_weight_limit' => $maxWeightLimit,
+                        'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
+                        'is_active' => true,
+                    ]);
+                    $tariffsCreated++;
+                }
+
+                $tariffCache[$cacheKey] = $tariff;
+            }
+
+            if (! empty($row['zone_code'])) {
+                $zone = Zone::where('code', strtoupper(trim($row['zone_code'])))->first();
+
+                if ($zone && is_numeric($row['charge'] ?? null)) {
+                    ClientSpecialTariffZonePrice::updateOrCreate(
+                        ['client_special_tariff_id' => $tariffCache[$cacheKey]->id, 'zone_id' => $zone->id],
+                        [
+                            'charge' => $row['charge'],
+                            'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
+                            'transit_days' => ($row['transit_days'] ?? '') !== '' ? (int) $row['transit_days'] : null,
+                        ]
+                    );
+                    $pricesSaved++;
+                }
+            }
+        }
+
+        return $this->redirectToTab($user, 'billing', "Imported: {$tariffsCreated} special rates created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type or missing weight)." : '.'));
+    }
+
+    public function importOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $serviceType = ServiceType::where('code', strtoupper(trim($row['product_code'] ?? '')))->first();
+            $minWeight = $row['base_weight'] ?? null;
+            $maxWeightLimit = $row['max_weight_limit'] ?? null;
+
+            $originCountry = ! empty($row['origin_country_code'])
+                ? Country::where('code', strtoupper(trim($row['origin_country_code'])))->first()
+                : null;
+            $originState = ! $originCountry && ! empty($row['origin_state_code'])
+                ? State::where('short_code', strtoupper(trim($row['origin_state_code'])))->first()
+                : null;
+
+            $destinationCountry = ! empty($row['destination_country_code'])
+                ? Country::where('code', strtoupper(trim($row['destination_country_code'])))->first()
+                : null;
+            $destinationState = ! $destinationCountry && ! empty($row['destination_state_code'])
+                ? State::where('short_code', strtoupper(trim($row['destination_state_code'])))->first()
+                : null;
+
+            $originResolved = $originCountry || $originState;
+            $destinationResolved = $destinationCountry || $destinationState;
+
+            if (! $originResolved || ! $destinationResolved || ! $serviceType || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
+                $skipped++;
+                continue;
+            }
+
+            $originCity = ($originState && ! empty($row['origin_city_code']))
+                ? City::where('state_id', $originState->id)->where('short_code', strtoupper(trim($row['origin_city_code'])))->first()
+                : null;
+            $destinationCity = ($destinationState && ! empty($row['destination_city_code']))
+                ? City::where('state_id', $destinationState->id)->where('short_code', strtoupper(trim($row['destination_city_code'])))->first()
+                : null;
+
+            \App\Models\ClientOriginDestinationTariff::updateOrCreate(
+                [
+                    'client_account_id' => $account->id,
+                    'service_type_id' => $serviceType->id,
+                    'origin_state_id' => $originState?->id,
+                    'origin_city_id' => $originCity?->id,
+                    'origin_country_id' => $originCountry?->id,
+                    'destination_state_id' => $destinationState?->id,
+                    'destination_city_id' => $destinationCity?->id,
+                    'destination_country_id' => $destinationCountry?->id,
+                    'min_weight' => $minWeight,
+                    'max_weight_limit' => $maxWeightLimit,
+                ],
+                [
+                    'client_user_id' => $user->id,
+                    'max_weight' => is_numeric($row['max_weight'] ?? null) ? $row['max_weight'] : $minWeight,
+                    'base_charge' => is_numeric($row['base_charge'] ?? null) ? $row['base_charge'] : 0,
+                    'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
+                    'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
+                    'transit_days' => is_numeric($row['transit_days'] ?? null) ? $row['transit_days'] : null,
+                    'is_active' => true,
+                ]
+            );
+            $count++;
+        }
+
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Origin-to-Destination rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code or missing weight)." : '.'));
+    }
+
+    public function importFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+        $request->validate(['file' => 'required|file|mimes:csv,txt']);
+
+        $rows = $this->csv->parse($request->file('file'));
+        $count = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $vehicleType = \App\Models\VehicleType::where('code', strtoupper(trim($row['vehicle_type_code'] ?? '')))->first();
+            $serviceType = ServiceType::where('code', strtoupper(trim($row['product_code'] ?? '')))->first();
+            $minWeight = $row['base_weight'] ?? null;
+            $maxWeightLimit = $row['max_weight_limit'] ?? null;
+
+            $originCountry = ! empty($row['origin_country_code'])
+                ? Country::where('code', strtoupper(trim($row['origin_country_code'])))->first()
+                : null;
+            $originState = ! $originCountry && ! empty($row['origin_state_code'])
+                ? State::where('short_code', strtoupper(trim($row['origin_state_code'])))->first()
+                : null;
+
+            $destinationCountry = ! empty($row['destination_country_code'])
+                ? Country::where('code', strtoupper(trim($row['destination_country_code'])))->first()
+                : null;
+            $destinationState = ! $destinationCountry && ! empty($row['destination_state_code'])
+                ? State::where('short_code', strtoupper(trim($row['destination_state_code'])))->first()
+                : null;
+
+            $originResolved = $originCountry || $originState;
+            $destinationResolved = $destinationCountry || $destinationState;
+
+            if (! $vehicleType || ! $serviceType || ! $originResolved || ! $destinationResolved || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
+                $skipped++;
+                continue;
+            }
+
+            $originCity = ($originState && ! empty($row['origin_city_code']))
+                ? City::where('state_id', $originState->id)->where('short_code', strtoupper(trim($row['origin_city_code'])))->first()
+                : null;
+            $destinationCity = ($destinationState && ! empty($row['destination_city_code']))
+                ? City::where('state_id', $destinationState->id)->where('short_code', strtoupper(trim($row['destination_city_code'])))->first()
+                : null;
+
+            \App\Models\ClientFleetBillingTariff::updateOrCreate(
+                [
+                    'client_account_id' => $account->id,
+                    'service_type_id' => $serviceType->id,
+                    'vehicle_type_id' => $vehicleType->id,
+                    'origin_state_id' => $originState?->id,
+                    'origin_city_id' => $originCity?->id,
+                    'origin_country_id' => $originCountry?->id,
+                    'destination_state_id' => $destinationState?->id,
+                    'destination_city_id' => $destinationCity?->id,
+                    'destination_country_id' => $destinationCountry?->id,
+                    'min_weight' => $minWeight,
+                    'max_weight_limit' => $maxWeightLimit,
+                ],
+                [
+                    'client_user_id' => $user->id,
+                    'max_weight' => is_numeric($row['max_weight'] ?? null) ? $row['max_weight'] : $minWeight,
+                    'base_charge' => is_numeric($row['weight_base_charge'] ?? null) ? $row['weight_base_charge'] : 0,
+                    'additional_weight' => is_numeric($row['additional_weight'] ?? null) ? $row['additional_weight'] : 1,
+                    'additional_charge' => is_numeric($row['additional_charge'] ?? null) ? $row['additional_charge'] : 0,
+                    'fuel_surcharge_percentage' => is_numeric($row['fuel_surcharge_percentage'] ?? null) ? $row['fuel_surcharge_percentage'] : 0,
+                    'empty_return_charge_type' => in_array($row['empty_return_charge_type'] ?? null, ['flat', 'percentage']) ? $row['empty_return_charge_type'] : 'flat',
+                    'empty_return_charge_value' => is_numeric($row['empty_return_charge_value'] ?? null) ? $row['empty_return_charge_value'] : 0,
+                    'transit_days' => is_numeric($row['transit_days'] ?? null) ? $row['transit_days'] : null,
+                    'is_active' => true,
+                ]
+            );
+            $count++;
+        }
+
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code or missing weight)." : '.'));
+    }
+
+    /**
+     * Three blank templates (headers only, one sample row) matching
+     * exactly what each import above expects — so staff never have to
+     * guess column names or order by reverse-engineering the importer.
+     */
+    public function downloadTariffTemplate(string $type): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return match ($type) {
+            'standard' => $this->csv->download('special-rate-standard-template.csv',
+                ['service_type_code', 'min_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'zone_code', 'charge', 'additional_charge', 'transit_days'],
+                [['EXP', 0, 2, 2, 1, 'Z1', 1500, 200, 1]]
+            ),
+            'od' => $this->csv->download('special-rate-od-template.csv',
+                ['product_code', 'origin_state_code', 'origin_city_code', 'origin_country_code', 'destination_state_code', 'destination_city_code', 'destination_country_code', 'base_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'base_charge', 'additional_charge', 'transit_days'],
+                [['ISF', 'LA', '', '', 'FC', '', '', 0, 10, 10, 1, 5500, 400, 2]]
+            ),
+            'fleet' => $this->csv->download('special-rate-fleet-template.csv',
+                ['product_code', 'vehicle_type_code', 'origin_state_code', 'origin_city_code', 'origin_country_code', 'destination_state_code', 'destination_city_code', 'destination_country_code', 'base_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'weight_base_charge', 'additional_charge', 'fuel_surcharge_percentage', 'empty_return_charge_type', 'empty_return_charge_value', 'transit_days'],
+                [['FLT', 'VAN', 'LA', '', '', 'FC', '', '', 0, 500, 500, 1, 15000, 80, 0, 'flat', 0, 2]]
+            ),
+            default => abort(404),
+        };
     }
 
     /**

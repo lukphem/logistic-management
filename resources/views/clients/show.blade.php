@@ -486,9 +486,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.special-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
+                        <form method="POST" action="{{ route('clients.special-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
                             @csrf
-                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                                <button type="button" onclick="document.getElementById('import-standard-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                            </div>
+                            <div id="import-standard-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
+                                <p class="mb-2 text-xs text-ink-500">One row per zone — several rows with the same product/weight range are combined into one rate with multiple zone prices. <a href="{{ route('clients.tariff-template', 'standard') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                                <form method="POST" action="{{ route('clients.special-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                    @csrf
+                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                                </form>
+                            </div>
                             @if ($errors->standardTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">
@@ -498,36 +509,64 @@
                                     </ul>
                                 </div>
                             @endif
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select…</option>
-                                        @foreach ($modelServiceTypes as $serviceType)
-                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                                        @endforeach
-                                    </select>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Product &amp; weight range</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select…</option>
+                                            @foreach ($modelServiceTypes as $serviceType)
+                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Min weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The lightest shipment this rate covers.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The weight the base zone charge covers up to. Anything heavier bills in 'Increment size' steps at the zone's 'Per increment' rate, up to Max weight limit.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight limit (kg)
+                                            <span class="cursor-help text-ink-400" title="The heaviest shipment this rate will ever price — nothing above this weight uses this rate at all, even at the overage rate.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Increment size (kg)
+                                            <span class="cursor-help text-ink-400" title="How weight above 'Max weight' is billed — e.g. 1kg steps, each charged at the zone's Per increment rate.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0.01" name="additional_weight" value="1" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
                                 </div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight (overage from)</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Increment size (kg)</label><input type="number" step="0.01" min="0.01" name="additional_weight" value="1" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
                             </div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Zone pricing</p>
-                            <div id="special-zone-rows" class="space-y-2">
-                                <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                    <select name="zone_prices[0][zone_id]" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Zone…</option>
-                                        @foreach ($zones as $zone)
-                                            <option value="{{ $zone->id }}">{{ $zone->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <input type="number" step="0.01" min="0" name="zone_prices[0][charge]" placeholder="Charge" required class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                    <input type="number" step="0.01" min="0" name="zone_prices[0][additional_charge]" placeholder="Per increment" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                    <input type="number" min="0" name="zone_prices[0][transit_days]" placeholder="Transit days" class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Zone pricing</p>
+                                <div id="special-zone-rows" class="space-y-2">
+                                    <div class="zone-row grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                        <select name="zone_prices[0][zone_id]" required title="Which delivery zone this price applies to." class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Zone…</option>
+                                            @foreach ($zones as $zone)
+                                                <option value="{{ $zone->id }}">{{ $zone->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <input type="number" step="0.01" min="0" name="zone_prices[0][charge]" placeholder="Charge" required title="Base price for this zone, up to Max weight." class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <input type="number" step="0.01" min="0" name="zone_prices[0][additional_charge]" placeholder="Per increment" title="Price per Increment size step above Max weight, for this zone." class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <input type="number" min="0" name="zone_prices[0][transit_days]" placeholder="Transit days" title="Expected delivery days for this zone (optional)." class="rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
                                 </div>
+                                <button type="button" id="add-zone-row" class="mt-2 text-xs font-medium text-[var(--brand-primary)] hover:underline">+ Add another zone</button>
                             </div>
-                            <button type="button" id="add-zone-row" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">+ Add another zone</button>
+
                             <div class="flex justify-end pt-2">
                                 <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add special rate</button>
                             </div>
@@ -553,9 +592,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.od-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
+                        <form method="POST" action="{{ route('clients.od-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
                             @csrf
-                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                                <button type="button" onclick="document.getElementById('import-od-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                            </div>
+                            <div id="import-od-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
+                                <p class="mb-2 text-xs text-ink-500">One row per route. <a href="{{ route('clients.tariff-template', 'od') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                                <form method="POST" action="{{ route('clients.od-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                    @csrf
+                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                                </form>
+                            </div>
                             @if ($errors->odTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">
@@ -565,62 +615,104 @@
                                     </ul>
                                 </div>
                             @endif
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select…</option>
-                                        @foreach ($modelServiceTypes as $serviceType)
-                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                                        @endforeach
-                                    </select>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Product &amp; route</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select…</option>
+                                            @foreach ($modelServiceTypes as $serviceType)
+                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin
+                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic origin, or Country for an international one.">ⓘ</span>
+                                        </label>
+                                        <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
+                                        <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select state…</option>
+                                            @foreach ($billingStates as $state)
+                                                <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination
+                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic destination, or Country for an international one.">ⓘ</span>
+                                        </label>
+                                        <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
+                                        <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select state…</option>
+                                            @foreach ($billingStates as $state)
+                                                <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Transit days
+                                            <span class="cursor-help text-ink-400" title="Expected delivery time for this route (optional).">ⓘ</span>
+                                        </label>
+                                        <input type="number" min="0" name="transit_days" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Origin</label>
-                                    <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="state">State</option>
-                                        <option value="country">Country</option>
-                                    </select>
-                                    <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select state…</option>
-                                        @foreach ($billingStates as $state)
-                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select country…</option>
-                                        @foreach ($billingCountries as $country)
-                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Destination</label>
-                                    <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="state">State</option>
-                                        <option value="country">Country</option>
-                                    </select>
-                                    <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select state…</option>
-                                        @foreach ($billingStates as $state)
-                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select country…</option>
-                                        @foreach ($billingCountries as $country)
-                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Transit days</label><input type="number" min="0" name="transit_days" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Base charge</label><input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Per kg after</label><input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Weight &amp; pricing</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Min weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The lightest shipment this rate covers.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The weight the Base charge covers up to — heavier ships bill Per kg after up to Max weight limit.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight limit (kg)
+                                            <span class="cursor-help text-ink-400" title="The heaviest shipment this rate will ever price on this route.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Base charge
+                                            <span class="cursor-help text-ink-400" title="Price for this route up to Max weight.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Per kg after
+                                            <span class="cursor-help text-ink-400" title="Price per kg above Max weight, up to Max weight limit.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                </div>
                             </div>
                             <input type="hidden" name="additional_weight" value="1">
                             <div class="flex justify-end pt-2">
@@ -648,9 +740,20 @@
                         @endforelse
 
                         @if (true)
-                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
+                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', [$user, $account]) }}" class="space-y-4 border-t border-line pt-4">
                             @csrf
-                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                            <div class="flex items-center justify-between">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
+                                <button type="button" onclick="document.getElementById('import-fleet-{{ $account->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Bulk import (CSV) ▾</button>
+                            </div>
+                            <div id="import-fleet-{{ $account->id }}" class="hidden rounded-lg border border-line bg-surface-50 p-3">
+                                <p class="mb-2 text-xs text-ink-500">One row per vehicle type/route. <a href="{{ route('clients.tariff-template', 'fleet') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Download a template</a> to see the exact columns.</p>
+                                <form method="POST" action="{{ route('clients.fleet-tariffs.import', [$user, $account]) }}" enctype="multipart/form-data" class="flex items-center gap-2">
+                                    @csrf
+                                    <input type="file" name="file" accept=".csv,.txt" required class="block flex-1 text-xs text-ink-900 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--brand-primary)]/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[var(--brand-primary)]">
+                                    <button type="submit" class="shrink-0 rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Import</button>
+                                </form>
+                            </div>
                             @if ($errors->fleetTariff->any())
                                 <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
                                     <ul class="list-disc space-y-0.5 pl-4">
@@ -660,81 +763,136 @@
                                     </ul>
                                 </div>
                             @endif
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                    <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select…</option>
-                                        @foreach ($modelServiceTypes as $serviceType)
-                                            <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Vehicle type</label>
-                                    <select name="vehicle_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select…</option>
-                                        @foreach ($vehicleTypes as $vehicleType)
-                                            <option value="{{ $vehicleType->id }}">{{ $vehicleType->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Origin</label>
-                                    <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="state">State</option>
-                                        <option value="country">Country</option>
-                                    </select>
-                                    <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select state…</option>
-                                        @foreach ($billingStates as $state)
-                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select country…</option>
-                                        @foreach ($billingCountries as $country)
-                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Destination</label>
-                                    <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="state">State</option>
-                                        <option value="country">Country</option>
-                                    </select>
-                                    <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select state…</option>
-                                        @foreach ($billingStates as $state)
-                                            <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="">Select country…</option>
-                                        @foreach ($billingCountries as $country)
-                                            <option value="{{ $country->id }}">{{ $country->name }}</option>
-                                        @endforeach
-                                    </select>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Product, vehicle &amp; route</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select…</option>
+                                            @foreach ($modelServiceTypes as $serviceType)
+                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Vehicle type
+                                            <span class="cursor-help text-ink-400" title="Which vehicle this rate applies to — a bike rate and a truck rate for the same route are two separate special rates.">ⓘ</span>
+                                        </label>
+                                        <select name="vehicle_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select…</option>
+                                            @foreach ($vehicleTypes as $vehicleType)
+                                                <option value="{{ $vehicleType->id }}">{{ $vehicleType->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin
+                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic origin, or Country for an international one.">ⓘ</span>
+                                        </label>
+                                        <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
+                                        <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select state…</option>
+                                            @foreach ($billingStates as $state)
+                                                <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination
+                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic destination, or Country for an international one.">ⓘ</span>
+                                        </label>
+                                        <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
+                                        <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select state…</option>
+                                            @foreach ($billingStates as $state)
+                                                <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Min weight</label><input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight</label><input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Max weight limit</label><input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Base charge</label><input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Per kg after</label><input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Fuel surcharge %</label><input type="number" step="0.01" min="0" max="100" name="fuel_surcharge_percentage" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
-                                <div>
-                                    <label class="mb-1 block text-xs font-medium text-ink-900">Empty return</label>
-                                    <select name="empty_return_charge_type" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                        <option value="flat">Flat</option>
-                                        <option value="percentage">% of freight</option>
-                                    </select>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Weight &amp; base pricing</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Min weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The lightest shipment this rate covers.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="min_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight (kg)
+                                            <span class="cursor-help text-ink-400" title="The weight the Base charge covers up to — heavier ships bill Per kg after up to Max weight limit.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight limit (kg)
+                                            <span class="cursor-help text-ink-400" title="The heaviest shipment this rate will ever price — should not exceed the vehicle's own real capacity.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Base charge
+                                            <span class="cursor-help text-ink-400" title="Price for this vehicle/route up to Max weight.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="base_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
                                 </div>
-                                <div><label class="mb-1 block text-xs font-medium text-ink-900">Empty return value</label><input type="number" step="0.01" min="0" name="empty_return_charge_value" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                            </div>
+
+                            <div>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Surcharges</p>
+                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Per kg after
+                                            <span class="cursor-help text-ink-400" title="Price per kg above Max weight, up to Max weight limit.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="additional_charge" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Fuel surcharge %
+                                            <span class="cursor-help text-ink-400" title="A percentage added on top of the freight amount to cover fuel — 0 if not applicable.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" max="100" name="fuel_surcharge_percentage" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Empty return
+                                            <span class="cursor-help text-ink-400" title="How the vehicle's return trip is charged, when applicable — a flat amount, or a percentage of the freight.">ⓘ</span>
+                                        </label>
+                                        <select name="empty_return_charge_type" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="flat">Flat</option>
+                                            <option value="percentage">% of freight</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Empty return value
+                                            <span class="cursor-help text-ink-400" title="The flat amount, or the percentage, matching what's chosen in Empty return above — 0 if not applicable.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="empty_return_charge_value" value="0" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                </div>
                             </div>
                             <input type="hidden" name="additional_weight" value="1">
                             <div class="flex justify-end pt-2">
