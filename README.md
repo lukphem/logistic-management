@@ -6464,3 +6464,52 @@ routes/web.php
 app/Http/Controllers/Web/ClientController.php   (8 actions take explicit ClientAccount, destroy ownership checks fixed)
 resources/views/clients/show.blade.php   (account selector, form actions updated, isViewingDefault gate removed in Billing Setup)
 ```
+
+## Increment 111, Phase 3b — Billing Model Sub-Tabs + Standard/Special as a Real View Switch
+
+Completes points #3 and #4: billing models are now three clickable
+sub-tabs within Billing Setup, and Standard/Special is a genuine
+either/or view, not two sections stacked together.
+
+- **Sub-tabs**: one per billing model, only one visible at a time.
+  A model the account isn't enabled for still shows as a tab —
+  visibly locked (🔒, disabled, no click handler) rather than
+  hidden — matching "disabled ones visible but not clickable."
+- **Standard/Special is now a real view switch**, not a cosmetic
+  toggle: `@unless($isSpecialMode)` wraps the entire service-type/
+  discount table, `@if($isSpecialMode)` wraps the entire special-rate
+  section — only one renders at all. This was already true at the
+  pricing level since Phase 1; the view now matches.
+- Switching mode still round-trips through the server (Phase 2's
+  tab-persistence means it lands back on the same tab), so the
+  correct view renders fresh from the database rather than needing
+  separate client-side state to stay in sync.
+
+### A subtle bug caught before shipping
+
+The sub-tab that opens by default was initially going to be "whichever
+model is first in the list" — but if that model happens to be
+*disabled* for this specific account, nothing would show at all (every
+model starts hidden until JS opens one, and a disabled tab has no click
+handler to open it manually). Fixed by computing the first model that's
+both configured *and* actually enabled for this account, used
+consistently for both the nav's active styling and the JS that opens it
+on page load.
+
+### Verified
+
+Full repo balance check (`@if`/`@endif`, `@unless`/`@endunless`,
+`@foreach`, `@forelse`, `@php`, every HTML tag pair) confirmed
+balanced after the restructure — 30/30, 7/7, 31/31, 6/6, 6/6,
+140/140. Duplicate-method scan, raw-byte backslash scan: clean.
+
+**This closes out points #2-#4** from the billing amendment request.
+Still pending: hiding unavailable options in Rate Checker/Create
+Shipment (#6/#5 from the original list), bulk CSV import (#7),
+editable special-rate rows (#8).
+
+### Files
+
+```
+resources/views/clients/show.blade.php   (sub-tab nav, mutually-exclusive Standard/Special views, first-enabled-model init)
+```

@@ -300,10 +300,37 @@
         </form>
         @endif
 
+        @php
+            $firstEnabledBillingModel = collect($billingModels)->keys()->first(function ($key) use ($serviceTypes, $account) {
+                return $serviceTypes->where('billing_model', $key)->isNotEmpty() && $account->usesBillingModel($key);
+            });
+        @endphp
+        {{-- One clickable sub-tab per billing model — a model the
+             account isn't enabled for still shows, just locked, so
+             it's a visible "not available" rather than hidden
+             entirely. --}}
+        <div class="mb-4 flex flex-wrap gap-2 border-b border-line pb-3">
+            @foreach ($billingModels as $modelKey => $modelLabel)
+                @php $modelHasServiceTypes = $serviceTypes->where('billing_model', $modelKey)->isNotEmpty(); @endphp
+                @continue(! $modelHasServiceTypes)
+                @php $modelEnabled = $account->usesBillingModel($modelKey); @endphp
+                <button type="button"
+                        @if ($modelEnabled) onclick="showBillingModelTab('{{ $modelKey }}')" @endif
+                        id="billing-model-nav-{{ $modelKey }}"
+                        @unless ($modelEnabled) disabled title="Not enabled for this account — turn it on above" @endunless
+                        class="rounded-lg px-3 py-1.5 text-sm font-medium transition {{ ! $modelEnabled ? 'cursor-not-allowed text-ink-500/40' : ($modelKey === $firstEnabledBillingModel ? 'bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]' : 'text-ink-500 hover:bg-surface-50 hover:text-ink-900') }}">
+                    {{ $modelLabel }}
+                    @unless ($modelEnabled)
+                        <span class="ml-1 text-xs">🔒</span>
+                    @endunless
+                </button>
+            @endforeach
+        </div>
+
         @foreach ($billingModels as $modelKey => $modelLabel)
             @php $modelServiceTypes = $serviceTypes->where('billing_model', $modelKey); @endphp
             @if ($modelServiceTypes->isNotEmpty())
-            <div class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <div id="billing-model-{{ $modelKey }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5" style="display:none">
                 <div class="mb-3 flex items-center justify-between">
                     <p class="text-sm font-semibold text-ink-900">{{ $modelLabel }}</p>
                     @unless ($account->usesBillingModel($modelKey))
@@ -316,8 +343,12 @@
                     <div class="mb-4 flex items-center justify-between rounded-lg border border-line bg-surface-50 p-3">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Mode</p>
-                            <p class="text-sm text-ink-900">
-                                {{ $isSpecialMode ? 'Special — discount below is switched off, only the special rates apply' : 'Standard — discount below applies, special rates (if any) are ignored' }}
+                            <div class="mt-1 inline-flex rounded-md border border-line p-0.5 text-xs">
+                                <span class="rounded px-2.5 py-1 font-medium {{ ! $isSpecialMode ? 'bg-[var(--brand-primary)] text-white' : 'text-ink-500' }}">Standard</span>
+                                <span class="rounded px-2.5 py-1 font-medium {{ $isSpecialMode ? 'bg-[var(--brand-primary)] text-white' : 'text-ink-500' }}">Special</span>
+                            </div>
+                            <p class="mt-1 text-xs text-ink-500">
+                                {{ $isSpecialMode ? 'Discount is switched off — only the special rates below apply.' : 'Discount applies below; special rates (if any) are ignored.' }}
                             </p>
                         </div>
                         @if (true)
@@ -333,6 +364,7 @@
                         @endif
                     </div>
 
+                    @unless ($isSpecialMode)
                     {{-- Service types under this model: on/off + discount, one row each --}}
                     <table class="mb-4 w-full text-left text-sm">
                         <thead>
@@ -392,7 +424,9 @@
                             @endforeach
                         </tbody>
                     </table>
+                    @endunless
 
+                    @if ($isSpecialMode)
                     {{-- ===== Special rates, shaped per billing model ===== --}}
                     @if ($modelKey === 'standard_billing')
                         <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-500">Special rates (Zoning & Weight)</p>
@@ -684,6 +718,7 @@
                             </div>
                         </form>
                         @endif
+                    @endif
                     @endif
                 @else
                     <p class="text-sm text-ink-500">This account isn't set up to use {{ $modelLabel }} — enable it above to configure service access or special rates.</p>
@@ -1032,6 +1067,19 @@
             });
         }
 
+        function showBillingModelTab(model) {
+            document.querySelectorAll('[id^="billing-model-"]:not([id^="billing-model-nav-"])').forEach(function (el) {
+                el.style.display = el.id === 'billing-model-' + model ? '' : 'none';
+            });
+            document.querySelectorAll('[id^="billing-model-nav-"]').forEach(function (btn) {
+                if (btn.disabled) return;
+                const active = btn.id === 'billing-model-nav-' + model;
+                btn.classList.toggle('bg-[var(--brand-primary)]/10', active);
+                btn.classList.toggle('text-[var(--brand-primary)]', active);
+                btn.classList.toggle('text-ink-500', !active);
+            });
+        }
+
         (function () {
             const container = document.getElementById('special-zone-rows');
             const addBtn = document.getElementById('add-zone-row');
@@ -1059,6 +1107,16 @@
             const requested = @json($activeTab);
             const target = document.getElementById('tab-' + requested) ? requested : 'overview';
             showClientTab(target);
+        })();
+
+        // Opens the first billing model this account is actually
+        // enabled for — every model starts hidden (display:none) so
+        // there's no flash of an unavailable one before JS runs.
+        (function () {
+            const firstEnabled = @json($firstEnabledBillingModel);
+            if (firstEnabled) {
+                showBillingModelTab(firstEnabled);
+            }
         })();
     </script>
 
