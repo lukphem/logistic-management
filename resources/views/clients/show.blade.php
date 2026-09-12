@@ -269,8 +269,21 @@
 
     {{-- ============ TARIFF (special rates) ============ --}}
     <div id="tab-billing" class="mt-5 max-w-4xl" style="display:none">
-        @if ($isViewingDefault)
-        <form method="POST" action="{{ route('clients.billing-models.update', $user) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        @if ($accounts->count() > 1)
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Configuring billing for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($accounts as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?tab=billing" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Every account under this client can be configured directly here — no need to switch which one is Default first.</p>
+            </div>
+        @endif
+        @if (true)
+        <form method="POST" action="{{ route('clients.billing-models.update', [$user, $account]) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             @csrf
             @method('PUT')
             <p class="mb-1 text-sm font-semibold text-ink-900">Billing models available to this account</p>
@@ -307,7 +320,7 @@
                                 {{ $isSpecialMode ? 'Special — discount below is switched off, only the special rates apply' : 'Standard — discount below applies, special rates (if any) are ignored' }}
                             </p>
                         </div>
-                        @if ($isViewingDefault)
+                        @if (true)
                         <form method="POST" action="{{ route('clients.billing-mode.update', [$user, $account]) }}">
                             @csrf
                             @method('PUT')
@@ -334,11 +347,11 @@
                                 <tr class="border-b border-line last:border-0">
                                     <td class="py-2 text-ink-900">{{ $serviceType->name }}</td>
                                     <td class="py-2">
-                                        <form method="POST" action="{{ route('clients.services.store', $user) }}">
+                                        <form method="POST" action="{{ route('clients.services.store', [$user, $account]) }}">
                                             @csrf
                                             <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
                                             <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-500">
-                                                <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()" {{ $isViewingDefault ? '' : 'disabled' }}
+                                                <input type="checkbox" name="is_active" value="1" onchange="this.form.submit()" {{ true ? '' : 'disabled' }}
                                                        @checked(!array_key_exists($serviceType->id, $subscriptions->toArray()) || $subscriptions[$serviceType->id]) class="rounded border-line">
                                                 Enabled
                                             </label>
@@ -347,8 +360,8 @@
                                     <td class="py-2">
                                         @if ($isSpecialMode)
                                             <span class="text-xs text-ink-500" title="Switched off — this billing model is in Special mode">Off (Special mode)</span>
-                                        @elseif ($isViewingDefault)
-                                        <form method="POST" action="{{ route('clients.discounts.store', $user) }}" class="flex items-center gap-2">
+                                        @elseif (true)
+                                        <form method="POST" action="{{ route('clients.discounts.store', [$user, $account]) }}" class="flex items-center gap-2">
                                             @csrf
                                             <input type="hidden" name="service_type_id" value="{{ $serviceType->id }}">
                                             <div>
@@ -414,8 +427,8 @@
                             <p class="mb-3 text-sm text-ink-500">No special rates — this client bills standard everywhere for this model.</p>
                         @endforelse
 
-                        @if ($isViewingDefault)
-                        <form method="POST" action="{{ route('clients.special-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                        @if (true)
+                        <form method="POST" action="{{ route('clients.special-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
                             @if ($errors->standardTariff->any())
@@ -481,8 +494,8 @@
                             <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every route.</p>
                         @endforelse
 
-                        @if ($isViewingDefault)
-                        <form method="POST" action="{{ route('clients.od-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                        @if (true)
+                        <form method="POST" action="{{ route('clients.od-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
                             @if ($errors->odTariff->any())
@@ -576,8 +589,8 @@
                             <p class="mb-3 text-sm text-ink-500">No special rates — this client bills the company rate for every vehicle type/route.</p>
                         @endforelse
 
-                        @if ($isViewingDefault)
-                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+                        @if (true)
+                        <form method="POST" action="{{ route('clients.fleet-tariffs.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
                             @csrf
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a special rate</p>
                             @if ($errors->fleetTariff->any())

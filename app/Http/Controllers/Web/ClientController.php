@@ -370,9 +370,9 @@ class ClientController extends Controller
         return $this->redirectToTab($user, 'overview', "{$user->name} upgraded to an organization account.");
     }
 
-    public function storeDiscount(Request $request, User $user): RedirectResponse
+    public function storeDiscount(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -390,16 +390,16 @@ class ClientController extends Controller
 
     public function destroyDiscount(User $user, ClientServiceDiscount $discount): RedirectResponse
     {
-        abort_unless($discount->client_account_id === $user->defaultAccount?->id, 404);
+        abort_unless($discount->clientAccount?->client_user_id === $user->id, 404);
 
         $discount->delete();
 
         return $this->redirectToTab($user, 'billing', 'Discount removed — this service type now bills standard for this client.');
     }
 
-    public function storeSpecialTariff(Request $request, User $user): RedirectResponse
+    public function storeSpecialTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -441,16 +441,16 @@ class ClientController extends Controller
 
     public function destroySpecialTariff(User $user, ClientSpecialTariff $tariff): RedirectResponse
     {
-        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
 
         $tariff->delete();
 
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this weight band now bills standard for this client.');
     }
 
-    public function storeOriginDestinationTariff(Request $request, User $user): RedirectResponse
+    public function storeOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -511,16 +511,16 @@ class ClientController extends Controller
 
     public function destroyOriginDestinationTariff(User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
     {
-        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
 
         $tariff->delete();
 
         return $this->redirectToTab($user, 'billing', 'Special rate removed — this route now bills at the company rate for this client.');
     }
 
-    public function storeFleetTariff(Request $request, User $user): RedirectResponse
+    public function storeFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
@@ -587,7 +587,7 @@ class ClientController extends Controller
 
     public function destroyFleetTariff(User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
     {
-        abort_unless($tariff->client_account_id === $user->defaultAccount?->id, 404);
+        abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
 
         $tariff->delete();
 
@@ -601,9 +601,9 @@ class ClientController extends Controller
      * nothing, so the array of DISABLED models has to be built from
      * which ones weren't checked, not read directly off the request.
      */
-    public function updateDisabledBillingModels(Request $request, User $user): RedirectResponse
+    public function updateDisabledBillingModels(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $enabled = $request->input('enabled_billing_models', []);
         $allModels = array_keys(\App\Models\Setting::current()->supportedBillingModels());
@@ -727,9 +727,9 @@ class ClientController extends Controller
     // Service subscriptions — access, not pricing
     // ---------------------------------------------------------------
 
-    public function storeServiceSubscription(Request $request, User $user): RedirectResponse
+    public function storeServiceSubscription(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',

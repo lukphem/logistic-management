@@ -6418,3 +6418,49 @@ Shipment, bulk CSV import, editable special-rate rows.
 app/Http/Controllers/Web/ClientController.php   (redirectToTab(), validated(), all 20 actions updated)
 resources/views/clients/show.blade.php   (active-tab init, discount row error scoping, 3 special-rate error boxes)
 ```
+
+## Increment 111, Phase 3a — Configure Any Account Without Switching
+
+The first half of the account-selector work: every billing action
+now operates on an **explicitly identified account**, not always
+whichever one is marked Default.
+
+- Routes for discount, special-tariff (all 3 billing models), and
+  service-subscription actions now carry `{account}` explicitly
+  (`/clients/{user}/accounts/{account}/discounts`, etc.) instead of
+  silently resolving "the Default Account" — mirroring the pattern
+  `updateBillingModelMode` already used.
+- **A real ownership-check bug fixed along the way**: every `destroy*`
+  action (removing a discount or special rate) was checking
+  `$x->client_account_id === $user->defaultAccount?->id` — meaning
+  removing a special rate on a *non-default* account would have
+  incorrectly 404'd, since it was only ever comparing against the
+  Default Account regardless of which account the rate actually
+  belonged to. Fixed to check against the rate's own account's
+  ownership instead.
+- New **account selector** at the top of the Billing Setup tab (shown
+  whenever a client has more than one account) — switches which
+  account you're configuring without changing which one is Default
+  elsewhere in the system.
+
+### Verified
+
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: all clean. Route/name uniqueness re-confirmed after the
+routing changes.
+
+**Not done yet**: the 3-tab billing-model restructure and the
+Standard/Special mutually-exclusive *view* switch (today, Standard's
+service list and Special's rate form both still show at once — the
+underlying pricing exclusivity from Phase 1 is real, but the UI
+hasn't caught up to only showing one view at a time yet). Also still
+pending: hiding unavailable options in Rate Checker/Create Shipment,
+bulk CSV import, editable special-rate rows.
+
+### Files
+
+```
+routes/web.php
+app/Http/Controllers/Web/ClientController.php   (8 actions take explicit ClientAccount, destroy ownership checks fixed)
+resources/views/clients/show.blade.php   (account selector, form actions updated, isViewingDefault gate removed in Billing Setup)
+```

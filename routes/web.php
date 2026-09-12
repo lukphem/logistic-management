@@ -285,18 +285,18 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/accounts/{account}/set-default', [ClientController::class, 'setDefaultAccount'])->name('clients.accounts.set-default');
         Route::delete('/clients/{user}/accounts/{account}', [ClientController::class, 'destroyAccount'])->name('clients.accounts.destroy');
 
-        Route::post('/clients/{user}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
+        Route::post('/clients/{user}/accounts/{account}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
         Route::delete('/clients/{user}/discounts/{discount}', [ClientController::class, 'destroyDiscount'])->name('clients.discounts.destroy');
-        Route::post('/clients/{user}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
+        Route::post('/clients/{user}/accounts/{account}/special-tariffs', [ClientController::class, 'storeSpecialTariff'])->name('clients.special-tariffs.store');
         Route::delete('/clients/{user}/special-tariffs/{tariff}', [ClientController::class, 'destroySpecialTariff'])->name('clients.special-tariffs.destroy');
 
-        Route::post('/clients/{user}/od-tariffs', [ClientController::class, 'storeOriginDestinationTariff'])->name('clients.od-tariffs.store');
+        Route::post('/clients/{user}/accounts/{account}/od-tariffs', [ClientController::class, 'storeOriginDestinationTariff'])->name('clients.od-tariffs.store');
         Route::delete('/clients/{user}/od-tariffs/{tariff}', [ClientController::class, 'destroyOriginDestinationTariff'])->name('clients.od-tariffs.destroy');
 
-        Route::post('/clients/{user}/fleet-tariffs', [ClientController::class, 'storeFleetTariff'])->name('clients.fleet-tariffs.store');
+        Route::post('/clients/{user}/accounts/{account}/fleet-tariffs', [ClientController::class, 'storeFleetTariff'])->name('clients.fleet-tariffs.store');
         Route::delete('/clients/{user}/fleet-tariffs/{tariff}', [ClientController::class, 'destroyFleetTariff'])->name('clients.fleet-tariffs.destroy');
 
-        Route::put('/clients/{user}/billing-models', [ClientController::class, 'updateDisabledBillingModels'])->name('clients.billing-models.update');
+        Route::put('/clients/{user}/accounts/{account}/billing-models', [ClientController::class, 'updateDisabledBillingModels'])->name('clients.billing-models.update');
         Route::put('/clients/{user}/accounts/{account}/billing-mode', [ClientController::class, 'updateBillingModelMode'])->name('clients.billing-mode.update');
 
         Route::post('/clients/{user}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
@@ -305,7 +305,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/users', [ClientController::class, 'storeSubUser'])->name('clients.sub-users.store');
         Route::delete('/clients/{user}/users/{subUser}', [ClientController::class, 'destroySubUser'])->name('clients.sub-users.destroy');
 
-        Route::post('/clients/{user}/services', [ClientController::class, 'storeServiceSubscription'])->name('clients.services.store');
+        Route::post('/clients/{user}/accounts/{account}/services', [ClientController::class, 'storeServiceSubscription'])->name('clients.services.store');
 
         Route::post('/clients/{user}/documents', [ClientController::class, 'storeDocument'])->name('clients.documents.store');
         Route::delete('/clients/{user}/documents/{document}', [ClientController::class, 'destroyDocument'])->name('clients.documents.destroy');
