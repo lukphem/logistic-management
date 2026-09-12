@@ -53,7 +53,7 @@
                                 </span>
                                 <div>
                                     <p class="font-medium text-ink-900">{{ $user->title ? $user->title . ' ' : '' }}{{ $user->name }}</p>
-                                    <p class="font-mono text-xs text-ink-500">{{ $user->staff_id }}</p>
+                                    <p class="font-mono text-xs text-ink-500">{{ $user->staff_id }} @if ($user->staff_short_code) · {{ $user->staff_short_code }} @endif</p>
                                 </div>
                             </div>
                         </td>

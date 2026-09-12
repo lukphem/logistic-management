@@ -164,7 +164,7 @@
                     <p class="mb-3 text-sm font-semibold text-ink-900">Account record</p>
                     <dl class="space-y-2 text-sm">
                         <div class="flex justify-between border-b border-line py-1.5"><dt class="text-ink-500">Created by</dt><dd class="text-ink-900">{{ $profile?->createdBy?->name ?? '—' }}</dd></div>
-                        <div class="flex justify-between py-1.5"><dt class="text-ink-500">Business manager</dt><dd class="text-ink-900">{{ $profile?->businessManager?->name ?? '—' }}</dd></div>
+                        <div class="flex justify-between py-1.5"><dt class="text-ink-500">Business manager</dt><dd class="text-ink-900">{{ $profile?->businessManager?->name ?? '—' }}{{ $profile?->businessManager?->staff_short_code ? ' (' . $profile->businessManager->staff_short_code . ')' : '' }}</dd></div>
                     </dl>
                 </div>
             </div>
@@ -198,7 +198,7 @@
                             </td>
                             <td class="py-2 text-ink-500">{{ $acct->account_number }}</td>
                             <td class="py-2 text-ink-500">{{ $acct->account_type === 'organization' ? 'Organization' : 'Individual' }}</td>
-                            <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}</td>
+                            <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}{{ $acct->businessManager?->staff_short_code ? ' (' . $acct->businessManager->staff_short_code . ')' : '' }}</td>
                             <td class="py-2 text-right">
                                 <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
                                 @unless ($acct->is_default)

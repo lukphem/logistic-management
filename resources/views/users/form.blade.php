@@ -253,6 +253,14 @@
                                     @endforeach
                                 </select>
                             </div>
+                            @if ($user->exists && $user->user_type === 'staff')
+                                <div>
+                                    <label class="mb-1 block text-sm font-medium text-ink-900">Reference code <span class="text-xs font-normal text-ink-500">(used in client account numbers)</span></label>
+                                    <input type="text" name="staff_short_code" value="{{ old('staff_short_code', $user->staff_short_code) }}" maxlength="3"
+                                           class="w-full max-w-[8rem] rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)]">
+                                    <p class="mt-1 text-xs text-ink-500">3 characters, auto-generated when this staff member was created — override here if it's unclear or collides awkwardly. Must be unique.</p>
+                                </div>
+                            @endif
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-ink-900">Date joined</label>

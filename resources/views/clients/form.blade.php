@@ -227,7 +227,7 @@
                 <select name="business_manager_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     <option value="">Unassigned</option>
                     @foreach ($staffUsers as $staff)
-                        <option value="{{ $staff->id }}" @selected(old('business_manager_id', $profile->business_manager_id) == $staff->id)>{{ $staff->name }}</option>
+                        <option value="{{ $staff->id }}" @selected(old('business_manager_id', $profile->business_manager_id) == $staff->id)>{{ $staff->name }}{{ $staff->staff_short_code ? ' (' . $staff->staff_short_code . ')' : '' }}</option>
                     @endforeach
                 </select>
             </div>

@@ -56,6 +56,7 @@ class OutletController extends Controller
             'hub_id' => 'required|exists:hubs,id',
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:50|unique:outlets,code,' . $request->route('outlet')?->id,
+            'short_code' => 'nullable|string|size:3|unique:outlets,short_code,' . $request->route('outlet')?->id,
             'address' => 'required|string',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
@@ -66,6 +67,16 @@ class OutletController extends Controller
 
         $data = $validator->validated();
         $data['is_active'] = $request->boolean('is_active', true);
+
+        // Blank means "auto-generate" (on create, the model's own
+        // creating() hook fills it in) or "leave whatever's already
+        // there" (on update) — never explicitly overwrite an existing
+        // code with nothing.
+        if (empty($data['short_code'])) {
+            unset($data['short_code']);
+        } else {
+            $data['short_code'] = strtoupper($data['short_code']);
+        }
 
         return $data;
     }

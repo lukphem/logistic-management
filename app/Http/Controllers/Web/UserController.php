@@ -113,6 +113,7 @@ class UserController extends Controller
             'employment_type' => $data['employment_type'],
             'emergency_contact_name' => $data['emergency_contact_name'],
             'emergency_contact_phone' => $data['emergency_contact_phone'],
+            ...($data['staff_short_code'] ? ['staff_short_code' => strtoupper($data['staff_short_code'])] : []),
             ...($data['password'] ? ['password' => Hash::make($data['password'])] : []),
         ]);
 
@@ -198,6 +199,7 @@ class UserController extends Controller
             'employment_type' => 'nullable|in:full_time,part_time,contract,intern',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:30',
+            'staff_short_code' => 'nullable|string|size:3|unique:users,staff_short_code' . ($ignoreUserId ? ",{$ignoreUserId}" : ''),
         ]);
 
         $validator->validate();

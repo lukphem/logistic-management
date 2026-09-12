@@ -6135,3 +6135,33 @@ app/Http/Controllers/Web/ShipmentController.php   (store(), previewPrice(), stor
 resources/views/rate-checker/index.blade.php   (account number field + result confirmation)
 resources/views/shipments/create.blade.php   (account number field)
 ```
+
+## Increment 109 — Staff/Outlet Reference Codes Get Real Screens
+
+The three gaps identified in the earlier "logic without UI" audit,
+fixed:
+
+- **Staff edit form**: new "Reference code" field (3 chars, uppercase,
+  unique) next to Job title/Employment type — editable so staff can
+  override a collision-prone auto-generated code, not just view it.
+  Also shown on the Staff list, appended after the existing `staff_id`.
+- **Business Manager's staff code** now shown everywhere their name
+  appears on client pages — Overview's "Account record" card, the
+  Accounts tab's table, and the Business Manager dropdown on the
+  Client form itself (so two staff with the same name are still
+  distinguishable when assigning one).
+- **Outlet form/list**: new "Short code" field (3 chars, uppercase,
+  unique) alongside the existing longer `code` field — editable, with
+  "leave blank to auto-generate" only shown at creation time, and
+  blank on update correctly leaves whatever's already there untouched
+  rather than overwriting it with nothing.
+
+### Files
+
+```
+resources/views/users/form.blade.php, index.blade.php
+app/Http/Controllers/Web/UserController.php
+resources/views/clients/show.blade.php, form.blade.php
+resources/views/outlets/form.blade.php, index.blade.php
+app/Http/Controllers/Web/OutletController.php
+```

@@ -19,6 +19,7 @@
                 <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                     <th class="px-5 py-3 font-medium">Name</th>
                     <th class="px-5 py-3 font-medium">Code</th>
+                    <th class="px-5 py-3 font-medium">Short code</th>
                     <th class="px-5 py-3 font-medium">Hub</th>
                     <th class="px-5 py-3 font-medium">Address</th>
                     <th class="px-5 py-3 font-medium">Status</th>
@@ -30,6 +31,7 @@
                     <tr class="border-b border-line last:border-0 odd:bg-surface-0 even:bg-surface-50/50 hover:bg-[var(--brand-primary)]/5 transition-colors">
                         <td class="px-5 py-3 font-medium text-ink-900">{{ $outlet->name }}</td>
                         <td class="px-5 py-3 font-mono text-ink-500">{{ $outlet->code }}</td>
+                        <td class="px-5 py-3 font-mono text-ink-500">{{ $outlet->short_code }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $outlet->hub->name }}</td>
                         <td class="px-5 py-3 text-ink-500">{{ $outlet->address }}</td>
                         <td class="px-5 py-3">
@@ -46,7 +48,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No outlets configured yet.</td></tr>
+                    <tr><td colspan="7" class="px-5 py-8 text-center text-sm text-ink-500">No outlets configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -36,6 +36,15 @@
         </div>
 
         <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Short code <span class="text-xs font-normal text-ink-500">(3 characters — used in client account numbers)</span></label>
+            <input type="text" name="short_code" value="{{ old('short_code', $outlet->short_code) }}" maxlength="3" placeholder="e.g. LOS"
+                   class="w-full max-w-[8rem] rounded-md border border-line px-3 py-2 text-sm font-mono uppercase outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            @if (! $outlet->exists)
+                <p class="mt-1 text-xs text-ink-500">Leave blank to auto-generate from the outlet name.</p>
+            @endif
+        </div>
+
+        <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Address <x-required /></label>
             <textarea name="address" rows="2"
                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('address', $outlet->address) }}</textarea>
