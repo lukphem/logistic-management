@@ -72,6 +72,19 @@ class BillingDemoSeeder extends Seeder
             'South West' => ['Ekiti', 'Lagos', 'Ogun', 'Ondo', 'Osun', 'Oyo'],
         ];
 
+        // Explicit, guaranteed-unique codes — the naive "first 4 letters
+        // with spaces stripped" approach collides badly here: North
+        // Central/East/West all reduce to "NORT", and South East/South/
+        // West all reduce to "SOUT".
+        $territoryCodes = [
+            'North Central' => 'NC',
+            'North East' => 'NE',
+            'North West' => 'NW',
+            'South East' => 'SE',
+            'South South' => 'SS',
+            'South West' => 'SW',
+        ];
+
         $airportStates = [
             'Lagos', 'Federal Capital Territory', 'Kano', 'Rivers', 'Enugu', 'Kaduna',
             'Oyo', 'Edo', 'Cross River', 'Imo', 'Sokoto', 'Borno', 'Adamawa', 'Plateau',
@@ -85,7 +98,7 @@ class BillingDemoSeeder extends Seeder
         foreach ($territoryStates as $territoryName => $stateNames) {
             $territory = Territory::firstOrCreate(
                 ['name' => $territoryName],
-                ['code' => strtoupper(substr(str_replace(' ', '', $territoryName), 0, 4))]
+                ['code' => $territoryCodes[$territoryName]]
             );
 
             State::where('country_id', $nigeria->id)
