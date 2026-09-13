@@ -7854,3 +7854,58 @@ app/Http/Controllers/Api/ClientShipmentController.php   (suspension check before
 resources/views/clients/show.blade.php   (merged Account Details section, Suspend/Reactivate UI, Add-account toggle, sub-user Edit, badge/text corrections)
 routes/web.php
 ```
+
+## Increment 135 — Fix: Web Form Submissions Silently Routing to API Endpoints
+
+Root cause finally found for a redirect issue that took extensive
+back-and-forth to isolate (misleading at every turn — it looked
+exactly like a permissions problem, and every permission/role/cache
+check along the way came back correct, because the real bug was
+somewhere else entirely).
+
+### The actual bug
+
+`routes/api.php`'s `Route::apiResource('shipments', ...)` and
+`Route::apiResource('roles', ...)` had no name prefix, so Laravel
+auto-generated route names like `shipments.store` and `roles.store` —
+the exact same names `routes/web.php` uses for its own, completely
+unrelated routes. Whichever file happened to register last silently
+won name resolution. The result: a Blade form calling
+`route('shipments.store')` was resolving to
+`/api/v1/staff/shipments` — a Sanctum-token-protected JSON endpoint —
+instead of the intended web route. A browser session was never going
+to authenticate against that, so every submission 302'd somewhere
+with no visible error anywhere in the web app's own code, no matter
+who was logged in or what permissions they had. This is why viewing
+pages always worked (GET requests to the *correctly-named* index/show
+web routes) while every create/update submission failed identically
+regardless of account, role, or browser.
+
+Confirmed via `git log` that this predates this session entirely —
+last touched at Increment 3/41, long before any of this
+conversation's work.
+
+### Fix
+
+`routes/api.php`'s whole route group now carries a `Route::name('api.')`
+prefix, so every route in the file — not just the two currently
+colliding ones — resolves as `api.shipments.store`,
+`api.roles.store`, etc. This closes off the entire class of bug, not
+just the two instances found, since nothing in `routes/web.php` (or
+anywhere else) uses an `api.`-prefixed name for anything.
+
+### Verified
+
+Confirmed via `git log` that no API controller anywhere references
+these route names directly (they all return JSON, never
+`redirect()->route(...)`), so renaming them is safe. Systematically
+re-scanned every `apiResource()` call in the file against every named
+route in `routes/web.php` after the fix — zero remaining collisions,
+versus two confirmed collisions (`shipments.*`, `roles.*`) before it.
+Full repo balance check: clean across 183 files.
+
+### Files
+
+```
+routes/api.php
+```

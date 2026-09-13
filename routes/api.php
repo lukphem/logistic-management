@@ -7,10 +7,23 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | API Routes — single backend, consumed by web (Blade), mobile, and
 | external integrators. Versioned from day one.
+|
+| Every route in this file is named under the "api." prefix
+| (Route::name('api.') below) — Route::apiResource() auto-generates
+| names like "shipments.store"/"roles.store" with NO prefix by
+| default, and routes/web.php happens to use those exact same names
+| for its own, completely different routes. Without this prefix, the
+| last-registered one silently wins name resolution: a web Blade form
+| calling route('shipments.store') would resolve to this file's API
+| URL instead, submitting to a Sanctum-token-protected JSON endpoint
+| a browser session was never going to authenticate against — every
+| web submission would 302 somewhere nonsensical with no error
+| visible anywhere in the web app's own code, which is exactly what
+| was happening before this line existed.
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->name('api.')->group(function () {
 
     // ── Auth (shared login endpoint, returns role/user_type-scoped token) ──
     Route::post('/auth/login', [\App\Http\Controllers\Api\AuthController::class, 'login']);
