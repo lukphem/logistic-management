@@ -560,13 +560,26 @@
 
                             <div>
                                 <p class="mb-2 text-xs font-semibold text-ink-700">Product &amp; weight range</p>
+                                <div class="mb-3">
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
+                                    <div class="flex gap-2">
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_standard" value="domestic" checked onchange="filterServiceTypesByRoute(this, 'standard')">
+                                            Domestic
+                                        </label>
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_standard" value="international" onchange="filterServiceTypesByRoute(this, 'standard')">
+                                            International
+                                        </label>
+                                    </div>
+                                </div>
                                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                     <div>
                                         <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <select name="service_type_id" data-route-select="standard" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select…</option>
                                             @foreach ($modelServiceTypes as $serviceType)
-                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                                <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @style(['display: none' => $serviceType->route_type !== 'domestic'])>{{ $serviceType->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>

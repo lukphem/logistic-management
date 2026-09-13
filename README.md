@@ -6879,3 +6879,31 @@ nested forms anywhere on the page.
 ```
 resources/views/clients/show.blade.php
 ```
+
+## Increment 118 — Fix: Fleet/O2D Route Labels Crash on Incomplete Data
+
+Real crash on the company-level Standard/Fleet Billing admin page:
+`Attempt to read property "name" on null` — `FleetBillingTariff::originLabel()`
+assumed that whenever `origin_country_id` was empty, `origin_state_id`
+must be set. A row missing both (however it got there) crashed the
+entire page rather than just that one row's label.
+
+Checked for the same pattern elsewhere and found it in a second file,
+`OriginDestinationTariff` — the same unsafe assumption, same crash
+risk. Both fixed: `originLabel()`/`destinationLabel()` now use
+null-safe access throughout and show "Not set" / "Unknown state" /
+"Unknown country" for whatever's actually missing, instead of
+crashing the page a bad row happens to appear on.
+
+Confirmed this client's own equivalent code
+(`ClientFleetBillingTariff`/`ClientOriginDestinationTariff`, both
+built this session) was never at risk — their display logic already
+used null-safe `?->` operators inline in the Blade template rather
+than a dedicated label method.
+
+### Files
+
+```
+app/Models/FleetBillingTariff.php
+app/Models/OriginDestinationTariff.php
+```

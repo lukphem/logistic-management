@@ -64,22 +64,36 @@ class FleetBillingTariff extends Model
         return $this->belongsTo(Country::class, 'destination_country_id');
     }
 
+    /**
+     * Defensive against a row missing BOTH country and state (bad
+     * data, however it got there) — never crash rendering a label,
+     * show what's actually known instead. A row with a genuinely
+     * complete route never hits the fallback.
+     */
     public function originLabel(): string
     {
         if ($this->origin_country_id) {
-            return $this->originCountry->name;
+            return $this->originCountry?->name ?? 'Unknown country';
         }
 
-        return $this->originCity ? "{$this->originState->name} ({$this->originCity->name})" : $this->originState->name;
+        if (! $this->origin_state_id) {
+            return 'Not set';
+        }
+
+        return $this->originCity ? "{$this->originState?->name} ({$this->originCity->name})" : ($this->originState?->name ?? 'Unknown state');
     }
 
     public function destinationLabel(): string
     {
         if ($this->destination_country_id) {
-            return $this->destinationCountry->name;
+            return $this->destinationCountry?->name ?? 'Unknown country';
         }
 
-        return $this->destinationCity ? "{$this->destinationState->name} ({$this->destinationCity->name})" : $this->destinationState->name;
+        if (! $this->destination_state_id) {
+            return 'Not set';
+        }
+
+        return $this->destinationCity ? "{$this->destinationState?->name} ({$this->destinationCity->name})" : ($this->destinationState?->name ?? 'Unknown state');
     }
 
     /**
