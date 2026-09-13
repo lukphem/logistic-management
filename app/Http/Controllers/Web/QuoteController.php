@@ -109,6 +109,15 @@ class QuoteController extends Controller
             'expires_at' => $quote->expires_at->toIso8601String(),
             'context' => $quote->context,
             'result' => $quote->result,
+            // The account_number string, not just client_account_id —
+            // that's what the shipment form's own account field
+            // actually expects, and it's what determined whether this
+            // quote could even use certain billing models in the
+            // first place, so it belongs with everything else this
+            // quote carries forward.
+            'account_number' => $quote->context['client_account_id'] ?? null
+                ? \App\Models\ClientAccount::find($quote->context['client_account_id'])?->account_number
+                : null,
         ]);
     }
 

@@ -38,6 +38,33 @@
     <form method="POST" action="{{ route('shipments.store') }}" id="create-shipment-form" class="max-w-2xl space-y-4 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
         @csrf
         <input type="hidden" name="quote_number" id="quote-number-field" value="{{ old('quote_number') }}">
+
+        <div class="space-y-4">
+            <p class="text-sm font-semibold text-ink-900">Who's this for?</p>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Account <span class="text-xs font-normal text-ink-500">(search by account number, account name, or client name — determines which billing models/rates apply below)</span></label>
+                <input type="text" id="account-number-field" name="account_number" value="{{ old('account_number') }}"
+                       list="account-options" autocomplete="off" placeholder="Start typing an account number, account name, or client name…"
+                       class="w-full max-w-md rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <datalist id="account-options">
+                    @foreach ($accountOptions as $accountOption)
+                        <option value="{{ $accountOption->account_number }}">{{ $accountOption->account_name }} — {{ $accountOption->client?->name }}</option>
+                    @endforeach
+                </datalist>
+                <p class="mt-1 text-xs text-ink-500">A client can have more than one account (Lagos, Abuja...) — pick the specific one to book against. Leave blank for a walk-in customer.</p>
+                <p id="account-number-status" class="mt-1 text-xs"></p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Or pick a client directly <span class="text-xs font-normal text-ink-500">(uses that client's default account — the account field above takes priority if both are filled in)</span></label>
+                <select name="client_user_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    <option value="">Walk-in customer</option>
+                    @foreach ($clients as $client)
+                        <option value="{{ $client->id }}" @selected(old('client_user_id') == $client->id)>{{ $client->name }} ({{ $client->email }})</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
         <div>
             <label class="mb-1 block text-sm font-medium text-ink-900">Billing model <x-required /></label>
             <select id="billing-model" name="billing_model" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
@@ -307,25 +334,6 @@
         <div class="space-y-4 border-t border-line pt-4">
             <p class="text-sm font-semibold text-ink-900">Shipment details</p>
 
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">Client <span class="text-xs font-normal text-ink-500">(optional — leave blank for a walk-in customer)</span></label>
-                <select name="client_user_id" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <option value="">Walk-in customer</option>
-                    @foreach ($clients as $client)
-                        <option value="{{ $client->id }}" @selected(old('client_user_id') == $client->id)>{{ $client->name }} ({{ $client->email }})</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="mb-1 block text-sm font-medium text-ink-900">— or account number <span class="text-xs font-normal text-ink-500">(fetches that specific account's rate/discount, overrides the Client field above)</span></label>
-                <input type="text" id="account-number-field" name="account_number" value="{{ old('account_number') }}"
-                       placeholder="e.g. LALOSTSF00001"
-                       class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                <p class="mt-1 text-xs text-ink-500">A client can have more than one account (Lagos, Abuja...) — use this to book against a specific one instead of always the default.</p>
-                <p id="account-number-status" class="mt-1 text-xs"></p>
-            </div>
-
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <div class="space-y-3 rounded-lg border border-line p-4">
                     <p class="text-sm font-semibold text-ink-900">Sender</p>
@@ -346,7 +354,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Origin address <x-required /></label>
-                        <textarea name="origin_address" rows="2" required
+                        <textarea name="origin_address" rows="2" maxlength="2000" required
                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('origin_address') }}</textarea>
                     </div>
                 </div>
@@ -369,7 +377,7 @@
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Destination address <x-required /></label>
-                        <textarea name="destination_address" rows="2" required
+                        <textarea name="destination_address" rows="2" maxlength="2000" required
                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('destination_address') }}</textarea>
                     </div>
                 </div>
@@ -378,8 +386,8 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Package description <x-required /> <span class="text-xs font-normal text-ink-500">(what's inside — needed for handling/customs)</span></label>
-                    <input type="text" name="package_description" value="{{ old('package_description') }}" required
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <textarea name="package_description" rows="2" maxlength="1000" required
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('package_description') }}</textarea>
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Special instructions <span class="text-xs font-normal text-ink-500">(optional)</span></label>
@@ -857,7 +865,18 @@
                 if (el) el.value = value ?? '';
             }
 
-            function loadQuoteIntoForm(context, result) {
+            function loadQuoteIntoForm(context, result, accountNumber) {
+                // 0. Account — determines which billing models/rates
+                // even show as options below, so this has to run
+                // before anything else, and needs the SAME lookup the
+                // account field's own blur handler runs, so billing
+                // model/service type get filtered to match.
+                if (accountNumber) {
+                    const accountField = document.getElementById('account-number-field');
+                    accountField.value = accountNumber;
+                    accountField.dispatchEvent(new Event('blur'));
+                }
+
                 // 1. Billing model — only one is implemented, always this.
                 billingModelSelect.value = 'standard_billing';
                 syncModelSection();
@@ -950,7 +969,7 @@
                         return body;
                     })
                     .then(function (body) {
-                        loadQuoteIntoForm(body.context, body.result);
+                        loadQuoteIntoForm(body.context, body.result, body.account_number);
 
                         document.getElementById('loaded-quote-number').textContent = body.quote_number;
                         document.getElementById('loaded-quote-total').textContent = Number(body.result.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

@@ -92,6 +92,13 @@ class ShipmentController extends Controller
                 ->with(['options' => fn ($q) => $q->where('is_active', true)->orderBy('name')])
                 ->orderBy('name')->get()->filter(fn ($s) => $s->options->isNotEmpty()),
             'clients' => User::where('user_type', 'client')->orderBy('name')->get(['id', 'name', 'email']),
+            // Powers the searchable account picker — by number AND by
+            // name/client, since staff usually know who they're
+            // booking for before they know (or even see) the account's
+            // own reference number.
+            'accountOptions' => \App\Models\ClientAccount::with('client:id,name')
+                ->orderBy('account_name')
+                ->get(['id', 'client_user_id', 'account_number', 'account_name']),
         ]);
     }
 
@@ -419,7 +426,7 @@ class ShipmentController extends Controller
             'sender_name' => 'required|string|max:255',
             'sender_phone' => 'required|string|max:255',
             'sender_email' => 'nullable|email|max:255',
-            'origin_address' => 'required|string',
+            'origin_address' => 'required|string|max:2000',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
             'origin_district_id' => 'nullable|exists:districts,id',
@@ -430,9 +437,9 @@ class ShipmentController extends Controller
             'receiver_name' => 'required|string|max:255',
             'receiver_phone' => 'required|string|max:255',
             'receiver_email' => 'nullable|email|max:255',
-            'package_description' => 'required|string|max:255',
+            'package_description' => 'required|string|max:1000',
             'special_instructions' => 'nullable|string',
-            'destination_address' => 'required|string',
+            'destination_address' => 'required|string|max:2000',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',

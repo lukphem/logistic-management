@@ -7909,3 +7909,71 @@ Full repo balance check: clean across 183 files.
 ```
 routes/api.php
 ```
+
+## Increment 136 — Fix: Address Field Crash + Shipment Form Resequenced
+
+### The crash, fixed at the root
+
+`origin_address`/`destination_address` were `VARCHAR(255)` with
+`required|string` validation — no `max:` rule at all, so a genuine
+address (landmarks/directions, normal for Nigerian addresses)
+sailed through validation and only failed at the database itself,
+with a raw SQL error reaching the user. Widened both to `TEXT` and
+added `max:2000` validation to match, across all three places a
+shipment gets created (web `ShipmentController`, and both API
+`ShipmentController`/`ClientShipmentController`). `package_description`
+got the same treatment on the same reasoning — hadn't crashed yet,
+same unbounded gap, same fix before it does. Reproduced the exact
+failing insert from the error report directly against live MySQL —
+succeeds now.
+
+### Shipment form resequenced
+
+Account now comes right after the Quote ID box, before Billing
+Model — matches the actual dependency (the account determines which
+billing models/rates even apply, so picking it first before those
+options render makes more sense than picking it after). The old
+"Client" dropdown and "account number" text field, previously buried
+deep in "Shipment details," are now one combined "Who's this for?"
+section at the top.
+
+### Account field is now searchable by name, not just number
+
+Was a plain text input — staff had to already know the exact account
+number. Now backed by a `<datalist>` covering every account's
+number, name, and client name, so typing any of the three surfaces
+it. Selecting still fills in the account *number* underneath (what
+the backend expects), so the existing billing-model filtering logic
+needed no changes.
+
+### Loading a quote now carries its account forward too
+
+`loadQuoteIntoForm()` populated service type, location, weight,
+dimensions, and additional services from a loaded quote, but never
+the account it was originally quoted against — meaning a quote
+generated with a client's special rate would silently lose that
+association the moment it got loaded into the shipment form.
+`QuoteController::show()` now also returns the resolved account
+number, and the JS fills it in first (before anything else, since it
+gates which billing models are even selectable) and fires the same
+lookup the account field's own blur handler uses, so billing
+model/service type options filter correctly too.
+
+### Verified
+
+Balance-checked after every edit, full repo balance check and
+duplicate-method scan clean across 184 files. Reproduced the exact
+crash from the error report against live MySQL — fixed. Verified the
+account datalist's query returns correct number/name/client data,
+and the quote-to-account-number resolution logic against real data.
+
+### Files
+
+```
+database/migrations/2026_03_11_000001_widen_address_fields_on_shipments_table.php
+app/Http/Controllers/Web/ShipmentController.php   (validation, accountOptions data)
+app/Http/Controllers/Api/ShipmentController.php   (validation)
+app/Http/Controllers/Api/ClientShipmentController.php   (validation)
+app/Http/Controllers/Web/QuoteController.php   (returns account_number)
+resources/views/shipments/create.blade.php   (resequenced, searchable account datalist, quote auto-populate)
+```
