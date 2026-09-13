@@ -7734,3 +7734,49 @@ app/Http/Controllers/Web/ClientController.php   (all API-management actions rewr
 resources/views/clients/show.blade.php   (tab renamed/reordered, full Integrations UI rebuild with Test/Live cards)
 routes/web.php
 ```
+
+## Increment 133 — Accounts Get a Full Profile, Creation Collects More Than Just a Name
+
+### Every account's profile is now directly editable
+
+A new "Profile" section on each account row (alongside the existing
+Billing & Invoicing one) — identity and company details:
+individual accounts get ID type/number; organization accounts get
+company name, RC number, industry, contact person's role, logo, and
+business objective. Contact person, address, and billing address
+stay where they already were (Billing & Invoicing), rather than
+duplicated across both sections. No switching required — same
+account-scoped pattern as everything else on this tab.
+
+### Creating an account now collects real information upfront
+
+The "Add account" form previously asked for nothing but a name and a
+type — everything else had to wait until after creation. It now
+mirrors the main client-creation form's identity fields
+(account-type-conditional, toggled the same way): ID type/number for
+Individual, company name/RC number/contact person/role/industry/logo/
+business objective for Organization, plus address and billing
+address. Left out on purpose: the cascading State → City → Outlet
+location picker, which has real JS-driven logic behind it — that's
+still set from the account's own Profile/Billing sections after
+creation rather than duplicating that logic into a quick-add form.
+
+Also fixed a stale code comment (not user-facing, but same issue as
+the user-facing text fixed a few increments back) still listing the
+old pre-consolidation tab names.
+
+### Verified
+
+Balance-checked after every edit, nested-form scan clean. Full repo
+balance check, duplicate-method scan: clean across 182 files.
+Verified end-to-end against live MySQL: an account created with the
+full enriched field set stores every value correctly, and updating an
+existing account's Profile section correctly persists every field.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (storeAccount() enriched, new updateAccountProfile(), stale comment fixed)
+resources/views/clients/show.blade.php   (Add-account form enriched, new Profile expandable section per account)
+routes/web.php
+```

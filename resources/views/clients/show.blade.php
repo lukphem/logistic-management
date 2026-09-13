@@ -210,6 +210,8 @@
                             <td class="py-2 text-right">
                                 <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
                                 <span class="mx-1 text-ink-500">·</span>
+                                <button type="button" onclick="document.getElementById('profile-info-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Profile</button>
+                                <span class="mx-1 text-ink-500">·</span>
                                 <button type="button" onclick="document.getElementById('billing-info-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Billing &amp; Invoicing</button>
                                 @if ($acct->is_default && $acct->account_type === 'individual')
                                     <span class="mx-1 text-ink-500">·</span>
@@ -347,6 +349,78 @@
                                 </form>
                             </td>
                         </tr>
+                        <tr id="profile-info-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                            <td colspan="5" class="p-4">
+                                <p class="mb-3 text-xs text-ink-500">Identity and company details for this specific account — contact person, address, and billing address are set under Billing &amp; Invoicing instead.</p>
+                                <form method="POST" action="{{ route('clients.accounts.profile.update', [$user, $acct]) }}" enctype="multipart/form-data" class="space-y-4">
+                                    @csrf
+                                    @method('PUT')
+                                    @if ($errors->{'profile' . $acct->id}->any())
+                                        <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                            <ul class="list-disc space-y-0.5 pl-4">
+                                                @foreach ($errors->{'profile' . $acct->id}->all() as $message)
+                                                    <li>{{ $message }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+
+                                    @if ($acct->account_type === 'individual')
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">ID type</label>
+                                                <select name="id_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                    <option value="">Select ID type</option>
+                                                    @foreach (\App\Models\ClientAccount::ID_TYPES as $key => $label)
+                                                        <option value="{{ $key }}" @selected($acct->id_type === $key)>{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">ID number</label>
+                                                <input type="text" name="id_number" value="{{ $acct->id_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Company name</label>
+                                                <input type="text" name="company_name" value="{{ $acct->company_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">RC / registration number</label>
+                                                <input type="text" name="rc_number" value="{{ $acct->rc_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person's role</label>
+                                                <input type="text" name="contact_person_role" value="{{ $acct->contact_person_role }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Industry</label>
+                                                <input type="text" name="industry" value="{{ $acct->industry }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Company logo</label>
+                                                <div class="flex items-center gap-3">
+                                                    @if ($acct->logo_url)
+                                                        <img src="{{ $acct->logo_url }}" alt="Current logo" class="h-10 w-10 rounded-lg border border-line object-contain bg-surface-0">
+                                                    @endif
+                                                    <input type="file" name="logo" accept="image/*" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="mb-1 block text-xs font-medium text-ink-900">Business objective</label>
+                                            <textarea name="business_objective" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">{{ $acct->business_objective }}</textarea>
+                                        </div>
+                                    @endif
+
+                                    <div class="flex justify-end">
+                                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
+                                    </div>
+                                </form>
+                            </td>
+                        </tr>
                         @if ($acct->is_default && $acct->account_type === 'individual')
                             <tr id="upgrade-account-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
                                 <td colspan="5" class="p-4">
@@ -399,24 +473,114 @@
                 </tbody>
             </table>
 
-            <form method="POST" action="{{ route('clients.accounts.store', $user) }}" class="flex flex-wrap items-end gap-3 border-t border-line pt-4">
+            <form method="POST" action="{{ route('clients.accounts.store', $user) }}" enctype="multipart/form-data" class="space-y-4 border-t border-line pt-4">
                 @csrf
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Account name</label>
-                    <input type="text" name="account_name" placeholder="e.g. Abuja Account" required class="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                @if ($errors->accounts->any())
+                    <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-xs text-status-exception">
+                        <ul class="list-disc space-y-0.5 pl-4">
+                            @foreach ($errors->accounts->all() as $message)
+                                <li>{{ $message }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Account name <x-required /></label>
+                        <input type="text" name="account_name" placeholder="e.g. Abuja Account" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Account type <x-required /></label>
+                        <select name="account_type" id="new-account-type" onchange="document.getElementById('new-account-individual').classList.toggle('hidden', this.value!=='individual'); document.getElementById('new-account-organization').classList.toggle('hidden', this.value!=='organization');" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="individual">Individual</option>
+                            <option value="organization">Organization</option>
+                        </select>
+                    </div>
                 </div>
-                <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Account type</label>
-                    <select name="account_type" required class="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="individual">Individual</option>
-                        <option value="organization">Organization</option>
-                    </select>
+
+                <div id="new-account-individual" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">ID type <x-required /></label>
+                        <select name="id_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <option value="">Select ID type</option>
+                            @foreach (\App\Models\ClientAccount::ID_TYPES as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">ID number <x-required /></label>
+                        <input type="text" name="id_number" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Contact person <span class="font-normal text-ink-500">(optional)</span></label>
+                        <input type="text" name="contact_person_name" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    </div>
                 </div>
-                <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
+
+                <div id="new-account-organization" class="hidden space-y-3">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Company name <x-required /></label>
+                            <input type="text" name="company_name" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">RC / registration number <x-required /></label>
+                            <input type="text" name="rc_number" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Contact person <x-required /></label>
+                            <input type="text" name="contact_person_name" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Contact person's role <span class="font-normal text-ink-500">(optional)</span></label>
+                            <input type="text" name="contact_person_role" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Industry <span class="font-normal text-ink-500">(optional)</span></label>
+                            <input type="text" name="industry" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Company logo <span class="font-normal text-ink-500">(optional)</span></label>
+                            <input type="file" name="logo" accept="image/*" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Business objective <span class="font-normal text-ink-500">(optional)</span></label>
+                        <textarea name="business_objective" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></textarea>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Address <span class="font-normal text-ink-500">(optional)</span></label>
+                        <textarea name="address" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></textarea>
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Billing address <span class="font-normal text-ink-500">(optional — leave blank if same as address)</span></label>
+                        <textarea name="billing_address" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></textarea>
+                    </div>
+                </div>
+                <p class="text-xs text-ink-500">State/City/Outlet assignment, tax/VAT, and charges can be set from this account's Profile and Billing &amp; Invoicing sections once it's created.</p>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
+                </div>
             </form>
-            <p class="mt-2 text-xs text-ink-500">After adding, switch to it above, then use Edit / Tariff / Discount / etc. to fill in its details — same as configuring any account.</p>
         </div>
     </div>
+    <script>
+        // Runs once on page load for the Add-account form's own
+        // type select, same as every other individual/organization
+        // toggle on this page.
+        (function () {
+            const typeSelect = document.getElementById('new-account-type');
+            if (!typeSelect) return;
+            document.getElementById('new-account-individual')?.classList.toggle('hidden', typeSelect.value !== 'individual');
+            document.getElementById('new-account-organization')?.classList.toggle('hidden', typeSelect.value !== 'organization');
+        })();
+    </script>
 
     {{-- ============ TRANSACTIONS ============ --}}
     <div id="tab-transactions" class="mt-5 max-w-4xl" style="display:none">

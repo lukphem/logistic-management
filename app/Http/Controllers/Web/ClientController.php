@@ -314,30 +314,61 @@ class ClientController extends Controller
     {
         abort_unless($user->user_type === 'client', 404);
 
-        $data = $this->validated(Validator::make($request->all(), [
+        $accountType = $request->input('account_type') === 'organization' ? 'organization' : 'individual';
+
+        $validator = Validator::make($request->all(), [
             'account_name' => 'required|string|max:255',
             'account_type' => 'required|in:individual,organization',
-        ]), $user, 'accounts');
+            'id_type' => $accountType === 'individual' ? 'required|string|max:100' : 'nullable',
+            'id_number' => $accountType === 'individual' ? 'required|string|max:255' : 'nullable',
+            'company_name' => $accountType === 'organization' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'rc_number' => $accountType === 'organization' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'industry' => 'nullable|string|max:255',
+            'contact_person_name' => $accountType === 'organization' ? 'required|string|max:255' : 'nullable|string|max:255',
+            'contact_person_role' => 'nullable|string|max:255',
+            'business_objective' => 'nullable|string|max:2000',
+            'logo' => 'nullable|image|max:2048',
+            'address' => 'nullable|string|max:1000',
+            'billing_address' => 'nullable|string|max:1000',
+        ]);
+        $data = $this->validated($validator, $user, 'accounts');
+
+        $logoPath = $request->hasFile('logo') ? $request->file('logo')->store('client-logos', 'public') : null;
 
         ClientAccount::create([
             'client_user_id' => $user->id,
             'account_name' => $data['account_name'],
             'account_number' => $this->resolveAccountNumber($request, null, null, auth()->user()),
             'is_default' => false,
-            'account_type' => $data['account_type'],
+            'account_type' => $accountType,
+            'id_type' => $accountType === 'individual' ? ($data['id_type'] ?? null) : null,
+            'id_number' => $accountType === 'individual' ? ($data['id_number'] ?? null) : null,
+            'company_name' => $accountType === 'organization' ? ($data['company_name'] ?? null) : null,
+            'rc_number' => $accountType === 'organization' ? ($data['rc_number'] ?? null) : null,
+            'logo_path' => $accountType === 'organization' ? $logoPath : null,
+            'industry' => $data['industry'] ?? null,
+            'contact_person_name' => $data['contact_person_name'] ?? null,
+            'contact_person_role' => $accountType === 'organization' ? ($data['contact_person_role'] ?? null) : null,
+            'business_objective' => $accountType === 'organization' ? ($data['business_objective'] ?? null) : null,
+            'address' => $data['address'] ?? null,
+            'billing_address' => $data['billing_address'] ?? null,
             'created_by' => auth()->id(),
         ]);
 
-        return $this->redirectToTab($user, 'accounts', "Account \"{$data['account_name']}\" created — switch to it below to configure its details, products, and billing.");
+        return $this->redirectToTab($user, 'accounts', "Account \"{$data['account_name']}\" created — its Billing Setup, Profile, and other details are already configurable directly, no need to switch to it first.");
     }
 
     /**
-     * Every tab besides "Accounts" itself (Overview, Tariff, Discount,
-     * Department, User, Service, Managerial services) currently
-     * operates on whichever Account is_default=true — this is how
-     * staff choose which one that is. Products/billing/Business
-     * Manager already configured on the account being switched TO stay
-     * exactly as they were; nothing is copied or reset.
+     * Every tab besides "Accounts" itself (Billing Setup, Department,
+     * User, Managerial services, Transactions, Integrations) now has
+     * its own account selector and can be configured directly for any
+     * account without switching which one is Default first — this
+     * action still exists for the one remaining exception (the
+     * Overview tab's separate Edit page) and as a convenience for
+     * staff who simply prefer a given account to be the one shown by
+     * default. Products/billing/Business Manager already configured on
+     * the account being switched TO stay exactly as they were; nothing
+     * is copied or reset.
      */
     public function setDefaultAccount(User $user, ClientAccount $account): RedirectResponse
     {
@@ -418,6 +449,50 @@ class ClientController extends Controller
         ]);
 
         return $this->redirectToTab($user, 'accounts', "Billing & invoicing details updated for \"{$account->account_name}\".", $account);
+    }
+
+    /**
+     * Covers what updateAccountBillingInfo() above doesn't: identity
+     * and company details, not contact/billing/tax/charges. Kept as a
+     * separate action rather than folded into that one since they're
+     * genuinely different concerns edited from different sections of
+     * the same Accounts tab row — matches this account's own
+     * account_type, same as the main create form and Increment 128's
+     * storeAccount() enrichment, rather than trusting whatever the
+     * request happens to send for fields that don't apply.
+     */
+    public function updateAccountProfile(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        $isOrganization = $account->account_type === 'organization';
+
+        $validator = Validator::make($request->all(), [
+            'id_type' => ! $isOrganization ? 'required|string|max:100' : 'nullable',
+            'id_number' => ! $isOrganization ? 'required|string|max:255' : 'nullable',
+            'company_name' => $isOrganization ? 'required|string|max:255' : 'nullable|string|max:255',
+            'rc_number' => $isOrganization ? 'required|string|max:255' : 'nullable|string|max:255',
+            'industry' => 'nullable|string|max:255',
+            'contact_person_role' => 'nullable|string|max:255',
+            'business_objective' => 'nullable|string|max:2000',
+            'logo' => 'nullable|image|max:2048',
+        ]);
+        $data = $this->validated($validator, $user, 'accounts', 'profile' . $account->id);
+
+        $account->update([
+            'id_type' => ! $isOrganization ? ($data['id_type'] ?? null) : null,
+            'id_number' => ! $isOrganization ? ($data['id_number'] ?? null) : null,
+            'company_name' => $isOrganization ? ($data['company_name'] ?? null) : null,
+            'rc_number' => $isOrganization ? ($data['rc_number'] ?? null) : null,
+            'logo_path' => $isOrganization && $request->hasFile('logo')
+                ? $request->file('logo')->store('client-logos', 'public')
+                : $account->logo_path,
+            'industry' => $data['industry'] ?? null,
+            'contact_person_role' => $isOrganization ? ($data['contact_person_role'] ?? null) : null,
+            'business_objective' => $isOrganization ? ($data['business_objective'] ?? null) : null,
+        ]);
+
+        return $this->redirectToTab($user, 'accounts', "Profile updated for \"{$account->account_name}\".", $account);
     }
 
     /**
