@@ -7263,3 +7263,83 @@ duplicate-method scan: clean across 176 files.
 resources/views/clients/show.blade.php   (Add form: Route-toggle-driven visibility; Edit form: full picker restored)
 app/Http/Controllers/Web/ClientController.php   (store/update/import validation and logic restored)
 ```
+
+## Increment 126 — Remove Client Billing (Superseded by the Client Hub)
+
+Traced every pricing code path before removing anything: `ClientBillingProfile`
+(the model backing this page) is a flat-discount mechanism that predates
+the entire `ClientAccount` system. Confirmed it's dead for every real
+portal-client scenario — web and API alike — since any request with a
+known `client_user_id` resolves pricing through that client's
+`ClientAccount` first, which always takes priority. The one path where
+it could still matter (a pure API-key client with no portal account
+at all) has no way to be configured through the Client Hub, since that
+UI is built entirely around portal `User` accounts.
+
+Removed the redundant admin UI: the "Client Billing" menu item, its
+three routes, `ClientBillingController`, and both its views. Left the
+underlying `ClientBillingProfile` model, its table, and its use as a
+pricing fallback in place — not because it's not redundant, but
+because removing it is a different kind of change (see the "Redundant
+Code Found" list below) that deserves an explicit decision rather than
+being bundled into this cleanup silently.
+
+Also fixed a stale, unrelated text reference found along the way:
+`cities/form.blade.php` pointed to "Setups → Client Billing →
+Onforwarding Classifications" — a navigation path that never matched
+the actual menu structure (Onforwarding is a direct item under
+Billing, not nested under Client Billing). Corrected the wording.
+
+### Verified
+
+Confirmed zero remaining references to `client-billing` or
+`ClientBillingController` anywhere in `app/`, `resources/`, or
+`routes/` after removal. Full repo balance check: clean across 175
+files (one fewer than before, from the deleted controller).
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (menu item removed)
+routes/web.php   (3 routes + use statement removed)
+app/Http/Controllers/Web/ClientBillingController.php   (deleted)
+resources/views/client-billing/   (deleted)
+resources/views/cities/form.blade.php   (stale text fixed)
+```
+
+## Redundant/Dead Code Found — For Your Decision
+
+A systematic pass checked every Controller, Model, View, Service, and
+Middleware for references elsewhere in the codebase, plus every named
+route for a UI trigger. Most of the codebase came back clean —
+several near-misses turned out to be genuine uses my first pass
+missed (Blade components used via `<x-name>` tag syntax rather than a
+dotted view name, a login-design partial selected dynamically via
+config, a quote lookup called via raw `fetch()` rather than the
+`route()` helper). After filtering those out, four real findings
+remain:
+
+1. **`resources/views/welcome.blade.php`** — Laravel's default
+   scaffold page. The root route (`/`) redirects straight to the
+   dashboard and never renders it; nothing else references it either.
+   Safe to delete outright.
+
+2. **`ClientController::destroy()` / route `clients.destroy`** — a
+   fully-built "delete a client" action with no Delete button or link
+   anywhere in the UI. Only reachable by hitting the URL directly.
+
+3. **`ClientController::upgrade()` / route `clients.upgrade`** —
+   likewise fully built (converts an individual account to an
+   organization), but no button calls it. The client create form's
+   own help text even says this can be done "later from their billing
+   page" — but that page has no such control.
+
+4. **`ScanStatusController::destroy()` / route `scan-statuses.destroy`**
+   — same pattern: full delete logic, no Remove button in the scan
+   statuses list.
+
+For 2–4, the code isn't unused by accident the way `welcome.blade.php`
+is — it's finished backend work with the frontend trigger never
+added. Two ways to resolve each: add the missing UI control, or
+remove the backend action if it was never actually meant to be
+reachable. Let me know which for each and I'll take care of it.

@@ -3,7 +3,6 @@
 use App\Http\Controllers\Web\Auth\LoginController;
 use App\Http\Controllers\Web\AdditionalServiceController;
 use App\Http\Controllers\Web\CityController;
-use App\Http\Controllers\Web\ClientBillingController;
 use App\Http\Controllers\Web\ClientController;
 use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\CountryRegionController;
@@ -196,8 +195,6 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/rate-checker', [RateCheckerController::class, 'index'])->name('rate-checker.index');
         Route::post('/rate-checker/quote', [QuoteController::class, 'store'])->name('quotes.store');
         Route::get('/additional-services', [AdditionalServiceController::class, 'index'])->name('additional-services.index');
-        Route::get('/client-billing', [ClientBillingController::class, 'index'])->name('client-billing.index');
-        Route::get('/client-billing/{type}/{id}/edit', [ClientBillingController::class, 'edit'])->name('client-billing.edit');
         Route::get('/onforwarding-classifications', [OnforwardingClassificationController::class, 'index'])->name('onforwarding-classifications.index');
         Route::get('/invoices', [InvoiceController::class, 'index'])->name('invoices.index');
     });
@@ -236,7 +233,6 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/fleet-billing/{tariff}/edit', [FleetBillingTariffController::class, 'edit'])->name('fleet-billing.edit');
         Route::put('/fleet-billing/{tariff}', [FleetBillingTariffController::class, 'update'])->name('fleet-billing.update');
         Route::delete('/fleet-billing/{tariff}', [FleetBillingTariffController::class, 'destroy'])->name('fleet-billing.destroy');
-        Route::put('/client-billing/{type}/{id}', [ClientBillingController::class, 'update'])->name('client-billing.update');
         Route::get('/onforwarding-classifications/create', [OnforwardingClassificationController::class, 'create'])->name('onforwarding-classifications.create');
         Route::post('/onforwarding-classifications', [OnforwardingClassificationController::class, 'store'])->name('onforwarding-classifications.store');
         Route::get('/onforwarding-classifications/{onforwardingClassification}/edit', [OnforwardingClassificationController::class, 'edit'])->name('onforwarding-classifications.edit');

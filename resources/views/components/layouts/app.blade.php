@@ -65,7 +65,6 @@
                     $billingItemsAfterStandard = [
                         ['label' => 'Additional Services', 'route' => 'additional-services.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                         ['label' => 'Invoice', 'route' => 'invoices.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
-                        ['label' => 'Client Billing', 'route' => 'client-billing.index', 'icon' => 'list-check', 'permission' => 'billing:read'],
                     ];
 
                     // Standard Billing is itself a submenu now, not a

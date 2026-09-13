@@ -75,7 +75,7 @@
             </select>
             <p class="mt-1 text-xs text-ink-500">
                 If set, any shipment originating from or destined to this city is charged this extra amount automatically.
-                Manage the available classifications under Setups → Client Billing → Onforwarding Classifications.
+                Manage the available classifications under Setups → Billing → Onforwarding Classifications.
             </p>
         </div>
 
