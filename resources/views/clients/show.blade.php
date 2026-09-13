@@ -420,11 +420,69 @@
 
     {{-- ============ TRANSACTIONS ============ --}}
     <div id="tab-transactions" class="mt-5 max-w-4xl" style="display:none">
+        @if ($accounts->count() > 1)
+            @php $transactionFilterQuery = http_build_query(array_merge(['tab' => 'transactions'], request()->only(['date_from', 'date_to', 'status', 'route_type', 'tracking_number']))); @endphp
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Viewing transactions for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($accounts as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?{{ $transactionFilterQuery }}" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Only this account's own shipments are shown — its other accounts have entirely separate transaction history. Any filters below carry over when switching.</p>
+            </div>
+        @endif
+
+        <form method="GET" action="{{ $isViewingDefault ? route('clients.show', $user) : route('clients.accounts.show', [$user, $account]) }}" class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm p-4">
+            <input type="hidden" name="tab" value="transactions">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">From</label>
+                    <input type="date" name="date_from" value="{{ request('date_from') }}" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">To</label>
+                    <input type="date" name="date_to" value="{{ request('date_to') }}" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Status</label>
+                    <select name="status" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Any</option>
+                        @foreach ($transactionStatuses as $status)
+                            <option value="{{ $status->key }}" @selected(request('status') === $status->key)>{{ $status->label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
+                    <select name="route_type" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Any</option>
+                        <option value="domestic" @selected(request('route_type') === 'domestic')>Domestic</option>
+                        <option value="international" @selected(request('route_type') === 'international')>International</option>
+                    </select>
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Tracking #</label>
+                    <input type="text" name="tracking_number" value="{{ request('tracking_number') }}" placeholder="Search" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                </div>
+                <div class="flex items-end gap-2">
+                    <button type="submit" class="w-full rounded-md bg-[var(--brand-primary)] px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Filter</button>
+                    @if (request()->only(['date_from', 'date_to', 'status', 'route_type', 'tracking_number']))
+                        <a href="{{ $isViewingDefault ? route('clients.show', $user) : route('clients.accounts.show', [$user, $account]) }}?tab=transactions" class="shrink-0 rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-500 transition hover:bg-surface-50">Clear</a>
+                    @endif
+                </div>
+            </div>
+        </form>
+
         <div class="overflow-x-auto rounded-xl border border-line bg-surface-0 shadow-sm">
             <table class="w-full text-left text-sm">
                 <thead>
                     <tr class="border-b border-line text-xs uppercase tracking-wide text-ink-500">
                         <th class="px-5 py-3 font-medium">Tracking #</th>
+                        <th class="px-5 py-3 font-medium">Service type</th>
+                        <th class="px-5 py-3 font-medium">Route</th>
                         <th class="px-5 py-3 font-medium">Status</th>
                         <th class="px-5 py-3 font-medium">Total</th>
                         <th class="px-5 py-3 font-medium">Date</th>
@@ -436,16 +494,21 @@
                             <td class="px-5 py-3 font-medium text-ink-900">
                                 <a href="{{ route('shipments.show', $shipment) }}" class="hover:underline">{{ $shipment->tracking_number }}</a>
                             </td>
+                            <td class="px-5 py-3 text-ink-500">{{ $shipment->serviceType?->name ?? '—' }}</td>
+                            <td class="px-5 py-3 text-ink-500">{{ $shipment->serviceType?->route_type === 'international' ? 'International' : 'Domestic' }}</td>
                             <td class="px-5 py-3 text-ink-500">{{ ucfirst(str_replace('_', ' ', $shipment->current_status)) }}</td>
                             <td class="px-5 py-3 text-ink-900">{{ number_format($shipment->total_amount, 2) }}</td>
                             <td class="px-5 py-3 text-ink-500">{{ $shipment->created_at->format('j M Y') }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="4" class="px-5 py-8 text-center text-sm text-ink-500">No shipments yet.</td></tr>
+                        <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No shipments match these filters.</td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
+        @if ($shipments->hasPages())
+            <div class="mt-4">{{ $shipments->links() }}</div>
+        @endif
     </div>
 
     {{-- ============ TARIFF (special rates) ============ --}}

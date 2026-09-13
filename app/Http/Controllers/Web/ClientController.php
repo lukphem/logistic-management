@@ -245,9 +245,42 @@ class ClientController extends Controller
             'subUsers' => $isOrganization ? User::whereHas('clientProfile', fn ($q) => $q->where('client_account_id', $accountId))->with('clientProfile.department')->orderBy('name')->get() : collect(),
             'documents' => ClientDocument::where('client_user_id', $user->id)->latest()->get(),
             'apiClient' => ApiClient::where('client_user_id', $user->id)->with('ipWhitelists', 'webhookSubscriptions')->first(),
-            'shipments' => \App\Models\Shipment::where('client_user_id', $user->id)->latest()->limit(25)->get(),
+            'shipments' => $this->filteredTransactions($accountId),
+            'transactionStatuses' => \App\Models\ScanStatus::all(),
             'accounts' => $user->accounts()->with('businessManager')->orderByDesc('is_default')->orderBy('account_name')->get(),
         ]);
+    }
+
+    /**
+     * Scoped to whichever account the page is currently viewing (the
+     * Transactions tab has its own account selector, same as Billing
+     * Setup/Department/Users/Managerial) — a request for "this
+     * account's transactions" that silently included every other
+     * account's shipments too would be wrong, not just imprecise.
+     * Filters are all optional query params so the tab stays
+     * bookmarkable/shareable with a specific view already applied.
+     */
+    private function filteredTransactions(?int $accountId): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    {
+        $query = \App\Models\Shipment::where('client_account_id', $accountId)->with('serviceType');
+
+        if (request()->filled('date_from')) {
+            $query->whereDate('created_at', '>=', request('date_from'));
+        }
+        if (request()->filled('date_to')) {
+            $query->whereDate('created_at', '<=', request('date_to'));
+        }
+        if (request()->filled('status')) {
+            $query->where('current_status', request('status'));
+        }
+        if (request()->filled('route_type')) {
+            $query->whereHas('serviceType', fn ($q) => $q->where('route_type', request('route_type')));
+        }
+        if (request()->filled('tracking_number')) {
+            $query->where('tracking_number', 'like', '%' . request('tracking_number') . '%');
+        }
+
+        return $query->latest()->paginate(20)->withQueryString();
     }
 
     public function destroy(User $user): RedirectResponse

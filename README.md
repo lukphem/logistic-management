@@ -7622,3 +7622,40 @@ is correctly scoped and visible only under its own account.
 ```
 app/Http/Controllers/Web/ClientController.php
 ```
+
+## Increment 131 — Transactions Tab: Account-Scoped with Filters
+
+Was previously a static, unfiltered list of the client's last 25
+shipments across *every* account mixed together. Now:
+
+- **Account selector**, same pattern as Billing Setup/Department/
+  Users/Managerial — shipments shown are scoped to whichever account
+  is selected, since different accounts under the same client have
+  entirely separate transaction history, not a shared pool.
+- **Filters**: date range, status (populated from whatever scan
+  statuses are actually configured, not hardcoded), Route
+  (Domestic/International, via the shipment's service type), and a
+  tracking number search — all as GET query params, so a filtered
+  view is bookmarkable/shareable, and switching accounts via the
+  selector carries the current filters forward instead of resetting
+  them.
+- **Real pagination** (20 per page) replacing the old hard 25-row
+  limit, which silently hid anything beyond the 25 most recent with
+  no way to see further back.
+
+### Verified
+
+Balance-checked, nested-form scan clean, full repo balance check and
+duplicate-method scan clean across 180 files. Simulated every filter
+dimension directly against live MySQL with shipments spread across
+two different accounts, two statuses, and both route types — account
+isolation, status filter, route filter, and date range all confirmed
+to return exactly the expected rows, and confirmed a different
+account's shipments never leak into another account's filtered view.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php   (filteredTransactions())
+resources/views/clients/show.blade.php   (account selector, filter form, pagination)
+```
