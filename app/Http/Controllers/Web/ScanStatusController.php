@@ -24,12 +24,14 @@ class ScanStatusController extends Controller
             'key' => 'required|string|max:100|alpha_dash|unique:scan_statuses,key',
             'label' => 'required|string|max:100',
             'is_terminal' => 'sometimes|boolean',
+            'is_delivery_attempt' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
 
         $data = $validator->validated();
         $data['is_terminal'] = $request->boolean('is_terminal');
+        $data['is_delivery_attempt'] = $request->boolean('is_delivery_attempt');
         $data['sort_order'] = (ScanStatus::withoutGlobalScopes()->max('sort_order') ?? 0) + 1;
 
         ScanStatus::create($data);
@@ -43,12 +45,14 @@ class ScanStatusController extends Controller
             'label' => 'required|string|max:100',
             'sort_order' => 'required|integer|min:0',
             'is_terminal' => 'sometimes|boolean',
+            'is_delivery_attempt' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
 
         $data = $validator->validated();
         $data['is_terminal'] = $request->boolean('is_terminal');
+        $data['is_delivery_attempt'] = $request->boolean('is_delivery_attempt');
 
         // key is intentionally not editable — it's what's stored on
         // historical shipments/scan_events, so renaming it would silently

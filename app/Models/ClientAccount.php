@@ -13,10 +13,12 @@ class ClientAccount extends Model
         'account_type', 'disabled_billing_models', 'special_billing_models', 'special_fallback_models', 'id_type', 'id_number',
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
-        'alternate_phone', 'billing_address',
+        'alternate_phone', 'billing_address', 'use_default_contact',
         'warehouse_access', 'cod_enabled',
         'insurance_agreement', 'insurance_agreement_date', 'insurance_agreement_notes',
         'invoice_due_days', 'sla_pickup_hours', 'sla_delivery_days',
+        'is_vatable', 'vat_percentage', 'is_pickup_chargeable', 'pickup_charge',
+        'is_onforwarding_chargeable', 'onforwarding_charge', 'maximum_delivery_attempts',
         'business_manager_id', 'created_by',
     ];
 
@@ -29,6 +31,13 @@ class ClientAccount extends Model
         'cod_enabled' => 'boolean',
         'insurance_agreement' => 'boolean',
         'insurance_agreement_date' => 'date',
+        'use_default_contact' => 'boolean',
+        'is_vatable' => 'boolean',
+        'vat_percentage' => 'float',
+        'is_pickup_chargeable' => 'boolean',
+        'pickup_charge' => 'float',
+        'is_onforwarding_chargeable' => 'boolean',
+        'onforwarding_charge' => 'float',
     ];
 
     public const ID_TYPES = [
@@ -263,6 +272,52 @@ class ClientAccount extends Model
     public function allowsFallbackToStandard(string $billingModel): bool
     {
         return in_array($billingModel, $this->special_fallback_models ?? [], true);
+    }
+
+    /**
+     * Resolved at read time, never copied — when use_default_contact
+     * is on, this account's own contact_person_name/address/
+     * billing_address columns are ignored in favor of the client's
+     * default account's current values, so the link never goes stale
+     * the way a one-time copy would the moment the default account's
+     * info changes. Meaningless (and never checked) on the default
+     * account itself — it has nothing else to defer to.
+     */
+    public function resolvedContactPersonName(): ?string
+    {
+        return $this->use_default_contact
+            ? ($this->client?->defaultAccount?->contact_person_name ?? $this->contact_person_name)
+            : $this->contact_person_name;
+    }
+
+    public function resolvedAddress(): ?string
+    {
+        return $this->use_default_contact
+            ? ($this->client?->defaultAccount?->address ?? $this->address)
+            : $this->address;
+    }
+
+    public function resolvedBillingAddress(): ?string
+    {
+        return $this->use_default_contact
+            ? ($this->client?->defaultAccount?->billing_address ?? $this->billing_address)
+            : $this->billing_address;
+    }
+
+    /**
+     * is_vatable gates whether VAT applies at all; vat_percentage
+     * only overrides the rate when it does. A vatable account with no
+     * override uses the company-wide rate from Settings, same as
+     * every other account — only a non-null value here means "this
+     * account specifically is taxed differently."
+     */
+    public function effectiveVatPercentage(): float
+    {
+        if (! $this->is_vatable) {
+            return 0.0;
+        }
+
+        return $this->vat_percentage ?? (\App\Models\Setting::current()->vat_percentage ?? 0.0);
     }
 
     public function serviceSubscriptions(): HasMany

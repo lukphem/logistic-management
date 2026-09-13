@@ -280,6 +280,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
 
         Route::post('/clients/{user}/accounts', [ClientController::class, 'storeAccount'])->name('clients.accounts.store');
         Route::post('/clients/{user}/accounts/{account}/set-default', [ClientController::class, 'setDefaultAccount'])->name('clients.accounts.set-default');
+        Route::put('/clients/{user}/accounts/{account}/billing-info', [ClientController::class, 'updateAccountBillingInfo'])->name('clients.accounts.billing-info.update');
         Route::delete('/clients/{user}/accounts/{account}', [ClientController::class, 'destroyAccount'])->name('clients.accounts.destroy');
 
         Route::post('/clients/{user}/accounts/{account}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');

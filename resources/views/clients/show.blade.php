@@ -209,6 +209,8 @@
                             <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}{{ $acct->businessManager?->staff_short_code ? ' (' . $acct->businessManager->staff_short_code . ')' : '' }}</td>
                             <td class="py-2 text-right">
                                 <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
+                                <span class="mx-1 text-ink-500">·</span>
+                                <button type="button" onclick="document.getElementById('billing-info-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Billing &amp; Invoicing</button>
                                 @if ($acct->is_default && $acct->account_type === 'individual')
                                     <span class="mx-1 text-ink-500">·</span>
                                     <button type="button" onclick="document.getElementById('upgrade-account-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Upgrade to Organization</button>
@@ -226,6 +228,123 @@
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
                                     </form>
                                 @endunless
+                            </td>
+                        </tr>
+                        <tr id="billing-info-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                            <td colspan="5" class="p-4">
+                                <p class="mb-3 text-xs text-ink-500">Feeds invoice preparation for this specific account — contact and billing address, tax details, and invoicing terms all belong to the account, not the client as a whole, since {{ $user->name }}'s other accounts can be billed completely differently.</p>
+                                <form method="POST" action="{{ route('clients.accounts.billing-info.update', [$user, $acct]) }}" class="space-y-4">
+                                    @csrf
+                                    @method('PUT')
+                                    @if ($errors->{'billingInfo' . $acct->id}->any())
+                                        <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                            <ul class="list-disc space-y-0.5 pl-4">
+                                                @foreach ($errors->{'billingInfo' . $acct->id}->all() as $message)
+                                                    <li>{{ $message }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+
+                                    <div>
+                                        <p class="mb-2 text-xs font-semibold text-ink-700">Contact &amp; address</p>
+                                        @unless ($acct->is_default)
+                                            <label class="mb-2 flex cursor-pointer items-center gap-2 text-xs text-ink-900">
+                                                <input type="checkbox" name="use_default_contact" value="1" @checked($acct->use_default_contact)
+                                                       onchange="document.getElementById('own-contact-{{ $acct->id }}').classList.toggle('hidden', this.checked)"
+                                                       class="rounded border-line">
+                                                Same as {{ $user->defaultAccount?->account_name ?? 'the main account' }}
+                                                <span class="cursor-help text-ink-400" title="Keeps this account's contact/address always matching the main account's current details — not a one-time copy, so it stays in sync if the main account's info changes later.">ⓘ</span>
+                                            </label>
+                                        @endunless
+                                        <div id="own-contact-{{ $acct->id }}" class="grid grid-cols-1 gap-3 sm:grid-cols-3 {{ ! $acct->is_default && $acct->use_default_contact ? 'hidden' : '' }}">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person</label>
+                                                <input type="text" name="contact_person_name" value="{{ $acct->contact_person_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Address</label>
+                                                <input type="text" name="address" value="{{ $acct->address }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Billing address</label>
+                                                <input type="text" name="billing_address" value="{{ $acct->billing_address }}" placeholder="Same as address above" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="mb-2 text-xs font-semibold text-ink-700">Tax &amp; VAT</p>
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Client Tax ID</label>
+                                                <input type="text" name="tin" value="{{ $acct->tin }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-2 flex cursor-pointer items-center gap-2 pt-6 text-sm text-ink-900">
+                                                    <input type="checkbox" name="is_vatable" value="1" @checked($acct->is_vatable)
+                                                           onchange="document.getElementById('vat-rate-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                           class="rounded border-line">
+                                                    VAT applies
+                                                </label>
+                                            </div>
+                                            <div id="vat-rate-{{ $acct->id }}" class="{{ $acct->is_vatable ? '' : 'hidden' }}">
+                                                <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">VAT %
+                                                    <span class="cursor-help text-ink-400" title="Leave blank to use the company-wide VAT rate from Settings — only fill this in if this account is taxed at a different rate.">ⓘ</span>
+                                                </label>
+                                                <input type="number" step="0.01" min="0" max="100" name="vat_percentage" value="{{ $acct->vat_percentage }}" placeholder="Company default" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="mb-2 text-xs font-semibold text-ink-700">Charges</p>
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div class="rounded-lg border border-line p-3">
+                                                <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                                    <input type="checkbox" name="is_pickup_chargeable" value="1" @checked($acct->is_pickup_chargeable)
+                                                           onchange="document.getElementById('pickup-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                           class="rounded border-line">
+                                                    Charge for pickup
+                                                </label>
+                                                <div id="pickup-charge-{{ $acct->id }}" class="{{ $acct->is_pickup_chargeable ? '' : 'hidden' }}">
+                                                    <input type="number" step="0.01" min="0" name="pickup_charge" value="{{ $acct->pickup_charge }}" placeholder="Pickup charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                            <div class="rounded-lg border border-line p-3">
+                                                <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                                    <input type="checkbox" name="is_onforwarding_chargeable" value="1" @checked($acct->is_onforwarding_chargeable)
+                                                           onchange="document.getElementById('onforwarding-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                           class="rounded border-line">
+                                                    Charge for onforwarding
+                                                </label>
+                                                <div id="onforwarding-charge-{{ $acct->id }}" class="{{ $acct->is_onforwarding_chargeable ? '' : 'hidden' }}">
+                                                    <input type="number" step="0.01" min="0" name="onforwarding_charge" value="{{ $acct->onforwarding_charge }}" placeholder="Onforwarding charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <p class="mb-2 text-xs font-semibold text-ink-700">Delivery &amp; invoicing</p>
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Maximum Delivery Attempt
+                                                    <span class="cursor-help text-ink-400" title="Once a shipment on this account reaches this many scans marked as a delivery attempt, it's flagged — leave blank for no limit.">ⓘ</span>
+                                                </label>
+                                                <input type="number" min="1" name="maximum_delivery_attempts" value="{{ $acct->maximum_delivery_attempts }}" placeholder="No limit" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Invoice Number of Days</label>
+                                                <input type="number" min="0" name="invoice_due_days" value="{{ $acct->invoice_due_days }}" placeholder="e.g. 30" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex justify-end">
+                                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
+                                    </div>
+                                </form>
                             </td>
                         </tr>
                         @if ($acct->is_default && $acct->account_type === 'individual')
@@ -1605,14 +1724,9 @@
             </div>
 
             <div class="mb-4 border-t border-line pt-4">
-                <p class="mb-2 text-sm font-semibold text-ink-900">Invoice & SLA</p>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div>
-                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Invoice due (days)
-                            <span class="cursor-help text-ink-400" title="Payment terms — how many days after an invoice is issued this client is expected to pay.">ⓘ</span>
-                        </label>
-                        <input type="number" min="0" name="invoice_due_days" value="{{ $profile?->invoice_due_days }}" placeholder="e.g. 30" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    </div>
+                <p class="mb-2 text-sm font-semibold text-ink-900">SLA</p>
+                <p class="mb-2 text-xs text-ink-500">Invoice terms moved to the Accounts tab — each account can now have its own, alongside its other billing/invoicing details.</p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">SLA: pickup within (hours)
                             <span class="cursor-help text-ink-400" title="How quickly a pickup request from this client should be actioned, in hours — an internal service target, not a customer-facing guarantee shown on a waybill.">ⓘ</span>

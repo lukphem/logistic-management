@@ -334,6 +334,60 @@ class ClientController extends Controller
     }
 
     /**
+     * Unlike most other write actions on this page (which always
+     * target whichever account is currently default), this one takes
+     * an explicit $account — the Accounts tab lets staff edit any
+     * account's contact/billing/invoicing details directly, without
+     * switching to it first, since these are exactly the fields that
+     * genuinely differ per account.
+     */
+    public function updateAccountBillingInfo(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        $validator = Validator::make($request->all(), [
+            'use_default_contact' => 'sometimes|boolean',
+            'contact_person_name' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:1000',
+            'billing_address' => 'nullable|string|max:1000',
+            'tin' => 'nullable|string|max:255',
+            'is_vatable' => 'sometimes|boolean',
+            'vat_percentage' => 'nullable|numeric|min:0|max:100',
+            'is_pickup_chargeable' => 'sometimes|boolean',
+            'pickup_charge' => 'required_if:is_pickup_chargeable,1|nullable|numeric|min:0',
+            'is_onforwarding_chargeable' => 'sometimes|boolean',
+            'onforwarding_charge' => 'required_if:is_onforwarding_chargeable,1|nullable|numeric|min:0',
+            'maximum_delivery_attempts' => 'nullable|integer|min:1',
+            'invoice_due_days' => 'nullable|integer|min:0',
+        ]);
+        $data = $this->validated($validator, $user, 'accounts', 'billingInfo' . $account->id);
+
+        $useDefault = $account->is_default ? false : $request->boolean('use_default_contact');
+
+        $account->update([
+            'use_default_contact' => $useDefault,
+            // Still saved even when linked to the default account's
+            // info — so switching the checkbox back off later
+            // restores whatever was last entered here instead of
+            // reverting to blank.
+            'contact_person_name' => $data['contact_person_name'] ?? null,
+            'address' => $data['address'] ?? null,
+            'billing_address' => $data['billing_address'] ?? null,
+            'tin' => $data['tin'] ?? null,
+            'is_vatable' => $request->boolean('is_vatable'),
+            'vat_percentage' => $data['vat_percentage'] ?? null,
+            'is_pickup_chargeable' => $request->boolean('is_pickup_chargeable'),
+            'pickup_charge' => $request->boolean('is_pickup_chargeable') ? $data['pickup_charge'] : null,
+            'is_onforwarding_chargeable' => $request->boolean('is_onforwarding_chargeable'),
+            'onforwarding_charge' => $request->boolean('is_onforwarding_chargeable') ? $data['onforwarding_charge'] : null,
+            'maximum_delivery_attempts' => $data['maximum_delivery_attempts'] ?? null,
+            'invoice_due_days' => $data['invoice_due_days'] ?? null,
+        ]);
+
+        return $this->redirectToTab($user, 'accounts', "Billing & invoicing details updated for \"{$account->account_name}\".");
+    }
+
+    /**
      * Manual entry (Company Settings -> allow_manual_account_number)
      * wins when it's turned on AND the requester actually supplied
      * one — validated for uniqueness here since the field itself
@@ -1479,7 +1533,6 @@ class ClientController extends Controller
             'insurance_agreement' => 'sometimes|boolean',
             'insurance_agreement_date' => 'nullable|date',
             'insurance_agreement_notes' => 'nullable|string|max:2000',
-            'invoice_due_days' => 'nullable|integer|min:0|max:365',
             'sla_pickup_hours' => 'nullable|integer|min:0|max:720',
             'sla_delivery_days' => 'nullable|integer|min:0|max:90',
         ]), $user, 'managerial');
@@ -1704,9 +1757,15 @@ class ClientController extends Controller
             'company_name' => $data['account_type'] === 'organization' ? ($data['company_name'] ?? null) : null,
             'logo_path' => $data['account_type'] === 'organization' ? $logoPath : null,
             'rc_number' => $data['account_type'] === 'organization' ? ($data['rc_number'] ?? null) : null,
-            'tin' => $data['account_type'] === 'organization' ? ($data['tin'] ?? null) : null,
+            // tin ("Client Tax ID") and contact_person_name are usable
+            // on any account type now, edited from the Accounts tab
+            // rather than this form — this form simply doesn't carry
+            // either field for an individual account, so preserve
+            // whatever's already saved instead of treating "not on
+            // this form" as "clear it".
+            'tin' => $request->has('tin') ? ($data['tin'] ?? null) : $existingAccount?->tin,
             'industry' => $data['industry'] ?? null,
-            'contact_person_name' => $data['account_type'] === 'organization' ? ($data['contact_person_name'] ?? null) : null,
+            'contact_person_name' => $request->has('contact_person_name') ? ($data['contact_person_name'] ?? null) : $existingAccount?->contact_person_name,
             'contact_person_role' => $data['account_type'] === 'organization' ? ($data['contact_person_role'] ?? null) : null,
             'address' => $data['address'] ?? null,
             'country_id' => $data['country_id'] ?? null,

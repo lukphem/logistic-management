@@ -79,6 +79,26 @@ class RiderController extends Controller
             $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself
         }
 
+        // Counts against the shipment's own client account's
+        // Maximum Delivery Attempt limit — not every scan status
+        // qualifies, only ones staff have explicitly marked as
+        // representing an attempt (ScanStatus::is_delivery_attempt),
+        // since statuses are fully staff-configurable and the app has
+        // no reliable way to infer this from a label alone.
+        $scanStatus = \App\Models\ScanStatus::where('key', $request->status)->first();
+
+        if ($scanStatus?->is_delivery_attempt) {
+            $shipmentUpdate['delivery_attempts_count'] = $shipment->delivery_attempts_count + 1;
+
+            $maxAttempts = $shipment->client_account_id
+                ? \App\Models\ClientAccount::find($shipment->client_account_id)?->maximum_delivery_attempts
+                : null;
+
+            if ($maxAttempts && $shipmentUpdate['delivery_attempts_count'] >= $maxAttempts && ! $shipment->delivery_attempts_exceeded_at) {
+                $shipmentUpdate['delivery_attempts_exceeded_at'] = now();
+            }
+        }
+
         $shipment->update($shipmentUpdate);
 
         return response()->json($scanEvent, 201);

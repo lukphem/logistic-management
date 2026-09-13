@@ -25,6 +25,7 @@
                     <th class="px-5 py-3 font-medium">Key</th>
                     <th class="px-5 py-3 font-medium">Label</th>
                     <th class="px-5 py-3 font-medium">Ends shipment?</th>
+                    <th class="px-5 py-3 font-medium">Delivery attempt?</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
@@ -45,6 +46,11 @@
                             <input form="{{ $formId }}" type="checkbox" name="is_terminal" value="1" @checked($status->is_terminal)
                                    class="rounded border-line">
                         </td>
+                        <td class="px-5 py-3">
+                            <input form="{{ $formId }}" type="checkbox" name="is_delivery_attempt" value="1" @checked($status->is_delivery_attempt)
+                                   title="Scanning this status counts as a delivery attempt against the shipment's client's Maximum Delivery Attempt limit."
+                                   class="rounded border-line">
+                        </td>
                         <td class="px-5 py-3 text-right">
                             <form id="{{ $formId }}" method="POST" action="{{ route('scan-statuses.update', $status) }}"></form>
                             <input form="{{ $formId }}" type="hidden" name="_token" value="{{ csrf_token() }}">
@@ -58,7 +64,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-5 py-8 text-center text-sm text-ink-500">No scan statuses configured yet.</td></tr>
+                    <tr><td colspan="6" class="px-5 py-8 text-center text-sm text-ink-500">No scan statuses configured yet.</td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -82,6 +88,10 @@
             <label class="flex items-center gap-2 pb-2 text-sm text-ink-900">
                 <input type="checkbox" name="is_terminal" value="1" class="rounded border-line">
                 Ends shipment
+            </label>
+            <label class="flex items-center gap-2 pb-2 text-sm text-ink-900">
+                <input type="checkbox" name="is_delivery_attempt" value="1" class="rounded border-line">
+                Counts as a delivery attempt
             </label>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
                 Add status

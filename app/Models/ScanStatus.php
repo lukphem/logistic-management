@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class ScanStatus extends Model
 {
-    protected $fillable = ['key', 'label', 'sort_order', 'is_terminal'];
+    protected $fillable = ['key', 'label', 'sort_order', 'is_terminal', 'is_delivery_attempt'];
 
-    protected $casts = ['is_terminal' => 'boolean'];
+    protected $casts = ['is_terminal' => 'boolean', 'is_delivery_attempt' => 'boolean'];
 
     protected static function booted(): void
     {

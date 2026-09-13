@@ -7402,3 +7402,100 @@ resources/views/scan-statuses/index.blade.php   (Remove button)
 app/Http/Controllers/Web/ClientController.php   (destroy() safety check)
 resources/views/clients/show.blade.php   (Upgrade to Organization control, Danger Zone / Delete client)
 ```
+
+## Increment 128 — Accounts Tab: Per-Account Billing & Invoicing Details
+
+Restructures the Accounts tab per your requirements: each account now
+carries its own contact person, address, and billing address — with
+an option to link them live to the client's main/default account
+instead of retyping — plus VAT, Client Tax ID, pickup/onforwarding
+charges, Maximum Delivery Attempt, and Invoice Number of Days, all
+scoped to that specific account for invoice preparation.
+
+### Schema
+
+Three migrations: `client_accounts` gets `use_default_contact`,
+`is_vatable`, `vat_percentage`, `is_pickup_chargeable`,
+`pickup_charge`, `is_onforwarding_chargeable`, `onforwarding_charge`,
+`maximum_delivery_attempts`. `scan_statuses` gets `is_delivery_attempt`
+(same pattern as the existing `is_terminal` flag — staff mark which of
+their own configured statuses count as an attempt, since statuses are
+fully custom and the app can't infer this from a label). `shipments`
+gets `delivery_attempts_count` and `delivery_attempts_exceeded_at`.
+
+### The live-link design for "use the main account's info"
+
+`use_default_contact` is resolved at read time
+(`ClientAccount::resolvedContactPersonName()`/`resolvedAddress()`/
+`resolvedBillingAddress()`), not copied once at save time — verified
+directly against live MySQL that a linked account correctly reflects
+the default account's *current* details, not whatever they were when
+the checkbox was first ticked.
+
+### VAT
+
+`is_vatable` gates whether VAT applies at all; `vat_percentage` only
+overrides the *rate* when it does, falling back to the existing
+company-wide rate in Settings when left blank
+(`effectiveVatPercentage()`).
+
+### Delivery attempt tracking
+
+Wired into `RiderController::scan()` — the only place shipment status
+actually changes. Increments the shipment's count only when the
+scanned status is marked `is_delivery_attempt`, and sets
+`delivery_attempts_exceeded_at` the first time the count reaches that
+shipment's own client account's `maximum_delivery_attempts`.
+`client_account_id` (already captured on every shipment at booking
+time) is what ties a shipment back to the right account's limit.
+Verified end-to-end against live MySQL across two simulated scans —
+correctly not-yet-exceeded after the first, correctly flagged after
+the second.
+
+### Client Tax ID = existing TIN, now usable by any account type
+
+Previously `tin` was forced to `null` for individual accounts.
+Removed that restriction, and found (before it caused a real bug) that
+the *existing* Edit form would have silently wiped this field back to
+null on save, since that form was never built with a `tin` input for
+individual accounts — any submission of it would omit the field
+entirely. Fixed `accountData()` to preserve the current value when the
+request doesn't include the field, rather than treating "not on this
+form" as "clear it". Applied the identical fix to
+`contact_person_name` for the same reason, since it's now also editable
+from the Accounts tab.
+
+### Invoice Number of Days moved off the Managerial tab
+
+It's the same `invoice_due_days` column, now edited from the Accounts
+tab per-account instead. Found and fixed the same clobbering risk one
+more time: `updateManagerial()`'s validation rule for this field
+lacked `sometimes`, so simply removing the input from that form would
+still have nulled the column via Laravel's own `nullable` handling.
+Removed the field from that action's rules entirely — it's no longer
+this form's responsibility at all.
+
+### Verified
+
+Balance-checked after every edit (this was the largest single UI
+addition of the session), nested-form scan clean. Full repo balance
+check, duplicate-method scan: clean across 178 files. Every new field
+verified end-to-end against live MySQL — the full save, the live-link
+resolution, and the delivery-attempt counter and exceeded-flag logic
+all confirmed to behave exactly as designed.
+
+### Files
+
+```
+database/migrations/2026_03_07_000001_add_invoicing_fields_to_client_accounts_table.php
+database/migrations/2026_03_07_000002_add_is_delivery_attempt_to_scan_statuses_table.php
+database/migrations/2026_03_07_000003_add_delivery_attempt_tracking_to_shipments_table.php
+app/Models/ClientAccount.php   (new fillable/casts, resolved*() helpers, effectiveVatPercentage())
+app/Models/ScanStatus.php   (is_delivery_attempt)
+app/Http/Controllers/Api/RiderController.php   (delivery-attempt counting in scan())
+app/Http/Controllers/Web/ScanStatusController.php   (is_delivery_attempt in store/update)
+resources/views/scan-statuses/index.blade.php   (Delivery attempt column + Add-form checkbox)
+app/Http/Controllers/Web/ClientController.php   (updateAccountBillingInfo(), tin/contact_person_name preserved on Edit, invoice_due_days removed from Managerial)
+resources/views/clients/show.blade.php   (Billing & Invoicing expandable section per account, Managerial tab trimmed)
+routes/web.php
+```
