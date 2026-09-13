@@ -7166,3 +7166,61 @@ resources/views/clients/show.blade.php
 resources/views/rate-checker/index.blade.php
 resources/views/shipments/create.blade.php
 ```
+
+## Increment 124 — Standard Billing Field Order/Layout Fix + Fleet Simplified to State-Only
+
+### Field order and wasted space (Standard Billing)
+
+Real layout bug, confirmed from a screenshot: the Standard Billing
+special-rate forms (both Add and the inline Edit row) packed 5 fields
+— Service type, Min weight, Max weight, Max weight limit, Increment
+size — into a 4-column grid, so the 5th field wrapped onto its own
+row, wasting the other 3 columns of that row. The field order was
+also not sequential (Max weight limit came before Increment size,
+when the increment is what actually gets you from Max weight up to
+the limit).
+
+Fixed on the client-specific Add form, the inline Edit form, **and**
+the company-level Standard Billing form** ("fix for overall too"):
+Service type moved to its own row, the 4 weight fields reordered to
+**Min weight → Max weight → Increment size → Max weight limit**, now
+filling a proper 4-column grid with nothing left over. Checked O2D and
+Fleet for the same issue first — neither shows `additional_weight` as
+an editable field at all (both hardcode it via a hidden input), so
+this reorder is isolated to Standard Billing specifically, not applied
+where it wouldn't mean anything.
+
+### Fleet simplified to state-only
+
+Fleet vehicles run domestic routes — the Origin/Destination
+State-vs-Country toggle and Country dropdowns never made sense there
+(that distinction belongs to Origin-to-Destination, which can
+genuinely be international). Removed from both the Add and Edit forms,
+the CSV import, and the CSV template — Origin/Destination are now
+plain, always-required State dropdowns.
+
+Controller validation simplified to match (`origin_state_id`/
+`destination_state_id` now simply `required`, no more `origin_type`/
+`destination_type`/city/country handling for Fleet). The shared
+`normalizeRouteFields()` helper (also used by Origin-to-Destination)
+needed no changes — it already gracefully defaults to state behavior
+when `origin_type`/`destination_type` are absent from the request,
+which is exactly what Fleet's simplified form now does.
+
+### Verified
+
+Balance-checked after every edit across all three touched files.
+Confirmed `client_fleet_billing_tariffs`' country columns are
+nullable, then verified end-to-end against live MySQL: a Fleet
+tariff created with only state IDs correctly stores `NULL` for both
+country columns, matching the simplified form exactly. Full repo
+balance check, duplicate-method scan, raw-byte backslash scan: clean
+across 176 files.
+
+### Files
+
+```
+resources/views/clients/show.blade.php   (Standard Billing reorder x2, Fleet state-only x2)
+resources/views/standard-billing/form.blade.php   (company-level reorder)
+app/Http/Controllers/Web/ClientController.php   (Fleet store/update/import simplified)
+```

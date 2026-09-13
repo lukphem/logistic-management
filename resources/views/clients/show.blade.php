@@ -535,16 +535,19 @@
                                                             </ul>
                                                         </div>
                                                     @endif
-                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                                        <select name="service_type_id" required class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                    <div class="mb-3 max-w-sm">
+                                                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                             @foreach ($modelServiceTypes as $serviceType)
                                                                 <option value="{{ $serviceType->id }}" @selected($tariff->service_type_id === $serviceType->id)>{{ $serviceType->name }}</option>
                                                             @endforeach
                                                         </select>
+                                                    </div>
+                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                                         <input type="number" step="0.01" min="0" name="min_weight" value="{{ $tariff->min_weight }}" required placeholder="Min weight" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                         <input type="number" step="0.01" min="0" name="max_weight" value="{{ $tariff->max_weight }}" required placeholder="Max weight" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                                        <input type="number" step="0.01" min="0" name="max_weight_limit" value="{{ $tariff->max_weight_limit }}" required placeholder="Max weight limit" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                         <input type="number" step="0.01" min="0.01" name="additional_weight" value="{{ $tariff->additional_weight }}" required placeholder="Increment size" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                        <input type="number" step="0.01" min="0" name="max_weight_limit" value="{{ $tariff->max_weight_limit }}" required placeholder="Max weight limit" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                     </div>
                                                     <div class="zone-rows-container space-y-2">
                                                         @foreach ($tariff->zonePrices as $i => $zp)
@@ -600,7 +603,7 @@
                             @endif
 
                             <div>
-                                <p class="mb-2 text-xs font-semibold text-ink-700">Product &amp; weight range</p>
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Product</p>
                                 <div class="mb-3">
                                     <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
                                     <div class="flex gap-2">
@@ -614,16 +617,18 @@
                                         </label>
                                     </div>
                                 </div>
+                                <div class="mb-4 max-w-sm">
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
+                                    <select name="service_type_id" data-route-select="standard" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <option value="">Select…</option>
+                                        @foreach ($modelServiceTypes as $serviceType)
+                                            <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @style(['display: none' => $serviceType->route_type !== 'domestic'])>{{ $serviceType->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <p class="mb-2 text-xs font-semibold text-ink-700">Weight range</p>
                                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div>
-                                        <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                        <select name="service_type_id" data-route-select="standard" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            <option value="">Select…</option>
-                                            @foreach ($modelServiceTypes as $serviceType)
-                                                <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @style(['display: none' => $serviceType->route_type !== 'domestic'])>{{ $serviceType->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
                                     <div>
                                         <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Min weight (kg)
                                             <span class="cursor-help text-ink-400" title="The lightest shipment this rate covers.">ⓘ</span>
@@ -637,16 +642,16 @@
                                         <input type="number" step="0.01" min="0" name="max_weight" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                     </div>
                                     <div>
-                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight limit (kg)
-                                            <span class="cursor-help text-ink-400" title="The heaviest shipment this rate will ever price — nothing above this weight uses this rate at all, even at the overage rate.">ⓘ</span>
-                                        </label>
-                                        <input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                    </div>
-                                    <div>
                                         <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Increment size (kg)
                                             <span class="cursor-help text-ink-400" title="How weight above 'Max weight' is billed — e.g. 1kg steps, each charged at the zone's Per increment rate.">ⓘ</span>
                                         </label>
                                         <input type="number" step="0.01" min="0.01" name="additional_weight" value="1" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Max weight limit (kg)
+                                            <span class="cursor-help text-ink-400" title="The heaviest shipment this rate will ever price — nothing above this weight uses this rate at all, even at the overage rate.">ⓘ</span>
+                                        </label>
+                                        <input type="number" step="0.01" min="0" name="max_weight_limit" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                     </div>
                                 </div>
                             </div>
@@ -1012,36 +1017,14 @@
                                                                 <option value="{{ $vehicleType->id }}" @selected($tariff->vehicle_type_id === $vehicleType->id)>{{ $vehicleType->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <select name="origin_type" onchange="this.closest('form').querySelector('[name=origin_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=origin_country_id]').classList.toggle('hidden', this.value==='state');" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                                            <option value="state" @selected(! $tariff->origin_country_id)>Origin: State</option>
-                                                            <option value="country" @selected($tariff->origin_country_id)>Origin: Country</option>
-                                                        </select>
-                                                        <select name="destination_type" onchange="this.closest('form').querySelector('[name=destination_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=destination_country_id]').classList.toggle('hidden', this.value==='state');" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                                            <option value="state" @selected(! $tariff->destination_country_id)>Destination: State</option>
-                                                            <option value="country" @selected($tariff->destination_country_id)>Destination: Country</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                                        <select name="origin_state_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->origin_country_id ? 'hidden' : '' }}">
+                                                        <select name="origin_state_id" required class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                             @foreach ($billingStates as $state)
                                                                 <option value="{{ $state->id }}" @selected($tariff->origin_state_id === $state->id)>{{ $state->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <select name="origin_country_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->origin_country_id ? '' : 'hidden' }}">
-                                                            <option value="">—</option>
-                                                            @foreach ($billingCountries as $country)
-                                                                <option value="{{ $country->id }}" @selected($tariff->origin_country_id === $country->id)>{{ $country->name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                        <select name="destination_state_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->destination_country_id ? 'hidden' : '' }}">
+                                                        <select name="destination_state_id" required class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
                                                             @foreach ($billingStates as $state)
                                                                 <option value="{{ $state->id }}" @selected($tariff->destination_state_id === $state->id)>{{ $state->name }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                        <select name="destination_country_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->destination_country_id ? '' : 'hidden' }}">
-                                                            <option value="">—</option>
-                                                            @foreach ($billingCountries as $country)
-                                                                <option value="{{ $country->id }}" @selected($tariff->destination_country_id === $country->id)>{{ $country->name }}</option>
                                                             @endforeach
                                                         </select>
                                                     </div>
@@ -1137,44 +1120,24 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin
-                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic origin, or Country for an international one.">ⓘ</span>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin state
+                                            <span class="cursor-help text-ink-400" title="Fleet vehicles run domestic routes only — pick the state this route starts from.">ⓘ</span>
                                         </label>
-                                        <select name="origin_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                            <option value="state">State</option>
-                                            <option value="country">Country</option>
-                                        </select>
-                                        <select name="origin_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <select name="origin_state_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select state…</option>
                                             @foreach ($billingStates as $state)
                                                 <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            <option value="">Select country…</option>
-                                            @foreach ($billingCountries as $country)
-                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination
-                                            <span class="cursor-help text-ink-400" title="Pick State for a domestic destination, or Country for an international one.">ⓘ</span>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination state
+                                            <span class="cursor-help text-ink-400" title="Fleet vehicles run domestic routes only — pick the state this route ends at.">ⓘ</span>
                                         </label>
-                                        <select name="destination_type" class="mb-1 w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
-                                            <option value="state">State</option>
-                                            <option value="country">Country</option>
-                                        </select>
-                                        <select name="destination_state_id" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <select name="destination_state_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select state…</option>
                                             @foreach ($billingStates as $state)
                                                 <option value="{{ $state->id }}">{{ $state->name }}</option>
-                                            @endforeach
-                                        </select>
-                                        <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            <option value="">Select country…</option>
-                                            @foreach ($billingCountries as $country)
-                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
