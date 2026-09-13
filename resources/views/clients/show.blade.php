@@ -165,6 +165,16 @@
                         <div class="flex justify-between py-1.5"><dt class="text-ink-500">Business manager</dt><dd class="text-ink-900">{{ $profile?->businessManager?->name ?? '—' }}{{ $profile?->businessManager?->staff_short_code ? ' (' . $profile->businessManager->staff_short_code . ')' : '' }}</dd></div>
                     </dl>
                 </div>
+
+                <div class="rounded-xl border border-status-exception/30 bg-status-exception/5 p-5">
+                    <p class="mb-1 text-sm font-semibold text-status-exception">Danger zone</p>
+                    <p class="mb-3 text-xs text-ink-500">Permanently removes {{ $user->name }} — every account, tariff, discount, and document. Blocked if they have any shipment history, so it never silently disconnects past shipments from their client record.</p>
+                    <form method="POST" action="{{ route('clients.destroy', $user) }}" onsubmit="return confirm('Permanently remove {{ $user->name }}? This cannot be undone.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="rounded-md border border-status-exception px-3 py-1.5 text-xs font-semibold text-status-exception transition hover:bg-status-exception/10">Delete client</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -199,6 +209,10 @@
                             <td class="py-2 text-ink-500">{{ $acct->businessManager?->name ?? '—' }}{{ $acct->businessManager?->staff_short_code ? ' (' . $acct->businessManager->staff_short_code . ')' : '' }}</td>
                             <td class="py-2 text-right">
                                 <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
+                                @if ($acct->is_default && $acct->account_type === 'individual')
+                                    <span class="mx-1 text-ink-500">·</span>
+                                    <button type="button" onclick="document.getElementById('upgrade-account-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Upgrade to Organization</button>
+                                @endif
                                 @unless ($acct->is_default)
                                     <span class="mx-1 text-ink-500">·</span>
                                     <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $acct]) }}" class="inline">
@@ -214,6 +228,54 @@
                                 @endunless
                             </td>
                         </tr>
+                        @if ($acct->is_default && $acct->account_type === 'individual')
+                            <tr id="upgrade-account-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                                <td colspan="5" class="p-4">
+                                    <p class="mb-3 text-xs text-ink-500">Converts this account from Individual to Organization — the account keeps its number and history, but the ID type/number fields are replaced with company details below. This cannot be undone from here.</p>
+                                    <form method="POST" action="{{ route('clients.upgrade', $user) }}" class="space-y-3">
+                                        @csrf
+                                        @if ($errors->any())
+                                            <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                                <ul class="list-disc space-y-0.5 pl-4">
+                                                    @foreach ($errors->all() as $message)
+                                                        <li>{{ $message }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Company name <x-required /></label>
+                                                <input type="text" name="company_name" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">RC number <x-required /></label>
+                                                <input type="text" name="rc_number" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">TIN</label>
+                                                <input type="text" name="tin" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Industry</label>
+                                                <input type="text" name="industry" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person <x-required /></label>
+                                                <input type="text" name="contact_person_name" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person role</label>
+                                                <input type="text" name="contact_person_role" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Upgrade account</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>

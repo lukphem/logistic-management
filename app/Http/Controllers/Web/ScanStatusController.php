@@ -60,6 +60,21 @@ class ScanStatusController extends Controller
 
     public function destroy(ScanStatus $scanStatus): RedirectResponse
     {
+        // Same reasoning as update()'s comment on why key is
+        // immutable: the key is what's stored on historical shipments
+        // and scan_events, as a plain string, not a foreign key —
+        // deleting a status still in use wouldn't fail loudly, it
+        // would just silently strip the label/terminal-flag from
+        // every past and current record using it. Blocks instead,
+        // the same "can't remove while in use" pattern used elsewhere
+        // in this app.
+        $inUseByShipments = \App\Models\Shipment::where('current_status', $scanStatus->key)->exists();
+        $inUseByScanEvents = \App\Models\ScanEvent::where('status', $scanStatus->key)->exists();
+
+        if ($inUseByShipments || $inUseByScanEvents) {
+            return redirect()->route('scan-statuses.index')->withErrors(['scan_status' => "Can't remove \"{$scanStatus->label}\" — it's still referenced by existing shipments or scan history."]);
+        }
+
         $scanStatus->delete();
 
         return redirect()->route('scan-statuses.index')->with('status', 'Scan status removed.');

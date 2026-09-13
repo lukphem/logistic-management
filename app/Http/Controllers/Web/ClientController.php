@@ -254,6 +254,16 @@ class ClientController extends Controller
     {
         abort_unless($user->user_type === 'client', 404);
 
+        // shipments.client_user_id is nullOnDelete — deleting the
+        // client wouldn't fail loudly, it would silently orphan every
+        // shipment they've ever had (still there, just with no client
+        // attached). Blocked outright rather than letting that happen
+        // quietly; a client with shipment history isn't something
+        // this action should be able to erase.
+        if (\App\Models\Shipment::where('client_user_id', $user->id)->exists()) {
+            return redirect()->route('clients.show', $user)->withErrors(['client' => "Can't remove {$user->name} — they have shipment history. Removing them would disconnect that history from any client record."]);
+        }
+
         $user->delete();
 
         return redirect()->route('clients.index')->with('status', 'Client account removed.');

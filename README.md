@@ -7343,3 +7343,62 @@ is — it's finished backend work with the frontend trigger never
 added. Two ways to resolve each: add the missing UI control, or
 remove the backend action if it was never actually meant to be
 reachable. Let me know which for each and I'll take care of it.
+
+## Increment 127 — Resolved the Dead-Code Findings
+
+### Removed
+- **`welcome.blade.php`** — deleted. Confirmed unreachable (root route
+  redirects straight to the dashboard) before removing.
+
+### Given a real UI, with a safety check added first where deleting silently loses data
+
+- **`scan-statuses.destroy`** — added a "Remove" button to each row.
+  Before wiring it up, checked what would actually happen on delete:
+  the status `key` is a plain string on `shipments.current_status` and
+  `scan_events.status`, not a foreign key, so removing a status still
+  referenced by either would silently strip its label from every past
+  and current record using it rather than fail loudly. Added a check
+  that blocks removal with a clear message when the key is still in
+  use, matching the same "can't remove while in use" pattern already
+  used elsewhere in this app — verified directly against live MySQL
+  that the block correctly triggers once a shipment references the
+  status, and doesn't trigger when nothing does.
+
+- **`clients.upgrade`** — added an "Upgrade to Organization" control
+  on the Accounts tab (shown only for the default account, only while
+  it's Individual), revealing the company/RC/contact-person fields
+  `upgrade()` already validates. Found and preserved the reason this
+  needed its own action rather than reusing the standard Edit form:
+  an explicit code comment states upgrading an existing individual is
+  meant to go through `upgrade()`, not `update()`, even though the
+  Edit form's account-type toggle could technically also attempt it —
+  kept that separation rather than second-guessing it.
+
+- **`clients.destroy`** — added a "Delete client" control in a new
+  Danger Zone section on the Overview tab. Before wiring it up, traced
+  what deleting a client actually does downstream:
+  `shipments.client_user_id` is `nullOnDelete()`, meaning the delete
+  would never fail — it would silently orphan every shipment the
+  client ever had, disconnecting their history rather than refusing
+  to lose it. Added the same kind of block as scan statuses: no
+  deletion while shipment history exists. Verified directly against
+  live MySQL that inserting a shipment for a client correctly flips
+  the check from allowed to blocked.
+
+### Verified
+
+Balance-checked after every edit, nested-form scan clean on
+`clients/show.blade.php`. Full repo balance check, duplicate-method
+scan, raw-byte backslash scan: clean across 175 files. Both new safety
+checks confirmed end-to-end against live MySQL — correctly permissive
+when nothing is in use, correctly blocking once something is.
+
+### Files
+
+```
+resources/views/welcome.blade.php   (deleted)
+app/Http/Controllers/Web/ScanStatusController.php   (destroy() safety check)
+resources/views/scan-statuses/index.blade.php   (Remove button)
+app/Http/Controllers/Web/ClientController.php   (destroy() safety check)
+resources/views/clients/show.blade.php   (Upgrade to Organization control, Danger Zone / Delete client)
+```
