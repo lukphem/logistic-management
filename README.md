@@ -7499,3 +7499,84 @@ app/Http/Controllers/Web/ClientController.php   (updateAccountBillingInfo(), tin
 resources/views/clients/show.blade.php   (Billing & Invoicing expandable section per account, Managerial tab trimmed)
 routes/web.php
 ```
+
+## Increment 129 — Account-Selector Extended to Department/Users/Managerial + Managerial Restructured + A Real Systemic Bug Found
+
+### Managerial services restructured
+
+Warehouse access and COD were previously plain toggles with no
+associated charge. Both now carry one (a flat Warehouse charge, a COD
+collection percentage), and a genuinely new third service — Staff
+Management (helping the client manage/pay their own staff) — was
+added alongside them, each independently toggleable with its own
+charge field.
+
+### Maximum Delivery Attempt: company-wide default, per-account override
+
+Same override shape as VAT: `Setting::maximum_delivery_attempts` is
+the company-wide default; a client account's own value (added last
+increment) overrides it when set.
+`ClientAccount::effectiveMaximumDeliveryAttempts()` resolves which
+applies, and `RiderController::scan()` now calls this instead of
+reading the account's raw field directly, so an account with no
+override correctly still enforces the company default rather than
+enforcing nothing. Verified both the fallback and the override
+directly against live MySQL.
+
+### Department, Users, and Managerial services made account-selectable
+
+Same pattern Billing Setup already had: a dropdown at the top of each
+tab to configure any of the client's accounts directly, no switching
+required. Department and Users are filtered to Organization accounts
+only in their selector, since Individual accounts don't have either —
+picking one would otherwise make the tab vanish out from under you.
+
+### A real, pre-existing systemic bug found and fixed along the way
+
+Building this surfaced that `redirectToTab()` — used across the
+entire Client Hub — never actually carried the account through: every
+save redirected back to `clients.show`, which always resolves to the
+Default account, regardless of which account was actually being
+edited. This wasn't new to this increment — it affected **17
+existing methods**, including already-shipped Billing Setup actions.
+Saving a special rate on a non-default account would have silently
+bounced the user back to viewing the Default account afterward.
+
+Fixed at the source (`redirectToTab()` now takes an optional
+`$account`, resolving to `clients.accounts.show` when it's set and
+non-default) and propagated across all 17 methods — 6 with an
+explicit `$account` parameter, 9 that derive their account via a
+relationship (e.g. `$tariff->clientAccount`), and 2 correctly left
+untouched because the account itself was mid-creation or mid-deletion
+at that point. Verified with a second, independent pass after an
+earlier automated attempt silently missed six of them — this one was
+checked method-by-method by hand, not trusted on its own report.
+
+### The outdated statement corrected
+
+Both the page's top banner (shown when viewing a non-default account)
+and the Accounts tab's own explanatory text described the *old*
+default-only, switch-first behavior. Both rewritten to describe what
+the page actually does now — every tab except Overview's separate
+Edit page is directly configurable per account, no switching required.
+
+### Verified
+
+Balance-checked after every edit (full file re-checked twice given
+its size), nested-form scan clean. Full repo balance check,
+duplicate-method scan: clean across 180 files. Managerial's full save
+path, and both the Maximum Delivery Attempt fallback and override,
+verified end-to-end against live MySQL.
+
+### Files
+
+```
+app/Models/Setting.php, app/Http/Controllers/Web/SettingsController.php, resources/views/settings/edit.blade.php   (company-wide Max Delivery Attempt)
+database/migrations/2026_03_08_000001_add_maximum_delivery_attempts_to_settings_table.php
+database/migrations/2026_03_08_000002_add_managerial_service_charges_to_client_accounts_table.php
+app/Models/ClientAccount.php   (effectiveMaximumDeliveryAttempts(), managerial fields)
+app/Http/Controllers/Api/RiderController.php   (uses effective value)
+app/Http/Controllers/Web/ClientController.php   (redirectToTab() account-aware fix across 17 methods, updateManagerial() restructured + account-scoped, storeDepartment/storeSubUser account-scoped)
+resources/views/clients/show.blade.php   (Department/Users/Managerial account-selectors, Managerial UI restructured, both outdated statements corrected)
+routes/web.php
+```

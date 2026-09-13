@@ -384,7 +384,7 @@ class ClientController extends Controller
             'invoice_due_days' => $data['invoice_due_days'] ?? null,
         ]);
 
-        return $this->redirectToTab($user, 'accounts', "Billing & invoicing details updated for \"{$account->account_name}\".");
+        return $this->redirectToTab($user, 'accounts', "Billing & invoicing details updated for \"{$account->account_name}\".", $account);
     }
 
     /**
@@ -453,7 +453,7 @@ class ClientController extends Controller
             ['client_user_id' => $user->id, 'discount_percentage' => $data['discount_percentage']]
         );
 
-        return $this->redirectToTab($user, 'billing', 'Discount saved.');
+        return $this->redirectToTab($user, 'billing', 'Discount save, $account).');
     }
 
     public function destroyDiscount(User $user, ClientServiceDiscount $discount): RedirectResponse
@@ -462,7 +462,7 @@ class ClientController extends Controller
 
         $discount->delete();
 
-        return $this->redirectToTab($user, 'billing', 'Discount removed — this service type now bills standard for this client.');
+        return $this->redirectToTab($user, 'billing', 'Discount removed — this service type now bills standard for this client.', $discount->clientAccount);
     }
 
     public function storeSpecialTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -516,7 +516,7 @@ class ClientController extends Controller
             ]);
         }
 
-        return $this->redirectToTab($user, 'billing', 'Special rate added.');
+        return $this->redirectToTab($user, 'billing', 'Special, $account)rate added.');
     }
 
     public function destroySpecialTariff(User $user, ClientSpecialTariff $tariff): RedirectResponse
@@ -525,7 +525,7 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return $this->redirectToTab($user, 'billing', 'Special rate removed — this weight band now bills standard for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this weight band now bills standard for this client.', $tariff->clientAccount);
     }
 
     /**
@@ -588,7 +588,7 @@ class ClientController extends Controller
 
         $tariff->zonePrices()->whereNotIn('zone_id', $submittedZoneIds)->delete();
 
-        return $this->redirectToTab($user, 'billing', 'Special rate updated.');
+        return $this->redirectToTab($user, 'billing', 'Special rate updated.', $tariff->clientAccount);
     }
 
     public function storeOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -662,7 +662,7 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return $this->redirectToTab($user, 'billing', 'Special Origin-to-Destination rate added.');
+        return $this->redirectToTab($user, 'billing', 'Special Origin-to-D, $account)stination rate added.');
     }
 
     public function destroyOriginDestinationTariff(User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
@@ -671,7 +671,7 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return $this->redirectToTab($user, 'billing', 'Special rate removed — this route now bills at the company rate for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this route now bills at the company rate for this client.', $tariff->clientAccount);
     }
 
     public function updateOriginDestinationTariff(Request $request, User $user, \App\Models\ClientOriginDestinationTariff $tariff): RedirectResponse
@@ -741,7 +741,7 @@ class ClientController extends Controller
             'transit_days' => $data['transit_days'] ?? null,
         ]);
 
-        return $this->redirectToTab($user, 'billing', 'Special Origin-to-Destination rate updated.');
+        return $this->redirectToTab($user, 'billing', 'Special Origin-to-Destination rate updated.', $tariff->clientAccount);
     }
 
     public function storeFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -821,7 +821,7 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return $this->redirectToTab($user, 'billing', 'Special Fleet rate added.');
+        return $this->redirectToTab($user, 'bill, $account)ng', 'Special Fleet rate added.');
     }
 
     public function destroyFleetTariff(User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
@@ -830,7 +830,7 @@ class ClientController extends Controller
 
         $tariff->delete();
 
-        return $this->redirectToTab($user, 'billing', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.');
+        return $this->redirectToTab($user, 'billing', 'Special rate removed — this vehicle type/route now bills at the company rate for this client.', $tariff->clientAccount);
     }
 
     public function updateFleetTariff(Request $request, User $user, \App\Models\ClientFleetBillingTariff $tariff): RedirectResponse
@@ -902,7 +902,7 @@ class ClientController extends Controller
             'transit_days' => $data['transit_days'] ?? null,
         ]);
 
-        return $this->redirectToTab($user, 'billing', 'Special Fleet rate updated.');
+        return $this->redirectToTab($user, 'billing', 'Special Fleet rate updated.', $tariff->clientAccount);
     }
 
     /**
@@ -988,7 +988,7 @@ class ClientController extends Controller
             }
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported: {$tariffsCreated} special rates created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type, overlapping range, or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported: {$tariffsCreated} special rates created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type, ove, $account)lapping range, or missing weight)." : '.'));
     }
 
     public function importOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -1082,7 +1082,7 @@ class ClientController extends Controller
             $count++;
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported {$count} special Origin-to-Destination rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code, overlapping range, or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Origin-to-Destination rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product, $account)code, overlapping range, or missing weight)." : '.'));
     }
 
     public function importFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -1181,7 +1181,7 @@ class ClientController extends Controller
             $count++;
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code, overlapping range, or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/count, $account)y/product code, overlapping range, or missing weight)." : '.'));
     }
 
     /**
@@ -1225,7 +1225,7 @@ class ClientController extends Controller
 
         $account->update(['disabled_billing_models' => $disabled]);
 
-        return $this->redirectToTab($user, 'billing', 'Billing model availability updated.');
+        return $this->redirectToTab($user, 'billing', 'Billing model availability updated.', $account);
     }
 
     /**
@@ -1255,7 +1255,7 @@ class ClientController extends Controller
 
         $account->update(['special_billing_models' => $special]);
 
-        return $this->redirectToTab($user, 'billing', 'Billing mode updated.');
+        return $this->redirectToTab($user, 'billing', 'Billing mode updated.', $account);
     }
 
     /**
@@ -1281,16 +1281,16 @@ class ClientController extends Controller
 
         $account->update(['special_fallback_models' => $fallback]);
 
-        return $this->redirectToTab($user, 'billing', 'Fallback setting updated.');
+        return $this->redirectToTab($user, 'billing', 'Fallback setting updated.', $account);
     }
 
     // ---------------------------------------------------------------
     // Department
     // ---------------------------------------------------------------
 
-    public function storeDepartment(Request $request, User $user): RedirectResponse
+    public function storeDepartment(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
         abort_unless($account->isOrganization(), 404);
 
         $data = $this->validated(Validator::make($request->all(), [
@@ -1299,16 +1299,19 @@ class ClientController extends Controller
 
         Department::create(['client_account_id' => $account->id, 'name' => $data['name']]);
 
-        return $this->redirectToTab($user, 'department', 'Department added.');
+        return $this->redirectToTab($user, 'department', 'Department added.', $account);
     }
 
     public function destroyDepartment(User $user, Department $department): RedirectResponse
     {
-        abort_unless($department->client_account_id === $user->defaultAccount?->id, 404);
+        // Any of the client's accounts, not just Default — a
+        // department belongs to whichever account it was created
+        // under, and that's no longer necessarily the Default one.
+        abort_unless($department->clientAccount?->client_user_id === $user->id, 404);
 
         $department->delete();
 
-        return $this->redirectToTab($user, 'department', 'Department removed.');
+        return $this->redirectToTab($user, 'department', 'Department removed.', $department->clientAccount);
     }
 
     // ---------------------------------------------------------------
@@ -1316,9 +1319,9 @@ class ClientController extends Controller
     // to the account they work under
     // ---------------------------------------------------------------
 
-    public function storeSubUser(Request $request, User $user): RedirectResponse
+    public function storeSubUser(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
         abort_unless($account->isOrganization(), 404);
 
         $data = $this->validated(Validator::make($request->all(), [
@@ -1351,16 +1354,19 @@ class ClientController extends Controller
             'department_id' => $data['department_id'] ?? null,
         ]);
 
-        return $this->redirectToTab($user, 'users', "{$subUser->name} added as a user under {$user->name}.");
+        return $this->redirectToTab($user, 'users', "{$subUser->name} added as a user under {$user->name}.", $account);
     }
 
     public function destroySubUser(User $user, User $subUser): RedirectResponse
     {
-        abort_unless($subUser->clientProfile?->client_account_id === $user->defaultAccount?->id, 404);
+        // Any of the client's accounts, not just Default — same
+        // reasoning as destroyDepartment().
+        $subUserAccountId = $subUser->clientProfile?->client_account_id;
+        abort_unless($subUserAccountId && \App\Models\ClientAccount::where('id', $subUserAccountId)->where('client_user_id', $user->id)->exists(), 404);
 
         $subUser->delete();
 
-        return $this->redirectToTab($user, 'users', 'User removed.');
+        return $this->redirectToTab($user, 'users', 'User removed.', \App\Models\ClientAccount::find($subUserAccountId));
     }
 
     // ---------------------------------------------------------------
@@ -1381,7 +1387,7 @@ class ClientController extends Controller
             ['client_user_id' => $user->id, 'is_active' => $request->boolean('is_active')]
         );
 
-        return $this->redirectToTab($user, 'billing', 'Service access updated.');
+        return $this->redirectToTab($user, 'billing', 'Service access updated.', $account);
     }
 
     // ---------------------------------------------------------------
@@ -1523,27 +1529,35 @@ class ClientController extends Controller
     // invoice terms, SLA commitments — account-level
     // ---------------------------------------------------------------
 
-    public function updateManagerial(Request $request, User $user): RedirectResponse
+    public function updateManagerial(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        $account = $this->requireDefaultAccount($user);
+        abort_unless($account->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'warehouse_access' => 'sometimes|boolean',
+            'warehouse_charge' => 'required_if:warehouse_access,1|nullable|numeric|min:0',
             'cod_enabled' => 'sometimes|boolean',
+            'cod_percentage' => 'required_if:cod_enabled,1|nullable|numeric|min:0|max:100',
+            'staff_management_enabled' => 'sometimes|boolean',
+            'staff_management_charge' => 'required_if:staff_management_enabled,1|nullable|numeric|min:0',
             'insurance_agreement' => 'sometimes|boolean',
             'insurance_agreement_date' => 'nullable|date',
             'insurance_agreement_notes' => 'nullable|string|max:2000',
             'sla_pickup_hours' => 'nullable|integer|min:0|max:720',
             'sla_delivery_days' => 'nullable|integer|min:0|max:90',
-        ]), $user, 'managerial');
+        ]), $user, 'managerial', 'managerial' . $account->id);
 
         $data['warehouse_access'] = $request->boolean('warehouse_access');
+        $data['warehouse_charge'] = $data['warehouse_access'] ? $data['warehouse_charge'] : null;
         $data['cod_enabled'] = $request->boolean('cod_enabled');
+        $data['cod_percentage'] = $data['cod_enabled'] ? $data['cod_percentage'] : null;
+        $data['staff_management_enabled'] = $request->boolean('staff_management_enabled');
+        $data['staff_management_charge'] = $data['staff_management_enabled'] ? $data['staff_management_charge'] : null;
         $data['insurance_agreement'] = $request->boolean('insurance_agreement');
 
         $account->update($data);
 
-        return $this->redirectToTab($user, 'managerial', 'Managerial settings updated.');
+        return $this->redirectToTab($user, 'man, $account)gerial', "Managerial settings updated for \"{$account->account_name}\".");
     }
 
     /**
@@ -1553,8 +1567,23 @@ class ClientController extends Controller
      * working in, not always Overview. Used for SUCCESS redirects;
      * see validated() for the matching FAILURE-path fix.
      */
-    private function redirectToTab(User $user, string $tab, string $status): RedirectResponse
+    /**
+     * $account is optional — most actions on this page still operate
+     * on whichever account is Default, and for those this behaves
+     * exactly as before. Actions that take an EXPLICIT account
+     * (Billing Setup's methods, and now Department/Users/Managerial
+     * services too) should pass it through: without it, saving
+     * anything on a non-default account would redirect back to
+     * clients.show, which always resolves to the Default account —
+     * silently dropping the person back onto the wrong account right
+     * after they just finished editing a different one.
+     */
+    private function redirectToTab(User $user, string $tab, string $status, ?ClientAccount $account = null): RedirectResponse
     {
+        if ($account && ! $account->is_default) {
+            return redirect()->route('clients.accounts.show', ['user' => $user, 'account' => $account, 'tab' => $tab])->with('status', $status);
+        }
+
         return redirect()->route('clients.show', ['user' => $user, 'tab' => $tab])->with('status', $status);
     }
 

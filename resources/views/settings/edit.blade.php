@@ -130,6 +130,12 @@
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
                 <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Maximum Delivery Attempt</label>
+                    <input type="number" step="1" min="1" name="maximum_delivery_attempts" value="{{ old('maximum_delivery_attempts', $settings->maximum_delivery_attempts) }}" placeholder="No limit"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <p class="mt-1 text-xs text-ink-500">Company-wide default — an individual client account can override this under its own Accounts tab; leave blank for no limit at all.</p>
+                </div>
+                <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Volumetric divisor <x-required /></label>
                     <input type="number" step="1" min="1" name="volumetric_divisor" value="{{ old('volumetric_divisor', $settings->volumetric_divisor) }}"
                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">

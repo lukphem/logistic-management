@@ -14,7 +14,8 @@ class ClientAccount extends Model
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
         'alternate_phone', 'billing_address', 'use_default_contact',
-        'warehouse_access', 'cod_enabled',
+        'warehouse_access', 'warehouse_charge', 'cod_enabled', 'cod_percentage',
+        'staff_management_enabled', 'staff_management_charge',
         'insurance_agreement', 'insurance_agreement_date', 'insurance_agreement_notes',
         'invoice_due_days', 'sla_pickup_hours', 'sla_delivery_days',
         'is_vatable', 'vat_percentage', 'is_pickup_chargeable', 'pickup_charge',
@@ -28,6 +29,10 @@ class ClientAccount extends Model
         'special_fallback_models' => 'array',
         'is_default' => 'boolean',
         'warehouse_access' => 'boolean',
+        'warehouse_charge' => 'float',
+        'cod_percentage' => 'float',
+        'staff_management_enabled' => 'boolean',
+        'staff_management_charge' => 'float',
         'cod_enabled' => 'boolean',
         'insurance_agreement' => 'boolean',
         'insurance_agreement_date' => 'date',
@@ -318,6 +323,17 @@ class ClientAccount extends Model
         }
 
         return $this->vat_percentage ?? (\App\Models\Setting::current()->vat_percentage ?? 0.0);
+    }
+
+    /**
+     * Same override shape as effectiveVatPercentage() — null on the
+     * account means "use the company-wide default from Settings", a
+     * set value here overrides it for this account specifically. Null
+     * either way means no limit is enforced, not zero.
+     */
+    public function effectiveMaximumDeliveryAttempts(): ?int
+    {
+        return $this->maximum_delivery_attempts ?? \App\Models\Setting::current()->maximum_delivery_attempts;
     }
 
     public function serviceSubscriptions(): HasMany

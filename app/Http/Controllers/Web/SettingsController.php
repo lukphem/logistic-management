@@ -29,6 +29,7 @@ class SettingsController extends Controller
             'supported_billing_models' => 'nullable|array',
             'supported_billing_models.*' => 'in:' . implode(',', array_keys(Setting::BILLING_MODELS)),
             'vat_percentage' => 'required|numeric|min:0|max:100',
+            'maximum_delivery_attempts' => 'nullable|integer|min:1',
             'volumetric_divisor' => 'required|integer|min:1',
             'quote_validity_days' => 'required|integer|min:1|max:365',
             'tracking_number_format' => 'nullable|string|max:255',

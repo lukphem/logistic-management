@@ -91,7 +91,7 @@ class RiderController extends Controller
             $shipmentUpdate['delivery_attempts_count'] = $shipment->delivery_attempts_count + 1;
 
             $maxAttempts = $shipment->client_account_id
-                ? \App\Models\ClientAccount::find($shipment->client_account_id)?->maximum_delivery_attempts
+                ? \App\Models\ClientAccount::find($shipment->client_account_id)?->effectiveMaximumDeliveryAttempts()
                 : null;
 
             if ($maxAttempts && $shipmentUpdate['delivery_attempts_count'] >= $maxAttempts && ! $shipment->delivery_attempts_exceeded_at) {

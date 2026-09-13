@@ -306,10 +306,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/clients/{user}/accounts/{account}/billing-mode', [ClientController::class, 'updateBillingModelMode'])->name('clients.billing-mode.update');
         Route::put('/clients/{user}/accounts/{account}/billing-fallback', [ClientController::class, 'updateBillingModelFallback'])->name('clients.billing-fallback.update');
 
-        Route::post('/clients/{user}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
+        Route::post('/clients/{user}/accounts/{account}/departments', [ClientController::class, 'storeDepartment'])->name('clients.departments.store');
         Route::delete('/clients/{user}/departments/{department}', [ClientController::class, 'destroyDepartment'])->name('clients.departments.destroy');
 
-        Route::post('/clients/{user}/users', [ClientController::class, 'storeSubUser'])->name('clients.sub-users.store');
+        Route::post('/clients/{user}/accounts/{account}/users', [ClientController::class, 'storeSubUser'])->name('clients.sub-users.store');
         Route::delete('/clients/{user}/users/{subUser}', [ClientController::class, 'destroySubUser'])->name('clients.sub-users.destroy');
 
         Route::post('/clients/{user}/accounts/{account}/services', [ClientController::class, 'storeServiceSubscription'])->name('clients.services.store');
@@ -324,7 +324,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/webhooks', [ClientController::class, 'storeWebhook'])->name('clients.webhooks.store');
         Route::delete('/clients/{user}/webhooks/{webhook}', [ClientController::class, 'destroyWebhook'])->name('clients.webhooks.destroy');
 
-        Route::put('/clients/{user}/managerial', [ClientController::class, 'updateManagerial'])->name('clients.managerial.update');
+        Route::put('/clients/{user}/accounts/{account}/managerial', [ClientController::class, 'updateManagerial'])->name('clients.managerial.update');
     });
     Route::middleware('can:clients:delete')->group(function () {
         Route::delete('/clients/{user}', [ClientController::class, 'destroy'])->name('clients.destroy');

@@ -26,8 +26,8 @@
     @unless ($isViewingDefault)
         <div class="mb-4 flex items-center justify-between rounded-xl border border-line bg-surface-50 px-4 py-3 text-sm">
             <p class="text-ink-900">
-                Viewing <span class="font-semibold">{{ $account->account_name }}</span> — read-only.
-                Sections reflect this account, but Add/Save actions are disabled until you switch to it.
+                Viewing <span class="font-semibold">{{ $account->account_name }}</span> — every tab below reads and writes to this account directly, no need to switch first.
+                The one exception is the Overview tab's Edit page, which still always edits the Default account.
             </p>
             <form method="POST" action="{{ route('clients.accounts.set-default', [$user, $account]) }}">
                 @csrf
@@ -183,7 +183,7 @@
     <div id="tab-accounts" class="mt-5 max-w-3xl" style="display:none">
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <p class="mb-1 text-sm font-semibold text-ink-900">Accounts under {{ $user->name }}</p>
-            <p class="mb-4 text-xs text-ink-500">Every other tab (Overview, Tariff, Discount, Department, User, Service, Managerial services) reflects whichever account below is marked "In use" — switch to configure a different one. Products, billing, and Business Manager stay exactly as configured per account; nothing is shared or reset when switching.</p>
+            <p class="mb-4 text-xs text-ink-500">Billing Setup, Department, User, and Managerial services can each be configured directly for any account below, via the selector at the top of that tab — no need to switch which one is "In use" first. Only the Overview tab's Edit page still always targets whichever account is marked "In use". Products, billing, and Business Manager stay exactly as configured per account; nothing is shared or reset when switching.</p>
 
             <table class="mb-4 w-full text-left text-sm">
                 <thead>
@@ -330,9 +330,9 @@
                                         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
                                                 <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Maximum Delivery Attempt
-                                                    <span class="cursor-help text-ink-400" title="Once a shipment on this account reaches this many scans marked as a delivery attempt, it's flagged — leave blank for no limit.">ⓘ</span>
+                                                    <span class="cursor-help text-ink-400" title="Once a shipment on this account reaches this many scans marked as a delivery attempt, it's flagged. Leave blank to use the company-wide default from Settings instead of setting one for this account specifically.">ⓘ</span>
                                                 </label>
-                                                <input type="number" min="1" name="maximum_delivery_attempts" value="{{ $acct->maximum_delivery_attempts }}" placeholder="No limit" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                <input type="number" min="1" name="maximum_delivery_attempts" value="{{ $acct->maximum_delivery_attempts }}" placeholder="Company default ({{ \App\Models\Setting::current()->maximum_delivery_attempts ?? 'no limit' }})" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             </div>
                                             <div>
                                                 <label class="mb-1 block text-xs font-medium text-ink-900">Invoice Number of Days</label>
@@ -1448,6 +1448,20 @@
     @if ($isOrganization)
     {{-- ============ DEPARTMENT ============ --}}
     <div id="tab-department" class="mt-5 max-w-2xl" style="display:none">
+        @php $organizationAccountsForDept = $accounts->where('account_type', 'organization'); @endphp
+        @if ($organizationAccountsForDept->count() > 1)
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Configuring departments for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($organizationAccountsForDept as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?tab=department" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Only Organization accounts are listed — Individual accounts don't have departments.</p>
+            </div>
+        @endif
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <p class="mb-3 text-sm font-semibold text-ink-900">Departments</p>
             @if ($departments->isNotEmpty())
@@ -1466,8 +1480,7 @@
             @else
                 <p class="mb-4 text-sm text-ink-500">No departments set up yet.</p>
             @endif
-            @if ($isViewingDefault)
-            <form method="POST" action="{{ route('clients.departments.store', $user) }}" class="flex items-end gap-3">
+            <form method="POST" action="{{ route('clients.departments.store', [$user, $account]) }}" class="flex items-end gap-3">
                 @csrf
                 <div class="flex-1">
                     <label class="mb-1 block text-xs font-medium text-ink-900">Department name</label>
@@ -1475,14 +1488,25 @@
                 </div>
                 <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add</button>
             </form>
-            @else
-                <p class="text-xs text-ink-500">Switch to this account (Accounts tab) to add a department.</p>
-            @endif
         </div>
     </div>
 
     {{-- ============ USER (sub-users) ============ --}}
     <div id="tab-users" class="mt-5 max-w-2xl" style="display:none">
+        @php $organizationAccounts = $accounts->where('account_type', 'organization'); @endphp
+        @if ($organizationAccounts->count() > 1)
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Configuring users for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($organizationAccounts as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?tab=users" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Only Organization accounts are listed — Individual accounts don't have sub-users.</p>
+            </div>
+        @endif
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <p class="mb-3 text-sm font-semibold text-ink-900">Users under {{ $user->name }}</p>
             @if ($subUsers->isNotEmpty())
@@ -1509,8 +1533,7 @@
                 <p class="mb-4 text-sm text-ink-500">No sub-users yet.</p>
             @endif
 
-            @if ($isViewingDefault)
-            <form method="POST" action="{{ route('clients.sub-users.store', $user) }}" class="space-y-3 border-t border-line pt-4">
+            <form method="POST" action="{{ route('clients.sub-users.store', [$user, $account]) }}" class="space-y-3 border-t border-line pt-4">
                 @csrf
                 <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Add a user</p>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1532,9 +1555,6 @@
                     <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Add user</button>
                 </div>
             </form>
-            @else
-                <p class="border-t border-line pt-4 text-xs text-ink-500">Switch to this account (Accounts tab) to add a user.</p>
-            @endif
         </div>
     </div>
     @endif
@@ -1684,41 +1704,88 @@
 
     {{-- ============ MANAGERIAL SERVICES ============ --}}
     <div id="tab-managerial" class="mt-5 max-w-2xl" style="display:none">
-        <form method="POST" action="{{ route('clients.managerial.update', $user) }}" class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        @if ($accounts->count() > 1)
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Configuring managerial services for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($accounts as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?tab=managerial" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">Every account under this client can be configured directly here — no need to switch which one is Default first.</p>
+            </div>
+        @endif
+        <form method="POST" action="{{ route('clients.managerial.update', [$user, $account]) }}" class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             @csrf
             @method('PUT')
-            <fieldset {{ $isViewingDefault ? '' : 'disabled' }} class="space-y-0">
-            @unless ($isViewingDefault)
-                <p class="mb-4 text-xs text-ink-500">Switch to this account (Accounts tab) to change these settings.</p>
-            @endunless
+            @if ($errors->{'managerial' . $account->id}->any())
+                <div class="mb-4 rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-sm text-status-exception">
+                    <ul class="list-disc space-y-0.5 pl-5">
+                        @foreach ($errors->{'managerial' . $account->id}->all() as $message)
+                            <li>{{ $message }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
-            <div class="mb-4 flex flex-wrap gap-6">
-                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                    <input type="checkbox" name="warehouse_access" value="1" @checked($profile?->warehouse_access) class="rounded border-line">
-                    Warehouse access
-                    <span class="cursor-help text-ink-400" title="Lets this client store goods at a company warehouse ahead of dispatch, rather than every shipment being picked up or dropped off fresh.">ⓘ</span>
-                </label>
-                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                    <input type="checkbox" name="cod_enabled" value="1" @checked($profile?->cod_enabled) class="rounded border-line">
-                    Cash on delivery enabled
-                    <span class="cursor-help text-ink-400" title="Lets this client's shipments collect payment from the recipient at the point of delivery, instead of always being prepaid.">ⓘ</span>
-                </label>
+            <div class="mb-4">
+                <p class="mb-2 text-sm font-semibold text-ink-900">Services</p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div class="rounded-lg border border-line p-3">
+                        <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" name="warehouse_access" value="1" @checked($account->warehouse_access)
+                                   onchange="document.getElementById('warehouse-charge-field').classList.toggle('hidden', !this.checked)" class="rounded border-line">
+                            Warehouse
+                            <span class="cursor-help text-ink-400" title="Lets this client store goods at a company warehouse ahead of dispatch, rather than every shipment being picked up or dropped off fresh.">ⓘ</span>
+                        </label>
+                        <div id="warehouse-charge-field" class="{{ $account->warehouse_access ? '' : 'hidden' }}">
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
+                            <input type="number" step="0.01" min="0" name="warehouse_charge" value="{{ $account->warehouse_charge }}" placeholder="Amount charged for warehousing" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                    </div>
+                    <div class="rounded-lg border border-line p-3">
+                        <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" name="cod_enabled" value="1" @checked($account->cod_enabled)
+                                   onchange="document.getElementById('cod-percentage-field').classList.toggle('hidden', !this.checked)" class="rounded border-line">
+                            Cash on delivery
+                            <span class="cursor-help text-ink-400" title="Lets this client's shipments collect payment from the recipient at the point of delivery, instead of always being prepaid.">ⓘ</span>
+                        </label>
+                        <div id="cod-percentage-field" class="{{ $account->cod_enabled ? '' : 'hidden' }}">
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Collection fee %</label>
+                            <input type="number" step="0.01" min="0" max="100" name="cod_percentage" value="{{ $account->cod_percentage }}" placeholder="% of cash collected" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                    </div>
+                    <div class="rounded-lg border border-line p-3">
+                        <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" name="staff_management_enabled" value="1" @checked($account->staff_management_enabled)
+                                   onchange="document.getElementById('staff-management-charge-field').classList.toggle('hidden', !this.checked)" class="rounded border-line">
+                            Staff management
+                            <span class="cursor-help text-ink-400" title="Helping this client manage and pay their own staff — a separate service from anything shipment-related.">ⓘ</span>
+                        </label>
+                        <div id="staff-management-charge-field" class="{{ $account->staff_management_enabled ? '' : 'hidden' }}">
+                            <label class="mb-1 block text-xs font-medium text-ink-900">Charge</label>
+                            <input type="number" step="0.01" min="0" name="staff_management_charge" value="{{ $account->staff_management_charge }}" placeholder="Amount charged" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mb-4 border-t border-line pt-4">
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                    <input type="checkbox" name="insurance_agreement" value="1" @checked($profile?->insurance_agreement) class="rounded border-line">
+                    <input type="checkbox" name="insurance_agreement" value="1" @checked($account->insurance_agreement) class="rounded border-line">
                     Insurance agreement in place
                     <span class="cursor-help text-ink-400" title="A separate commercial agreement covering loss/damage liability for this client's shipments — not the same as declared-value insurance on an individual shipment.">ⓘ</span>
                 </label>
                 <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Agreement date</label>
-                        <input type="date" name="insurance_agreement_date" value="{{ $profile?->insurance_agreement_date?->format('Y-m-d') }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <input type="date" name="insurance_agreement_date" value="{{ $account->insurance_agreement_date?->format('Y-m-d') }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-medium text-ink-900">Notes</label>
-                        <input type="text" name="insurance_agreement_notes" value="{{ $profile?->insurance_agreement_notes }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <input type="text" name="insurance_agreement_notes" value="{{ $account->insurance_agreement_notes }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                 </div>
             </div>
@@ -1731,13 +1798,13 @@
                         <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">SLA: pickup within (hours)
                             <span class="cursor-help text-ink-400" title="How quickly a pickup request from this client should be actioned, in hours — an internal service target, not a customer-facing guarantee shown on a waybill.">ⓘ</span>
                         </label>
-                        <input type="number" min="0" name="sla_pickup_hours" value="{{ $profile?->sla_pickup_hours }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <input type="number" min="0" name="sla_pickup_hours" value="{{ $account->sla_pickup_hours }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                     <div>
                         <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">SLA: delivery within (days)
                             <span class="cursor-help text-ink-400" title="Expected delivery turnaround for this client's shipments, in days — an internal service target, separate from any per-shipment transit-day estimate.">ⓘ</span>
                         </label>
-                        <input type="number" min="0" name="sla_delivery_days" value="{{ $profile?->sla_delivery_days }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <input type="number" min="0" name="sla_delivery_days" value="{{ $account->sla_delivery_days }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                 </div>
             </div>
@@ -1745,7 +1812,6 @@
             <div class="flex justify-end">
                 <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Save</button>
             </div>
-            </fieldset>
         </form>
     </div>
 

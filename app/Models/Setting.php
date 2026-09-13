@@ -9,7 +9,7 @@ class Setting extends Model
     protected $fillable = [
         'company_name', 'logo_path',
         'color_primary', 'color_secondary', 'login_design',
-        'vat_percentage', 'volumetric_divisor', 'quote_validity_days', 'currency',
+        'vat_percentage', 'maximum_delivery_attempts', 'volumetric_divisor', 'quote_validity_days', 'currency',
         'tracking_number_format', 'next_tracking_sequence',
         'account_number_format', 'allow_manual_account_number',
         'waybill_thermal_size', 'waybill_show_qr',
@@ -21,6 +21,7 @@ class Setting extends Model
         'operating_regions' => 'array',
         'waybill_show_qr' => 'boolean',
         'vat_percentage' => 'float',
+        'maximum_delivery_attempts' => 'integer',
         'volumetric_divisor' => 'integer',
         'quote_validity_days' => 'integer',
         'next_tracking_sequence' => 'integer',
