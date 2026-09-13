@@ -6936,3 +6936,62 @@ either side freely, for any combination, without needing a named
 ```
 resources/views/clients/show.blade.php
 ```
+
+## Increment 120 — Overlap Detection for Special Rates
+
+Real gap, caught by direct feedback: nothing prevented staff from
+creating two special rates for the same service type (or same route,
+for O2D/Fleet) with overlapping weight ranges — the system would have
+had no way to know which rate should actually apply to a shipment
+landing in that overlap.
+
+### What was found
+
+`StandardBillingController` already has this protection at the
+company level (`rejectIfOverlapping()`, `rangesOverlap()`) — but
+Origin-to-Destination and Fleet Billing don't, even at the company
+level. This confirms the gap existed before this session's work, not
+just in it.
+
+### Fix
+
+Mirrors Standard Billing's exact closed-interval overlap test
+(`$minA <= $maxB && $minB <= $maxA` — touching endpoints count as
+overlapping on purpose, since a shipment at exactly the boundary
+weight would otherwise match two rates at once) across all three
+client-specific tariff types, wired into every store/update action
+via `Validator::after()` — same integration pattern the company-level
+one already uses.
+
+Scoped appropriately for each: Standard Billing checks service type
+alone (matching the company-level scope); Origin-to-Destination and
+Fleet additionally match on the *exact* route (state/city/country on
+both ends), and Fleet also matches vehicle type — two different
+routes (or vehicle types) sharing a weight range aren't in conflict,
+only the same one is. All three are additionally scoped by
+`client_account_id`, since two *different* accounts having rates in
+the same range isn't a conflict either.
+
+The three CSV bulk-import actions get the same protection — a row
+that would create a genuinely overlapping (not exactly-matching)
+range is skipped and counted, not silently imported.
+
+### Verified
+
+The overlap test itself simulated in Python for all four boundary
+cases (genuine overlap, touching endpoint, no overlap, exact
+duplicate) — all resolve as intended. The account-scoping confirmed
+directly against live MySQL: an identical service type and
+overlapping range on a *different* account correctly doesn't
+collide, while the same account correctly does. Full repo balance
+check, duplicate-method scan: clean across 176 files.
+
+**Not done yet** (next, per your message): switching the special-rate
+displays from cards to the table format used elsewhere in the
+system, for visual consistency.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php
+```

@@ -417,6 +417,18 @@ class ClientController extends Controller
             'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
             'zone_prices.*.transit_days' => 'nullable|integer|min:0',
         ]);
+
+        $validator->after(function ($validator) use ($request, $account) {
+            $this->rejectIfSpecialTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $account->id,
+                (int) $request->input('service_type_id'),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit')
+            );
+        });
+
         $data = $this->validated($validator, $user, 'billing', 'standardTariff');
 
         $tariff = ClientSpecialTariff::create([
@@ -474,6 +486,19 @@ class ClientController extends Controller
             'zone_prices.*.additional_charge' => 'nullable|numeric|min:0',
             'zone_prices.*.transit_days' => 'nullable|integer|min:0',
         ]);
+
+        $validator->after(function ($validator) use ($request, $tariff) {
+            $this->rejectIfSpecialTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $tariff->client_account_id,
+                (int) $request->input('service_type_id'),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit'),
+                $tariff
+            );
+        });
+
         $data = $this->validated($validator, $user, 'billing', 'standardTariff' . $tariff->id);
 
         $tariff->update([
@@ -506,7 +531,7 @@ class ClientController extends Controller
     {
         abort_unless($account->client_user_id === $user->id, 404);
 
-        $data = $this->validated(Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'origin_type' => 'required|in:state,country',
             'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
@@ -523,7 +548,20 @@ class ClientController extends Controller
             'additional_weight' => 'required|numeric|min:0.01',
             'additional_charge' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ]), $user, 'billing', 'odTariff');
+        ]);
+
+        $validator->after(function ($validator) use ($request, $account) {
+            $this->rejectIfOriginDestinationTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $account->id,
+                $this->normalizeRouteFields($request->all()),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit')
+            );
+        });
+
+        $data = $this->validated($validator, $user, 'billing', 'odTariff');
 
         // Same "state XOR country" clearing as the company-level form —
         // a route is one or the other, never both.
@@ -576,7 +614,7 @@ class ClientController extends Controller
     {
         abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
 
-        $data = $this->validated(Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'origin_type' => 'required|in:state,country',
             'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
@@ -593,7 +631,21 @@ class ClientController extends Controller
             'additional_weight' => 'required|numeric|min:0.01',
             'additional_charge' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ]), $user, 'billing', 'odTariff' . $tariff->id);
+        ]);
+
+        $validator->after(function ($validator) use ($request, $tariff) {
+            $this->rejectIfOriginDestinationTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $tariff->client_account_id,
+                $this->normalizeRouteFields($request->all()),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit'),
+                $tariff
+            );
+        });
+
+        $data = $this->validated($validator, $user, 'billing', 'odTariff' . $tariff->id);
 
         if ($data['origin_type'] === 'country') {
             $data['origin_state_id'] = null;
@@ -632,7 +684,7 @@ class ClientController extends Controller
     {
         abort_unless($account->client_user_id === $user->id, 404);
 
-        $data = $this->validated(Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'vehicle_type_id' => 'required|exists:vehicle_types,id',
             'origin_type' => 'required|in:state,country',
@@ -653,7 +705,20 @@ class ClientController extends Controller
             'empty_return_charge_type' => 'required|in:flat,percentage',
             'empty_return_charge_value' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ]), $user, 'billing', 'fleetTariff');
+        ]);
+
+        $validator->after(function ($validator) use ($request, $account) {
+            $this->rejectIfFleetTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $account->id,
+                $this->normalizeRouteFields($request->all()),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit')
+            );
+        });
+
+        $data = $this->validated($validator, $user, 'billing', 'fleetTariff');
 
         if ($data['origin_type'] === 'country') {
             $data['origin_state_id'] = null;
@@ -708,7 +773,7 @@ class ClientController extends Controller
     {
         abort_unless($tariff->clientAccount?->client_user_id === $user->id, 404);
 
-        $data = $this->validated(Validator::make($request->all(), [
+        $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'vehicle_type_id' => 'required|exists:vehicle_types,id',
             'origin_type' => 'required|in:state,country',
@@ -729,7 +794,21 @@ class ClientController extends Controller
             'empty_return_charge_type' => 'required|in:flat,percentage',
             'empty_return_charge_value' => 'required|numeric|min:0',
             'transit_days' => 'nullable|integer|min:0',
-        ]), $user, 'billing', 'fleetTariff' . $tariff->id);
+        ]);
+
+        $validator->after(function ($validator) use ($request, $tariff) {
+            $this->rejectIfFleetTariffOverlapping(
+                $validator,
+                'max_weight_limit',
+                $tariff->client_account_id,
+                $this->normalizeRouteFields($request->all()),
+                (float) $request->input('min_weight'),
+                (float) $request->input('max_weight_limit'),
+                $tariff
+            );
+        });
+
+        $data = $this->validated($validator, $user, 'billing', 'fleetTariff' . $tariff->id);
 
         if ($data['origin_type'] === 'country') {
             $data['origin_state_id'] = null;
@@ -807,6 +886,17 @@ class ClientController extends Controller
                     ->where('min_weight', $minWeight)->where('max_weight_limit', $maxWeightLimit)->first();
 
                 if (! $tariff) {
+                    $overlaps = ClientSpecialTariff::where('client_account_id', $account->id)
+                        ->where('service_type_id', $serviceType->id)
+                        ->where('is_active', true)
+                        ->get(['min_weight', 'max_weight_limit'])
+                        ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeightLimit, (float) $t->min_weight, (float) $t->max_weight_limit));
+
+                    if ($overlaps) {
+                        $skipped++;
+                        continue;
+                    }
+
                     $tariff = ClientSpecialTariff::create([
                         'client_account_id' => $account->id,
                         'client_user_id' => $user->id,
@@ -840,7 +930,7 @@ class ClientController extends Controller
             }
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported: {$tariffsCreated} special rates created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported: {$tariffsCreated} special rates created, {$pricesSaved} zone prices saved" . ($skipped ? ", {$skipped} rows skipped (unknown service type, overlapping range, or missing weight)." : '.'));
     }
 
     public function importOriginDestinationTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -886,6 +976,28 @@ class ClientController extends Controller
                 ? City::where('state_id', $destinationState->id)->where('short_code', strtoupper(trim($row['destination_city_code'])))->first()
                 : null;
 
+            // Only rejects a DIFFERENT range that overlaps this one —
+            // an exact match on every route field + weight band is a
+            // legitimate re-import (updateOrCreate below updates it),
+            // not a conflict.
+            $overlaps = \App\Models\ClientOriginDestinationTariff::where('client_account_id', $account->id)
+                ->where('service_type_id', $serviceType->id)
+                ->where('origin_state_id', $originState?->id)
+                ->where('origin_city_id', $originCity?->id)
+                ->where('origin_country_id', $originCountry?->id)
+                ->where('destination_state_id', $destinationState?->id)
+                ->where('destination_city_id', $destinationCity?->id)
+                ->where('destination_country_id', $destinationCountry?->id)
+                ->where('is_active', true)
+                ->where(fn ($q) => $q->where('min_weight', '!=', $minWeight)->orWhere('max_weight_limit', '!=', $maxWeightLimit))
+                ->get(['min_weight', 'max_weight_limit'])
+                ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeightLimit, (float) $t->min_weight, (float) $t->max_weight_limit));
+
+            if ($overlaps) {
+                $skipped++;
+                continue;
+            }
+
             \App\Models\ClientOriginDestinationTariff::updateOrCreate(
                 [
                     'client_account_id' => $account->id,
@@ -912,7 +1024,7 @@ class ClientController extends Controller
             $count++;
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported {$count} special Origin-to-Destination rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Origin-to-Destination rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code, overlapping range, or missing weight)." : '.'));
     }
 
     public function importFleetTariff(Request $request, User $user, ClientAccount $account): RedirectResponse
@@ -959,6 +1071,28 @@ class ClientController extends Controller
                 ? City::where('state_id', $destinationState->id)->where('short_code', strtoupper(trim($row['destination_city_code'])))->first()
                 : null;
 
+            // Only rejects a DIFFERENT range that overlaps this one —
+            // an exact match on vehicle type + every route field +
+            // weight band is a legitimate re-import, not a conflict.
+            $overlaps = \App\Models\ClientFleetBillingTariff::where('client_account_id', $account->id)
+                ->where('service_type_id', $serviceType->id)
+                ->where('vehicle_type_id', $vehicleType->id)
+                ->where('origin_state_id', $originState?->id)
+                ->where('origin_city_id', $originCity?->id)
+                ->where('origin_country_id', $originCountry?->id)
+                ->where('destination_state_id', $destinationState?->id)
+                ->where('destination_city_id', $destinationCity?->id)
+                ->where('destination_country_id', $destinationCountry?->id)
+                ->where('is_active', true)
+                ->where(fn ($q) => $q->where('min_weight', '!=', $minWeight)->orWhere('max_weight_limit', '!=', $maxWeightLimit))
+                ->get(['min_weight', 'max_weight_limit'])
+                ->contains(fn ($t) => $this->rangesOverlap((float) $minWeight, (float) $maxWeightLimit, (float) $t->min_weight, (float) $t->max_weight_limit));
+
+            if ($overlaps) {
+                $skipped++;
+                continue;
+            }
+
             \App\Models\ClientFleetBillingTariff::updateOrCreate(
                 [
                     'client_account_id' => $account->id,
@@ -989,7 +1123,7 @@ class ClientController extends Controller
             $count++;
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code, overlapping range, or missing weight)." : '.'));
     }
 
     /**
@@ -1415,6 +1549,116 @@ class ClientController extends Controller
      * missing a Default Account gets a clear error instead of a null
      * pointer three lines into an update.
      */
+    /**
+     * Mirrors StandardBillingController::rejectIfOverlapping() exactly
+     * — same closed-interval overlap test, same reasoning for why
+     * touching endpoints (0–20 and 20–40) count as overlapping (a
+     * shipment at exactly 20kg would otherwise match two special
+     * tariffs at once) — scoped additionally by client_account_id,
+     * since two DIFFERENT accounts having special rates in the same
+     * weight range for the same service type isn't a conflict at all,
+     * only two rates on the SAME account are.
+     */
+    private function rejectIfSpecialTariffOverlapping($validator, string $errorField, int $clientAccountId, int $serviceTypeId, float $min, float $max, ?ClientSpecialTariff $ignoring = null): void
+    {
+        $others = ClientSpecialTariff::where('client_account_id', $clientAccountId)
+            ->where('service_type_id', $serviceTypeId)
+            ->where('is_active', true)
+            ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
+            ->get(['min_weight', 'max_weight_limit']);
+
+        foreach ($others as $tariff) {
+            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight_limit)) {
+                $validator->errors()->add(
+                    $errorField,
+                    "This range ({$min}–{$max}kg) overlaps another special rate for this service type ({$tariff->min_weight}–{$tariff->max_weight_limit}kg)."
+                );
+            }
+        }
+    }
+
+    /**
+     * Same overlap test as the client-specific O2D/Fleet checks below
+     * it and StandardBillingController's own version — additionally
+     * matched by exact route (state/city/country on both ends) for
+     * O2D, plus vehicle type for Fleet, since two DIFFERENT routes (or
+     * vehicle types) sharing a weight range aren't actually in
+     * conflict — only the same route/vehicle type is.
+     */
+    private function rangesOverlap(float $minA, float $maxA, float $minB, float $maxB): bool
+    {
+        return $minA <= $maxB && $minB <= $maxA;
+    }
+
+    private function rejectIfOriginDestinationTariffOverlapping($validator, string $errorField, int $clientAccountId, array $data, float $min, float $max, ?\App\Models\ClientOriginDestinationTariff $ignoring = null): void
+    {
+        $others = \App\Models\ClientOriginDestinationTariff::where('client_account_id', $clientAccountId)
+            ->where('service_type_id', $data['service_type_id'])
+            ->where('origin_state_id', $data['origin_state_id'])
+            ->where('origin_city_id', $data['origin_city_id'] ?? null)
+            ->where('origin_country_id', $data['origin_country_id'])
+            ->where('destination_state_id', $data['destination_state_id'])
+            ->where('destination_city_id', $data['destination_city_id'] ?? null)
+            ->where('destination_country_id', $data['destination_country_id'])
+            ->where('is_active', true)
+            ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
+            ->get(['min_weight', 'max_weight_limit']);
+
+        foreach ($others as $tariff) {
+            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight_limit)) {
+                $validator->errors()->add(
+                    $errorField,
+                    "This range ({$min}–{$max}kg) overlaps another special rate for this exact route ({$tariff->min_weight}–{$tariff->max_weight_limit}kg)."
+                );
+            }
+        }
+    }
+
+    private function rejectIfFleetTariffOverlapping($validator, string $errorField, int $clientAccountId, array $data, float $min, float $max, ?\App\Models\ClientFleetBillingTariff $ignoring = null): void
+    {
+        $others = \App\Models\ClientFleetBillingTariff::where('client_account_id', $clientAccountId)
+            ->where('service_type_id', $data['service_type_id'])
+            ->where('vehicle_type_id', $data['vehicle_type_id'])
+            ->where('origin_state_id', $data['origin_state_id'])
+            ->where('origin_city_id', $data['origin_city_id'] ?? null)
+            ->where('origin_country_id', $data['origin_country_id'])
+            ->where('destination_state_id', $data['destination_state_id'])
+            ->where('destination_city_id', $data['destination_city_id'] ?? null)
+            ->where('destination_country_id', $data['destination_country_id'])
+            ->where('is_active', true)
+            ->when($ignoring, fn ($query) => $query->where('id', '!=', $ignoring->id))
+            ->get(['min_weight', 'max_weight_limit']);
+
+        foreach ($others as $tariff) {
+            if ($this->rangesOverlap($min, $max, (float) $tariff->min_weight, (float) $tariff->max_weight_limit)) {
+                $validator->errors()->add(
+                    $errorField,
+                    "This range ({$min}–{$max}kg) overlaps another special rate for this exact vehicle type/route ({$tariff->min_weight}–{$tariff->max_weight_limit}kg)."
+                );
+            }
+        }
+    }
+
+    /**
+     * Same "state XOR country" normalization the store/update actions
+     * apply to validated data — needed a second time here since the
+     * overlap check runs inside validator->after(), before validated()
+     * has actually returned the normalized $data.
+     */
+    private function normalizeRouteFields(array $raw): array
+    {
+        return [
+            'service_type_id' => $raw['service_type_id'] ?? null,
+            'vehicle_type_id' => $raw['vehicle_type_id'] ?? null,
+            'origin_state_id' => ($raw['origin_type'] ?? null) === 'country' ? null : ($raw['origin_state_id'] ?? null),
+            'origin_city_id' => ($raw['origin_type'] ?? null) === 'country' ? null : ($raw['origin_city_id'] ?? null),
+            'origin_country_id' => ($raw['origin_type'] ?? null) === 'country' ? ($raw['origin_country_id'] ?? null) : null,
+            'destination_state_id' => ($raw['destination_type'] ?? null) === 'country' ? null : ($raw['destination_state_id'] ?? null),
+            'destination_city_id' => ($raw['destination_type'] ?? null) === 'country' ? null : ($raw['destination_city_id'] ?? null),
+            'destination_country_id' => ($raw['destination_type'] ?? null) === 'country' ? ($raw['destination_country_id'] ?? null) : null,
+        ];
+    }
+
     private function requireDefaultAccount(User $user): ClientAccount
     {
         abort_unless($user->user_type === 'client', 404);
