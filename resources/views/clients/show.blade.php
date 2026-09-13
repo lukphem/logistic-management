@@ -182,8 +182,11 @@
     {{-- ============ ACCOUNTS ============ --}}
     <div id="tab-accounts" class="mt-5 max-w-3xl" style="display:none">
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-1 text-sm font-semibold text-ink-900">Accounts under {{ $user->name }}</p>
-            <p class="mb-4 text-xs text-ink-500">Billing Setup, Department, User, and Managerial services can each be configured directly for any account below, via the selector at the top of that tab — no need to switch which one is "In use" first. Only the Overview tab's Edit page still always targets whichever account is marked "In use". Products, billing, and Business Manager stay exactly as configured per account; nothing is shared or reset when switching.</p>
+            <div class="mb-1 flex items-center justify-between">
+                <p class="text-sm font-semibold text-ink-900">Accounts under {{ $user->name }}</p>
+                <button type="button" onclick="document.getElementById('add-account-form').classList.toggle('hidden')" class="rounded-md border border-[var(--brand-primary)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
+            </div>
+            <p class="mb-4 text-xs text-ink-500">Billing Setup, Department, User, and Managerial services can each be configured directly for any account below, via the selector at the top of that tab — every account is fully usable and configurable, not just the one marked "Default". Only the Overview tab's Edit page still always targets the Default account. Products, billing, and Business Manager stay exactly as configured per account; nothing is shared or reset when switching which one is Default.</p>
 
             <table class="mb-4 w-full text-left text-sm">
                 <thead>
@@ -201,7 +204,10 @@
                             <td class="py-2 text-ink-900">
                                 {{ $acct->account_name }}
                                 @if ($acct->is_default)
-                                    <span class="ml-2 inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)]">In use</span>
+                                    <span class="ml-2 inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--brand-primary)]">Default</span>
+                                @endif
+                                @if ($acct->isSuspended())
+                                    <span class="ml-2 inline-flex items-center rounded-full bg-status-exception/10 px-2 py-0.5 text-xs font-medium text-status-exception">Suspended</span>
                                 @endif
                             </td>
                             <td class="py-2 text-ink-500">{{ $acct->account_number }}</td>
@@ -210,9 +216,18 @@
                             <td class="py-2 text-right">
                                 <a href="{{ route('clients.accounts.show', [$user, $acct]) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">View</a>
                                 <span class="mx-1 text-ink-500">·</span>
-                                <button type="button" onclick="document.getElementById('profile-info-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Profile</button>
+                                <button type="button" onclick="document.getElementById('account-details-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Account Details</button>
                                 <span class="mx-1 text-ink-500">·</span>
-                                <button type="button" onclick="document.getElementById('billing-info-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Billing &amp; Invoicing</button>
+                                @if ($acct->isSuspended())
+                                    <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="inline" onsubmit="return confirm('Reactivate this account?');">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="status" value="active">
+                                        <button type="submit" class="text-xs font-medium text-status-delivered hover:underline">Reactivate</button>
+                                    </form>
+                                @else
+                                    <button type="button" onclick="document.getElementById('suspend-account-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-status-exception hover:underline">Suspend</button>
+                                @endif
                                 @if ($acct->is_default && $acct->account_type === 'individual')
                                     <span class="mx-1 text-ink-500">·</span>
                                     <button type="button" onclick="document.getElementById('upgrade-account-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Upgrade to Organization</button>
@@ -232,193 +247,234 @@
                                 @endunless
                             </td>
                         </tr>
-                        <tr id="billing-info-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                        @if ($acct->isSuspended() && $acct->suspension_reason)
+                            <tr class="border-b border-line last:border-0 bg-status-exception/5">
+                                <td colspan="5" class="px-2 py-1.5 text-xs text-status-exception">Suspended: {{ $acct->suspension_reason }}</td>
+                            </tr>
+                        @endif
+                        <tr id="suspend-account-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
                             <td colspan="5" class="p-4">
-                                <p class="mb-3 text-xs text-ink-500">Feeds invoice preparation for this specific account — contact and billing address, tax details, and invoicing terms all belong to the account, not the client as a whole, since {{ $user->name }}'s other accounts can be billed completely differently.</p>
-                                <form method="POST" action="{{ route('clients.accounts.billing-info.update', [$user, $acct]) }}" class="space-y-4">
+                                <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="flex items-end gap-3" onsubmit="return confirm('Suspend this account? It will no longer be able to book new shipments.');">
                                     @csrf
                                     @method('PUT')
-                                    @if ($errors->{'billingInfo' . $acct->id}->any())
-                                        <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
-                                            <ul class="list-disc space-y-0.5 pl-4">
-                                                @foreach ($errors->{'billingInfo' . $acct->id}->all() as $message)
-                                                    <li>{{ $message }}</li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @endif
-
-                                    <div>
-                                        <p class="mb-2 text-xs font-semibold text-ink-700">Contact &amp; address</p>
-                                        @unless ($acct->is_default)
-                                            <label class="mb-2 flex cursor-pointer items-center gap-2 text-xs text-ink-900">
-                                                <input type="checkbox" name="use_default_contact" value="1" @checked($acct->use_default_contact)
-                                                       onchange="document.getElementById('own-contact-{{ $acct->id }}').classList.toggle('hidden', this.checked)"
-                                                       class="rounded border-line">
-                                                Same as {{ $user->defaultAccount?->account_name ?? 'the main account' }}
-                                                <span class="cursor-help text-ink-400" title="Keeps this account's contact/address always matching the main account's current details — not a one-time copy, so it stays in sync if the main account's info changes later.">ⓘ</span>
-                                            </label>
-                                        @endunless
-                                        <div id="own-contact-{{ $acct->id }}" class="grid grid-cols-1 gap-3 sm:grid-cols-3 {{ ! $acct->is_default && $acct->use_default_contact ? 'hidden' : '' }}">
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person</label>
-                                                <input type="text" name="contact_person_name" value="{{ $acct->contact_person_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Address</label>
-                                                <input type="text" name="address" value="{{ $acct->address }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Billing address</label>
-                                                <input type="text" name="billing_address" value="{{ $acct->billing_address }}" placeholder="Same as address above" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                        </div>
+                                    <input type="hidden" name="status" value="suspended">
+                                    <div class="flex-1">
+                                        <label class="mb-1 block text-xs font-medium text-ink-900">Reason for suspension <x-required /></label>
+                                        <input type="text" name="suspension_reason" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                     </div>
-
-                                    <div>
-                                        <p class="mb-2 text-xs font-semibold text-ink-700">Tax &amp; VAT</p>
-                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Client Tax ID</label>
-                                                <input type="text" name="tin" value="{{ $acct->tin }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-2 flex cursor-pointer items-center gap-2 pt-6 text-sm text-ink-900">
-                                                    <input type="checkbox" name="is_vatable" value="1" @checked($acct->is_vatable)
-                                                           onchange="document.getElementById('vat-rate-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
-                                                           class="rounded border-line">
-                                                    VAT applies
-                                                </label>
-                                            </div>
-                                            <div id="vat-rate-{{ $acct->id }}" class="{{ $acct->is_vatable ? '' : 'hidden' }}">
-                                                <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">VAT %
-                                                    <span class="cursor-help text-ink-400" title="Leave blank to use the company-wide VAT rate from Settings — only fill this in if this account is taxed at a different rate.">ⓘ</span>
-                                                </label>
-                                                <input type="number" step="0.01" min="0" max="100" name="vat_percentage" value="{{ $acct->vat_percentage }}" placeholder="Company default" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p class="mb-2 text-xs font-semibold text-ink-700">Charges</p>
-                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div class="rounded-lg border border-line p-3">
-                                                <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                                                    <input type="checkbox" name="is_pickup_chargeable" value="1" @checked($acct->is_pickup_chargeable)
-                                                           onchange="document.getElementById('pickup-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
-                                                           class="rounded border-line">
-                                                    Charge for pickup
-                                                </label>
-                                                <div id="pickup-charge-{{ $acct->id }}" class="{{ $acct->is_pickup_chargeable ? '' : 'hidden' }}">
-                                                    <input type="number" step="0.01" min="0" name="pickup_charge" value="{{ $acct->pickup_charge }}" placeholder="Pickup charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                                </div>
-                                            </div>
-                                            <div class="rounded-lg border border-line p-3">
-                                                <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                                                    <input type="checkbox" name="is_onforwarding_chargeable" value="1" @checked($acct->is_onforwarding_chargeable)
-                                                           onchange="document.getElementById('onforwarding-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
-                                                           class="rounded border-line">
-                                                    Charge for onforwarding
-                                                </label>
-                                                <div id="onforwarding-charge-{{ $acct->id }}" class="{{ $acct->is_onforwarding_chargeable ? '' : 'hidden' }}">
-                                                    <input type="number" step="0.01" min="0" name="onforwarding_charge" value="{{ $acct->onforwarding_charge }}" placeholder="Onforwarding charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p class="mb-2 text-xs font-semibold text-ink-700">Delivery &amp; invoicing</p>
-                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div>
-                                                <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Maximum Delivery Attempt
-                                                    <span class="cursor-help text-ink-400" title="Once a shipment on this account reaches this many scans marked as a delivery attempt, it's flagged. Leave blank to use the company-wide default from Settings instead of setting one for this account specifically.">ⓘ</span>
-                                                </label>
-                                                <input type="number" min="1" name="maximum_delivery_attempts" value="{{ $acct->maximum_delivery_attempts }}" placeholder="Company default ({{ \App\Models\Setting::current()->maximum_delivery_attempts ?? 'no limit' }})" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Invoice Number of Days</label>
-                                                <input type="number" min="0" name="invoice_due_days" value="{{ $acct->invoice_due_days }}" placeholder="e.g. 30" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="flex justify-end">
-                                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
-                                    </div>
+                                    <button type="submit" class="rounded-md border border-status-exception px-4 py-2 text-xs font-semibold text-status-exception transition hover:bg-status-exception/10">Confirm suspend</button>
                                 </form>
                             </td>
                         </tr>
-                        <tr id="profile-info-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
-                            <td colspan="5" class="p-4">
-                                <p class="mb-3 text-xs text-ink-500">Identity and company details for this specific account — contact person, address, and billing address are set under Billing &amp; Invoicing instead.</p>
-                                <form method="POST" action="{{ route('clients.accounts.profile.update', [$user, $acct]) }}" enctype="multipart/form-data" class="space-y-4">
-                                    @csrf
-                                    @method('PUT')
-                                    @if ($errors->{'profile' . $acct->id}->any())
-                                        <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
-                                            <ul class="list-disc space-y-0.5 pl-4">
-                                                @foreach ($errors->{'profile' . $acct->id}->all() as $message)
-                                                    <li>{{ $message }}</li>
-                                                @endforeach
-                                            </ul>
-                                        </div>
-                                    @endif
-
-                                    @if ($acct->account_type === 'individual')
-                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">ID type</label>
-                                                <select name="id_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                                    <option value="">Select ID type</option>
-                                                    @foreach (\App\Models\ClientAccount::ID_TYPES as $key => $label)
-                                                        <option value="{{ $key }}" @selected($acct->id_type === $key)>{{ $label }}</option>
+                        <tr id="account-details-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                            <td colspan="5" class="p-4 space-y-6">
+                                <div>
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Profile</p>
+                                    <p class="mb-3 text-xs text-ink-500">Identity and company details for this specific account — contact person, address, and billing address are set below under Billing &amp; Invoicing instead.</p>
+                                    <form method="POST" action="{{ route('clients.accounts.profile.update', [$user, $acct]) }}" enctype="multipart/form-data" class="space-y-4">
+                                        @csrf
+                                        @method('PUT')
+                                        @if ($errors->{'profile' . $acct->id}->any())
+                                            <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                                <ul class="list-disc space-y-0.5 pl-4">
+                                                    @foreach ($errors->{'profile' . $acct->id}->all() as $message)
+                                                        <li>{{ $message }}</li>
                                                     @endforeach
-                                                </select>
+                                                </ul>
+                                            </div>
+                                        @endif
+
+                                        @if ($acct->account_type === 'individual')
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">ID type</label>
+                                                    <select name="id_type" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                        <option value="">Select ID type</option>
+                                                        @foreach (\App\Models\ClientAccount::ID_TYPES as $key => $label)
+                                                            <option value="{{ $key }}" @selected($acct->id_type === $key)>{{ $label }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">ID number</label>
+                                                    <input type="text" name="id_number" value="{{ $acct->id_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Company name</label>
+                                                    <input type="text" name="company_name" value="{{ $acct->company_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">RC / registration number</label>
+                                                    <input type="text" name="rc_number" value="{{ $acct->rc_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Contact person's role</label>
+                                                    <input type="text" name="contact_person_role" value="{{ $acct->contact_person_role }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Industry</label>
+                                                    <input type="text" name="industry" value="{{ $acct->industry }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Company logo</label>
+                                                    <div class="flex items-center gap-3">
+                                                        @if ($acct->logo_url)
+                                                            <img src="{{ $acct->logo_url }}" alt="Current logo" class="h-10 w-10 rounded-lg border border-line object-contain bg-surface-0">
+                                                        @endif
+                                                        <input type="file" name="logo" accept="image/*" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">ID number</label>
-                                                <input type="text" name="id_number" value="{{ $acct->id_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Business objective</label>
+                                                <textarea name="business_objective" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">{{ $acct->business_objective }}</textarea>
                                             </div>
+                                        @endif
+
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
                                         </div>
-                                    @else
-                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Company name</label>
-                                                <input type="text" name="company_name" value="{{ $acct->company_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    </form>
+                                </div>
+
+                                <div class="border-t border-line pt-6">
+                                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Billing &amp; Invoicing</p>
+                                    <p class="mb-3 text-xs text-ink-500">Feeds invoice preparation for this specific account — contact and billing address, tax details, invoicing terms, and payment terms all belong to the account, not the client as a whole, since {{ $user->name }}'s other accounts can be billed completely differently.</p>
+                                    <form method="POST" action="{{ route('clients.accounts.billing-info.update', [$user, $acct]) }}" class="space-y-4">
+                                        @csrf
+                                        @method('PUT')
+                                        @if ($errors->{'billingInfo' . $acct->id}->any())
+                                            <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                                <ul class="list-disc space-y-0.5 pl-4">
+                                                    @foreach ($errors->{'billingInfo' . $acct->id}->all() as $message)
+                                                        <li>{{ $message }}</li>
+                                                    @endforeach
+                                                </ul>
                                             </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">RC / registration number</label>
-                                                <input type="text" name="rc_number" value="{{ $acct->rc_number }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Contact person's role</label>
-                                                <input type="text" name="contact_person_role" value="{{ $acct->contact_person_role }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Industry</label>
-                                                <input type="text" name="industry" value="{{ $acct->industry }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                                            </div>
-                                            <div>
-                                                <label class="mb-1 block text-xs font-medium text-ink-900">Company logo</label>
-                                                <div class="flex items-center gap-3">
-                                                    @if ($acct->logo_url)
-                                                        <img src="{{ $acct->logo_url }}" alt="Current logo" class="h-10 w-10 rounded-lg border border-line object-contain bg-surface-0">
-                                                    @endif
-                                                    <input type="file" name="logo" accept="image/*" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        @endif
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold text-ink-700">Contact &amp; address</p>
+                                            @unless ($acct->is_default)
+                                                <label class="mb-2 flex cursor-pointer items-center gap-2 text-xs text-ink-900">
+                                                    <input type="checkbox" name="use_default_contact" value="1" @checked($acct->use_default_contact)
+                                                           onchange="document.getElementById('own-contact-{{ $acct->id }}').classList.toggle('hidden', this.checked)"
+                                                           class="rounded border-line">
+                                                    Same as {{ $user->defaultAccount?->account_name ?? 'the main account' }}
+                                                    <span class="cursor-help text-ink-400" title="Keeps this account's contact/address always matching the main account's current details — not a one-time copy, so it stays in sync if the main account's info changes later.">ⓘ</span>
+                                                </label>
+                                            @endunless
+                                            <div id="own-contact-{{ $acct->id }}" class="grid grid-cols-1 gap-3 sm:grid-cols-3 {{ ! $acct->is_default && $acct->use_default_contact ? 'hidden' : '' }}">
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Contact person</label>
+                                                    <input type="text" name="contact_person_name" value="{{ $acct->contact_person_name }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Address</label>
+                                                    <input type="text" name="address" value="{{ $acct->address }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Billing address</label>
+                                                    <input type="text" name="billing_address" value="{{ $acct->billing_address }}" placeholder="Same as address above" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label class="mb-1 block text-xs font-medium text-ink-900">Business objective</label>
-                                            <textarea name="business_objective" rows="2" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">{{ $acct->business_objective }}</textarea>
-                                        </div>
-                                    @endif
 
-                                    <div class="flex justify-end">
-                                        <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
-                                    </div>
-                                </form>
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold text-ink-700">Tax &amp; VAT</p>
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Client Tax ID</label>
+                                                    <input type="text" name="tin" value="{{ $acct->tin }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-2 flex cursor-pointer items-center gap-2 pt-6 text-sm text-ink-900">
+                                                        <input type="checkbox" name="is_vatable" value="1" @checked($acct->is_vatable)
+                                                               onchange="document.getElementById('vat-rate-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                               class="rounded border-line">
+                                                        VAT applies
+                                                    </label>
+                                                </div>
+                                                <div id="vat-rate-{{ $acct->id }}" class="{{ $acct->is_vatable ? '' : 'hidden' }}">
+                                                    <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">VAT %
+                                                        <span class="cursor-help text-ink-400" title="Leave blank to use the company-wide VAT rate from Settings — only fill this in if this account is taxed at a different rate.">ⓘ</span>
+                                                    </label>
+                                                    <input type="number" step="0.01" min="0" max="100" name="vat_percentage" value="{{ $acct->vat_percentage }}" placeholder="Company default" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold text-ink-700">Payment terms</p>
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Payment type
+                                                        <span class="cursor-help text-ink-400" title="Cash: paid upfront, no balance carried. Credit: can transact now, invoiced later, up to the credit limit below.">ⓘ</span>
+                                                    </label>
+                                                    <select name="payment_type" onchange="document.getElementById('credit-limit-{{ $acct->id }}').classList.toggle('hidden', this.value!=='credit')" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                        <option value="cash" @selected($acct->payment_type === 'cash')>Cash</option>
+                                                        <option value="credit" @selected($acct->payment_type === 'credit')>Credit</option>
+                                                    </select>
+                                                </div>
+                                                <div id="credit-limit-{{ $acct->id }}" class="{{ $acct->payment_type === 'credit' ? '' : 'hidden' }}">
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Credit limit</label>
+                                                    <input type="number" step="0.01" min="0" name="credit_limit" value="{{ $acct->credit_limit }}" placeholder="Maximum outstanding balance" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold text-ink-700">Charges</p>
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div class="rounded-lg border border-line p-3">
+                                                    <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                                        <input type="checkbox" name="is_pickup_chargeable" value="1" @checked($acct->is_pickup_chargeable)
+                                                               onchange="document.getElementById('pickup-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                               class="rounded border-line">
+                                                        Charge for pickup
+                                                    </label>
+                                                    <div id="pickup-charge-{{ $acct->id }}" class="{{ $acct->is_pickup_chargeable ? '' : 'hidden' }}">
+                                                        <input type="number" step="0.01" min="0" name="pickup_charge" value="{{ $acct->pickup_charge }}" placeholder="Pickup charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                    </div>
+                                                </div>
+                                                <div class="rounded-lg border border-line p-3">
+                                                    <label class="mb-2 flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                                        <input type="checkbox" name="is_onforwarding_chargeable" value="1" @checked($acct->is_onforwarding_chargeable)
+                                                               onchange="document.getElementById('onforwarding-charge-{{ $acct->id }}').classList.toggle('hidden', !this.checked)"
+                                                               class="rounded border-line">
+                                                        Charge for onforwarding
+                                                    </label>
+                                                    <div id="onforwarding-charge-{{ $acct->id }}" class="{{ $acct->is_onforwarding_chargeable ? '' : 'hidden' }}">
+                                                        <input type="number" step="0.01" min="0" name="onforwarding_charge" value="{{ $acct->onforwarding_charge }}" placeholder="Onforwarding charge amount" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p class="mb-2 text-xs font-semibold text-ink-700">Delivery &amp; invoicing</p>
+                                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Maximum Delivery Attempt
+                                                        <span class="cursor-help text-ink-400" title="Once a shipment on this account reaches this many scans marked as a delivery attempt, it's flagged. Leave blank to use the company-wide default from Settings instead of setting one for this account specifically.">ⓘ</span>
+                                                    </label>
+                                                    <input type="number" min="1" name="maximum_delivery_attempts" value="{{ $acct->maximum_delivery_attempts }}" placeholder="Company default ({{ \App\Models\Setting::current()->maximum_delivery_attempts ?? 'no limit' }})" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                                <div>
+                                                    <label class="mb-1 block text-xs font-medium text-ink-900">Invoice Number of Days</label>
+                                                    <input type="number" min="0" name="invoice_due_days" value="{{ $acct->invoice_due_days }}" placeholder="e.g. 30" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
+                                        </div>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         @if ($acct->is_default && $acct->account_type === 'individual')
@@ -473,6 +529,7 @@
                 </tbody>
             </table>
 
+            <div id="add-account-form" class="{{ $errors->accounts->any() ? '' : 'hidden' }}">
             <form method="POST" action="{{ route('clients.accounts.store', $user) }}" enctype="multipart/form-data" class="space-y-4 border-t border-line pt-4">
                 @csrf
                 @if ($errors->accounts->any())
@@ -568,6 +625,7 @@
                     <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
                 </div>
             </form>
+            </div>
         </div>
     </div>
     <script>
@@ -1746,10 +1804,49 @@
                                 <td class="py-2 text-ink-500">{{ $subUser->email }}</td>
                                 <td class="py-2 text-ink-500">{{ $subUser->clientProfile?->department?->name ?? '—' }}</td>
                                 <td class="py-2 text-right">
-                                    <form method="POST" action="{{ route('clients.sub-users.destroy', [$user, $subUser]) }}" onsubmit="return confirm('Remove this user?');">
+                                    <button type="button" onclick="document.getElementById('edit-subuser-{{ $subUser->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
+                                    <form method="POST" action="{{ route('clients.sub-users.destroy', [$user, $subUser]) }}" class="inline" onsubmit="return confirm('Remove this user?');">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                        <button type="submit" class="ml-3 text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr id="edit-subuser-{{ $subUser->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
+                                <td colspan="4" class="p-4">
+                                    <form method="POST" action="{{ route('clients.sub-users.update', [$user, $subUser]) }}" class="space-y-3">
+                                        @csrf
+                                        @method('PUT')
+                                        @if ($errors->{'subUser' . $subUser->id}->any())
+                                            <div class="rounded-md border border-status-exception/30 bg-status-exception/5 p-2 text-xs text-status-exception">
+                                                <ul class="list-disc space-y-0.5 pl-4">
+                                                    @foreach ($errors->{'subUser' . $subUser->id}->all() as $message)
+                                                        <li>{{ $message }}</li>
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                        @endif
+                                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div><label class="mb-1 block text-xs font-medium text-ink-900">Name</label><input type="text" name="name" value="{{ $subUser->name }}" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                            <div><label class="mb-1 block text-xs font-medium text-ink-900">Email</label><input type="email" name="email" value="{{ $subUser->email }}" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                            <div><label class="mb-1 block text-xs font-medium text-ink-900">Phone</label><input type="text" name="phone_number" value="{{ $subUser->phone_number }}" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]"></div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">New password <span class="font-normal text-ink-500">(leave blank to keep current)</span></label>
+                                                <input type="password" name="password" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-xs font-medium text-ink-900">Department <span class="font-normal text-ink-500">(optional)</span></label>
+                                                <select name="department_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                                    <option value="">None</option>
+                                                    @foreach ($departments as $department)
+                                                        <option value="{{ $department->id }}" @selected($subUser->clientProfile?->department_id === $department->id)>{{ $department->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-end">
+                                            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">Save changes</button>
+                                        </div>
                                     </form>
                                 </td>
                             </tr>

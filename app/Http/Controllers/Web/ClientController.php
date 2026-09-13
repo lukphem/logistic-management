@@ -423,6 +423,8 @@ class ClientController extends Controller
             'onforwarding_charge' => 'required_if:is_onforwarding_chargeable,1|nullable|numeric|min:0',
             'maximum_delivery_attempts' => 'nullable|integer|min:1',
             'invoice_due_days' => 'nullable|integer|min:0',
+            'payment_type' => 'required|in:cash,credit',
+            'credit_limit' => 'required_if:payment_type,credit|nullable|numeric|min:0',
         ]);
         $data = $this->validated($validator, $user, 'accounts', 'billingInfo' . $account->id);
 
@@ -446,9 +448,11 @@ class ClientController extends Controller
             'onforwarding_charge' => $request->boolean('is_onforwarding_chargeable') ? $data['onforwarding_charge'] : null,
             'maximum_delivery_attempts' => $data['maximum_delivery_attempts'] ?? null,
             'invoice_due_days' => $data['invoice_due_days'] ?? null,
+            'payment_type' => $data['payment_type'],
+            'credit_limit' => $data['payment_type'] === 'credit' ? $data['credit_limit'] : null,
         ]);
 
-        return $this->redirectToTab($user, 'accounts', "Billing & invoicing details updated for \"{$account->account_name}\".", $account);
+        return $this->redirectToTab($user, 'accounts', "Details updated for \"{$account->account_name}\".", $account);
     }
 
     /**
@@ -493,6 +497,36 @@ class ClientController extends Controller
         ]);
 
         return $this->redirectToTab($user, 'accounts', "Profile updated for \"{$account->account_name}\".", $account);
+    }
+
+    /**
+     * status is a real lifecycle state (see the migration's note),
+     * not a plain toggle — reactivating clears suspension_reason
+     * rather than leaving a stale reason attached to an active
+     * account. Suspension is enforced where it actually matters
+     * (ShipmentController::store() / Api\ClientShipmentController::
+     * store()) — this action only flips the flag and records why.
+     */
+    public function updateAccountStatus(Request $request, User $user, ClientAccount $account): RedirectResponse
+    {
+        abort_unless($account->client_user_id === $user->id, 404);
+
+        $validator = Validator::make($request->all(), [
+            'status' => 'required|in:active,suspended',
+            'suspension_reason' => 'required_if:status,suspended|nullable|string|max:1000',
+        ]);
+        $data = $this->validated($validator, $user, 'accounts', 'status' . $account->id);
+
+        $account->update([
+            'status' => $data['status'],
+            'suspension_reason' => $data['status'] === 'suspended' ? ($data['suspension_reason'] ?? null) : null,
+        ]);
+
+        $message = $data['status'] === 'suspended'
+            ? "\"{$account->account_name}\" suspended — it can no longer book new shipments."
+            : "\"{$account->account_name}\" reactivated.";
+
+        return $this->redirectToTab($user, 'accounts', $message, $account);
     }
 
     /**
@@ -1463,6 +1497,41 @@ class ClientController extends Controller
         ]);
 
         return $this->redirectToTab($user, 'users', "{$subUser->name} added as a user under {$user->name}.", $account);
+    }
+
+    /**
+     * Password is optional here — leaving it blank keeps the sub-user's
+     * current one, since forcing a password on every profile edit
+     * would mean staff can never update just a name or department
+     * without also resetting how the sub-user logs in.
+     */
+    public function updateSubUser(Request $request, User $user, User $subUser): RedirectResponse
+    {
+        $account = $subUser->clientProfile?->clientAccount;
+        abort_unless($account && $account->client_user_id === $user->id, 404);
+
+        $data = $this->validated(Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $subUser->id,
+            'phone_number' => 'required|string|max:30',
+            'password' => 'nullable|string|min:8',
+            'department_id' => 'nullable|exists:departments,id',
+        ]), $user, 'users', 'subUser' . $subUser->id);
+
+        if (! empty($data['department_id'])) {
+            abort_unless(Department::where('id', $data['department_id'])->where('client_account_id', $account->id)->exists(), 422);
+        }
+
+        $subUser->update([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'phone_number' => $data['phone_number'],
+            ...(! empty($data['password']) ? ['password' => Hash::make($data['password'])] : []),
+        ]);
+
+        $subUser->clientProfile()->update(['department_id' => $data['department_id'] ?? null]);
+
+        return $this->redirectToTab($user, 'users', "{$subUser->name} updated.", $account);
     }
 
     public function destroySubUser(User $user, User $subUser): RedirectResponse

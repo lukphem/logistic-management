@@ -290,6 +290,18 @@ class ShipmentController extends Controller
         $data['client_account_id'] = $data['client_account_id']
             ?? (! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null);
 
+        // Checked against whichever account this shipment ultimately
+        // resolved to, not just the one explicitly typed in — a
+        // suspended account shouldn't be able to book through its own
+        // Default fallback either.
+        if ($data['client_account_id']) {
+            $resolvedAccount = \App\Models\ClientAccount::find($data['client_account_id']);
+
+            if ($resolvedAccount?->isSuspended()) {
+                return redirect()->route('shipments.create')->withErrors(['account_number' => "\"{$resolvedAccount->account_name}\" is suspended and can't book new shipments." . ($resolvedAccount->suspension_reason ? " Reason: {$resolvedAccount->suspension_reason}" : '')])->withInput();
+            }
+        }
+
         $shipment = Shipment::create([
             ...$data,
             'shipping_type' => $quote['shipping_type'],

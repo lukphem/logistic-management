@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ClientAccount extends Model
 {
     protected $fillable = [
-        'client_user_id', 'account_name', 'account_number', 'is_default',
+        'client_user_id', 'account_name', 'account_number', 'is_default', 'status', 'suspension_reason',
         'account_type', 'disabled_billing_models', 'special_billing_models', 'special_fallback_models', 'id_type', 'id_number',
         'company_name', 'logo_path', 'rc_number', 'tin', 'industry', 'contact_person_name', 'contact_person_role',
         'address', 'city_id', 'city_name', 'outlet_id', 'country_id', 'state_id', 'territory_id', 'business_objective',
@@ -20,6 +20,7 @@ class ClientAccount extends Model
         'invoice_due_days', 'sla_pickup_hours', 'sla_delivery_days',
         'is_vatable', 'vat_percentage', 'is_pickup_chargeable', 'pickup_charge',
         'is_onforwarding_chargeable', 'onforwarding_charge', 'maximum_delivery_attempts',
+        'payment_type', 'credit_limit',
         'business_manager_id', 'created_by',
     ];
 
@@ -43,7 +44,18 @@ class ClientAccount extends Model
         'pickup_charge' => 'float',
         'is_onforwarding_chargeable' => 'boolean',
         'onforwarding_charge' => 'float',
+        'credit_limit' => 'float',
     ];
+
+    public function isSuspended(): bool
+    {
+        return $this->status === 'suspended';
+    }
+
+    public function isCreditAccount(): bool
+    {
+        return $this->payment_type === 'credit';
+    }
 
     public const ID_TYPES = [
         'national_id' => 'National ID',

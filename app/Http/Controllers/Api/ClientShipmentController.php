@@ -87,7 +87,16 @@ class ClientShipmentController extends Controller
         // pricing correctly reach this specific account's own rates.
         $apiClient = $request->attributes->get('api_client');
         $data['client_user_id'] = $request->user()?->id ?? $apiClient?->client_user_id;
-        $data['client_account_id'] = $apiClient?->client_account_id;
+        $data['client_account_id'] = $apiClient?->client_account_id
+            ?? (! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null);
+
+        if ($data['client_account_id']) {
+            $resolvedAccount = \App\Models\ClientAccount::find($data['client_account_id']);
+
+            if ($resolvedAccount?->isSuspended()) {
+                return response()->json(['message' => "This account is suspended and can't book new shipments."], 403);
+            }
+        }
 
         try {
             $quote = $this->pricingEngine->quote($data);

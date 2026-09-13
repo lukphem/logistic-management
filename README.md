@@ -7780,3 +7780,77 @@ app/Http/Controllers/Web/ClientController.php   (storeAccount() enriched, new up
 resources/views/clients/show.blade.php   (Add-account form enriched, new Profile expandable section per account)
 routes/web.php
 ```
+
+## Increment 134 — Account Details Merged, Suspension, Credit/Cash Terms, Editable Sub-Users
+
+### Profile + Billing & Invoicing combined into "Account Details"
+
+One toggle, one section, instead of two — Profile's identity fields
+and Billing & Invoicing's contact/tax/charges fields now live under a
+single "Account Details" expandable row per account, with their own
+sub-headings inside it. Still two separate forms internally (they
+save to two different actions), just presented as one place to look.
+
+### "In use" corrected
+
+The badge and its explanatory text both described only the Default
+account as "in use" — inaccurate now that every account is fully
+usable and configurable on its own. Badge renamed to "Default" (a
+statement of fact, not a claim about which accounts work), text
+reworded to match.
+
+### Add-account form now opens on demand
+
+Was always inline, permanently taking up space. Now hidden behind its
+own "+ Add account" button, auto-opening only if a submission had
+validation errors so nothing gets silently hidden from someone
+mid-correction.
+
+### Account suspension — enforced, not just stored
+
+New `status`/`suspension_reason` columns. Suspending requires a
+reason; reactivating clears it. Enforced at the two places that
+actually matter — `ShipmentController::store()` and
+`Api\ClientShipmentController::store()` — checked against whichever
+account a shipment ultimately resolves to (typed account number,
+dropdown, or Default fallback), not just an explicitly-named one. A
+"Suspended" badge shows in the account list, and the reason shows
+inline beneath it.
+
+### Cash vs Credit, with a credit limit
+
+New `payment_type` (cash/credit) and `credit_limit` fields, added to
+the same Billing & Invoicing form. Being direct about scope: this
+is configuration only — there's no existing outstanding-balance
+tracking in the app (Invoice is a shipment list, not a payment-status
+ledger), so the credit limit isn't yet enforced against actual usage.
+Building that would mean a real payment-tracking system, which is a
+separate, larger piece of work.
+
+### Sub-users are now editable
+
+Each user under an organization account gets an inline Edit form —
+name, email, phone, department, and an optional password reset that
+only takes effect if filled in (leaving it blank keeps the current
+password, so editing a name doesn't force a password change).
+
+### Verified
+
+Balance-checked after every edit (large splice for the merged
+section), nested-form scan clean, full repo balance check and
+duplicate-method scan clean across 183 files. Verified end-to-end
+against live MySQL: suspension status and reason save and clear
+correctly, the suspension check logic matches intent, and a sub-user
+update persists every field correctly.
+
+### Files
+
+```
+database/migrations/2026_03_10_000001_add_status_and_credit_fields_to_client_accounts_table.php
+app/Models/ClientAccount.php   (status, payment_type, credit_limit, isSuspended(), isCreditAccount())
+app/Http/Controllers/Web/ClientController.php   (updateAccountStatus(), updateSubUser(), payment fields wired into updateAccountBillingInfo())
+app/Http/Controllers/Web/ShipmentController.php   (suspension check before booking)
+app/Http/Controllers/Api/ClientShipmentController.php   (suspension check before booking)
+resources/views/clients/show.blade.php   (merged Account Details section, Suspend/Reactivate UI, Add-account toggle, sub-user Edit, badge/text corrections)
+routes/web.php
+```

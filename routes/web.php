@@ -282,6 +282,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/accounts/{account}/set-default', [ClientController::class, 'setDefaultAccount'])->name('clients.accounts.set-default');
         Route::put('/clients/{user}/accounts/{account}/billing-info', [ClientController::class, 'updateAccountBillingInfo'])->name('clients.accounts.billing-info.update');
         Route::put('/clients/{user}/accounts/{account}/profile', [ClientController::class, 'updateAccountProfile'])->name('clients.accounts.profile.update');
+        Route::put('/clients/{user}/accounts/{account}/status', [ClientController::class, 'updateAccountStatus'])->name('clients.accounts.status.update');
         Route::delete('/clients/{user}/accounts/{account}', [ClientController::class, 'destroyAccount'])->name('clients.accounts.destroy');
 
         Route::post('/clients/{user}/accounts/{account}/discounts', [ClientController::class, 'storeDiscount'])->name('clients.discounts.store');
@@ -311,6 +312,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/clients/{user}/departments/{department}', [ClientController::class, 'destroyDepartment'])->name('clients.departments.destroy');
 
         Route::post('/clients/{user}/accounts/{account}/users', [ClientController::class, 'storeSubUser'])->name('clients.sub-users.store');
+        Route::put('/clients/{user}/users/{subUser}', [ClientController::class, 'updateSubUser'])->name('clients.sub-users.update');
         Route::delete('/clients/{user}/users/{subUser}', [ClientController::class, 'destroySubUser'])->name('clients.sub-users.destroy');
 
         Route::post('/clients/{user}/accounts/{account}/services', [ClientController::class, 'storeServiceSubscription'])->name('clients.services.store');
