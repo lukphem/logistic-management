@@ -1510,10 +1510,12 @@
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
                     <input type="checkbox" name="warehouse_access" value="1" @checked($profile?->warehouse_access) class="rounded border-line">
                     Warehouse access
+                    <span class="cursor-help text-ink-400" title="Lets this client store goods at a company warehouse ahead of dispatch, rather than every shipment being picked up or dropped off fresh.">ⓘ</span>
                 </label>
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
                     <input type="checkbox" name="cod_enabled" value="1" @checked($profile?->cod_enabled) class="rounded border-line">
                     Cash on delivery enabled
+                    <span class="cursor-help text-ink-400" title="Lets this client's shipments collect payment from the recipient at the point of delivery, instead of always being prepaid.">ⓘ</span>
                 </label>
             </div>
 
@@ -1521,6 +1523,7 @@
                 <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
                     <input type="checkbox" name="insurance_agreement" value="1" @checked($profile?->insurance_agreement) class="rounded border-line">
                     Insurance agreement in place
+                    <span class="cursor-help text-ink-400" title="A separate commercial agreement covering loss/damage liability for this client's shipments — not the same as declared-value insurance on an individual shipment.">ⓘ</span>
                 </label>
                 <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
@@ -1538,15 +1541,21 @@
                 <p class="mb-2 text-sm font-semibold text-ink-900">Invoice & SLA</p>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">Invoice due (days)</label>
+                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Invoice due (days)
+                            <span class="cursor-help text-ink-400" title="Payment terms — how many days after an invoice is issued this client is expected to pay.">ⓘ</span>
+                        </label>
                         <input type="number" min="0" name="invoice_due_days" value="{{ $profile?->invoice_due_days }}" placeholder="e.g. 30" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">SLA: pickup within (hours)</label>
+                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">SLA: pickup within (hours)
+                            <span class="cursor-help text-ink-400" title="How quickly a pickup request from this client should be actioned, in hours — an internal service target, not a customer-facing guarantee shown on a waybill.">ⓘ</span>
+                        </label>
                         <input type="number" min="0" name="sla_pickup_hours" value="{{ $profile?->sla_pickup_hours }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">SLA: delivery within (days)</label>
+                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">SLA: delivery within (days)
+                            <span class="cursor-help text-ink-400" title="Expected delivery turnaround for this client's shipments, in days — an internal service target, separate from any per-shipment transit-day estimate.">ⓘ</span>
+                        </label>
                         <input type="number" min="0" name="sla_delivery_days" value="{{ $profile?->sla_delivery_days }}" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                     </div>
                 </div>

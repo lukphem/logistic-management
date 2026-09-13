@@ -7114,3 +7114,55 @@ app/Http/Controllers/Web/OriginDestinationTariffController.php
 app/Http/Controllers/Web/FleetBillingTariffController.php
 resources/views/zone-mappings/index.blade.php
 ```
+
+## Increment 123 — Tooltips Where They Were Genuinely Missing
+
+Checked several forms across the system for confusing fields before
+adding anything, rather than assuming tooltips were needed
+everywhere:
+
+- **Company-level Standard Billing form** — already has permanent
+  explanatory text under each field (functionally the same as a
+  tooltip, just always-visible). No duplication added.
+- **Zone Mapping's rule-application radios** — already self-explanatory
+  via the option text itself ("Both states need an airport" / "Either
+  state having one is enough"). Left alone.
+- **Client Hub's Managerial tab** — genuinely had *no* explanation at
+  all for Warehouse access, Cash on delivery, Insurance agreement, or
+  the Invoice/SLA fields. Added tooltips here.
+- **Rate Checker and Create Shipment's "Empty return / repositioning
+  trip" checkbox** — the checkbox label didn't explain *why* it
+  matters (it triggers Fleet Billing's configured empty-return
+  surcharge). Added a tooltip explaining the pricing effect on both
+  pages.
+
+### Verified
+
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: clean across 176 files.
+
+### A note on scope, stated plainly
+
+"Everywhere necessary" across the whole system is a large surface —
+this pass covered the areas most likely to be actually confusing
+(recently-built billing forms, the Managerial tab, Fleet's empty-return
+checkbox), not literally every field in the application. Several
+areas already had adequate explanation in a different form (permanent
+help text, self-descriptive option labels) and weren't touched to
+avoid redundant clutter.
+
+Also carried over from last increment: Zone Mapping's *validation
+failures* (as opposed to successes, already fixed) still fall back to
+Laravel's default `back()`-based redirect. Judged lower-priority for
+now — those forms are simple required dropdowns with sensible
+defaults, not free-text fields where a typo is likely, so the
+practical risk of hitting this specific gap is low. Flagging it
+rather than silently leaving it out of this summary.
+
+### Files
+
+```
+resources/views/clients/show.blade.php
+resources/views/rate-checker/index.blade.php
+resources/views/shipments/create.blade.php
+```

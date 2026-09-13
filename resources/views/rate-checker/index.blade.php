@@ -224,6 +224,7 @@
                         <label class="flex items-center gap-2 text-sm text-ink-900">
                             <input type="checkbox" name="is_empty_return" value="1" @checked(request('is_empty_return')) class="rounded border-line">
                             Empty return / repositioning trip
+                            <span class="cursor-help text-ink-400" title="Adds the vehicle's configured empty-return charge on top of the freight — for a trip where the vehicle travels back empty or is repositioned, not carrying a paying load either way.">ⓘ</span>
                         </label>
                     </div>
                 </div>
