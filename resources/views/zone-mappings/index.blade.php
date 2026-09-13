@@ -551,6 +551,23 @@
                 btn.classList.toggle('font-medium', sub !== name);
             });
         }
+
+        // Restores state a redirect (see ZoneMappingController::
+        // redirectToZoneTab()) asked to land on — ?tab=domestic or
+        // ?tab=international, and for International specifically,
+        // ?sub=nigeria or ?sub=crosstrade for its own inner tab.
+        // Without this, every save reset back to whatever's hardcoded
+        // as visible by default (International), regardless of which
+        // tab the save was actually made from.
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('tab') === 'domestic') {
+                showZoneTab('domestic');
+            }
+            if (params.get('tab') === 'international' && params.get('sub') === 'crosstrade') {
+                showInternationalSubTab('crosstrade');
+            }
+        })();
     </script>
 
 </x-layouts.app>

@@ -7045,3 +7045,72 @@ duplicate-method scan: clean across 176 files.
 ```
 resources/views/clients/show.blade.php
 ```
+
+## Increment 122 — Tab-Redirect Fix Across the Whole System
+
+Systematically searched every view in the app for a tab-switching
+pattern (not just the Client Hub) — found two more pages with the
+exact same "always resets to the first tab" bug: the combined
+Standard/O2D/Fleet Billing admin page, and Zone Mapping.
+
+### Standard Billing / Origin-to-Destination / Fleet
+
+The page's own tab-restoring JS (`?model=`/`?tab=` query params) was
+already correct — the gap was purely on the controller side.
+`OriginDestinationTariffController::import()` and
+`FleetBillingTariffController::import()` both used `back()` — the
+same fragile pattern fixed twice before elsewhere in this project —
+instead of the explicit `['model' => ...]` redirect their own sibling
+store/update/destroy actions already use. Fixed to match.
+`StandardBillingController::importAll()` was checked too: its import
+isn't scoped to a single Domestic/International tab (one CSV can
+touch both), so there's no single correct tab to restore there — left
+as-is deliberately, not an oversight.
+
+### Zone Mapping — the larger gap
+
+13 actions (generate/apply-rule/update/import across Domestic,
+International, and International's own Cross-Trade sub-tab) were
+using `back()` or a bare `redirect()->route('zone-mappings.index')`
+with no tab context at all — every single save reset the page back to
+International (whatever's hardcoded as visible by default), regardless
+of which tab or sub-tab the action was actually performed from.
+
+New `redirectToZoneTab()` helper (same reasoning as `ClientController::
+redirectToTab()`), wired into all 13 actions, plus the view's own
+missing page-load restoration (`?tab=`/`?sub=`) — the exact
+`standard-billing` page already had this piece; zone-mappings never
+did.
+
+### A mistake caught by re-auditing my own work, not trusted at face value
+
+An automated pass mis-tagged `updateZone` (the *domestic* zone
+override) as redirecting to the *international* tab, and silently
+failed to update several other methods' success lines despite
+reporting them as fixed. Caught by re-checking every single method's
+final redirect call individually against its own function — rather
+than trusting the automation's own report — before treating this as
+done. All 13 confirmed correct on the re-audit.
+
+### Verified
+
+Full repo balance check, duplicate-method scan, raw-byte backslash
+scan: clean across 176 files. Every one of the 13 zone-mapping
+actions individually re-verified against its enclosing method after
+the fix, not just spot-checked.
+
+**Still pending, per your message**: tooltips added system-wide where
+genuinely helpful (only added them to the Billing Setup forms so
+far). Also worth a closer look: whether zone-mapping's *validation
+failures* (not just successes) correctly preserve old values — this
+session's fix covered every success-path redirect; failure-path
+`old()` handling on this specific page wasn't separately audited.
+
+### Files
+
+```
+app/Http/Controllers/Web/ZoneMappingController.php
+app/Http/Controllers/Web/OriginDestinationTariffController.php
+app/Http/Controllers/Web/FleetBillingTariffController.php
+resources/views/zone-mappings/index.blade.php
+```

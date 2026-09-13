@@ -22,6 +22,25 @@ class ZoneMappingController extends Controller
     }
 
     /**
+     * Every action on this page redirects back through here instead of
+     * back() or a bare redirect()->route() — same reasoning as
+     * ClientController::redirectToTab(): an explicit destination can
+     * never be lost to a missing Referer header, and it means a save
+     * made on the International tab (or its Cross-Trade sub-tab)
+     * actually reopens there instead of always landing back on
+     * Domestic. $sub only matters when $tab is 'international'.
+     */
+    private function redirectToZoneTab(string $tab, ?string $sub, string $status): RedirectResponse
+    {
+        $params = ['tab' => $tab];
+        if ($tab === 'international' && $sub) {
+            $params['sub'] = $sub;
+        }
+
+        return redirect()->route('zone-mappings.index', $params)->with('status', $status);
+    }
+
+    /**
      * Two independent sections on one screen:
      *
      * Domestic — every combination of Nigeria's states (~666 pairs),
@@ -86,7 +105,7 @@ class ZoneMappingController extends Controller
         $nigeria = Country::where('code', 'NG')->first();
 
         if (! $nigeria) {
-            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+            return redirect()->route('zone-mappings.index', ['tab' => 'domestic'])->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
         }
 
         $states = State::where('country_id', $nigeria->id)->get()->values();
@@ -117,7 +136,7 @@ class ZoneMappingController extends Controller
             }
         }
 
-        return redirect()->route('zone-mappings.index')->with('status', "Domestic combinations generated ({$created} new).");
+        return $this->redirectToZoneTab('domestic', null, "Domestic combinations generated ({$created} new).");
     }
 
     /**
@@ -162,7 +181,7 @@ class ZoneMappingController extends Controller
             }
         });
 
-        return redirect()->route('zone-mappings.index')->with('status', "Rule applied to {$updated} domestic mappings.");
+        return $this->redirectToZoneTab('domestic', null, "Rule applied to {$updated} domestic mappings.");
     }
 
     /**
@@ -197,7 +216,7 @@ class ZoneMappingController extends Controller
         $nigeria = Country::where('code', 'NG')->first();
 
         if (! $nigeria) {
-            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+            return redirect()->route('zone-mappings.index', ['tab' => 'international'] + ['sub' => 'nigeria'])->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
         }
 
         $created = 0;
@@ -207,7 +226,7 @@ class ZoneMappingController extends Controller
             $created += $mapping->wasRecentlyCreated ? 1 : 0;
         }
 
-        return redirect()->route('zone-mappings.index')->with('status', "International countries generated ({$created} new).");
+        return $this->redirectToZoneTab('international', 'nigeria', "International countries generated ({$created} new).");
     }
 
     /**
@@ -236,7 +255,7 @@ class ZoneMappingController extends Controller
         $nigeria = Country::where('code', 'NG')->first();
 
         if (! $nigeria) {
-            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+            return redirect()->route('zone-mappings.index', ['tab' => 'international'] + ['sub' => 'nigeria'])->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
         }
 
         $method = $request->input('grouping_method', 'continent_region');
@@ -278,7 +297,7 @@ class ZoneMappingController extends Controller
             }
         });
 
-        return redirect()->route('zone-mappings.index')->with('status', "Rule applied to {$updated} international mappings.");
+        return $this->redirectToZoneTab('international', 'nigeria', "Rule applied to {$updated} international mappings.");
     }
 
     public function updateZone(Request $request, ZoneMapping $zoneMapping): RedirectResponse
@@ -292,7 +311,7 @@ class ZoneMappingController extends Controller
 
         $zoneMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
-        return back()->with('status', 'Zone updated.');
+        return $this->redirectToZoneTab('domestic', null, 'Zone updated.');
     }
 
     public function updateCountryZone(Request $request, ZoneCountryMapping $zoneCountryMapping): RedirectResponse
@@ -306,7 +325,7 @@ class ZoneMappingController extends Controller
 
         $zoneCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
-        return back()->with('status', 'Zone updated.');
+        return $this->redirectToZoneTab('international', 'nigeria', 'Zone updated.');
     }
 
     /**
@@ -336,7 +355,7 @@ class ZoneMappingController extends Controller
             ['zone_id' => $data['zone_id'] ?: null]
         );
 
-        return back()->with('status', 'Third-party route saved.');
+        return $this->redirectToZoneTab('international', 'crosstrade', 'Third-party route saved.');
     }
 
     /**
@@ -368,7 +387,7 @@ class ZoneMappingController extends Controller
             }
         }
 
-        return back()->with('status', "Cross-trade combinations generated ({$created} new).");
+        return $this->redirectToZoneTab('international', 'crosstrade', "Cross-trade combinations generated ({$created} new).");
     }
 
     /**
@@ -419,7 +438,7 @@ class ZoneMappingController extends Controller
             }
         });
 
-        return back()->with('status', "Rule applied to {$updated} cross-trade routes.");
+        return $this->redirectToZoneTab('international', 'crosstrade', "Rule applied to {$updated} cross-trade routes.");
     }
 
     public function updateThirdPartyZone(Request $request, ThirdPartyCountryMapping $thirdPartyCountryMapping): RedirectResponse
@@ -432,14 +451,14 @@ class ZoneMappingController extends Controller
 
         $thirdPartyCountryMapping->update(['zone_id' => $data['zone_id'] ?: null]);
 
-        return back()->with('status', 'Zone updated.');
+        return $this->redirectToZoneTab('international', 'crosstrade', 'Zone updated.');
     }
 
     public function destroyThirdParty(ThirdPartyCountryMapping $thirdPartyCountryMapping): RedirectResponse
     {
         $thirdPartyCountryMapping->delete();
 
-        return back()->with('status', 'Third-party route removed.');
+        return $this->redirectToZoneTab('international', 'crosstrade', 'Third-party route removed.');
     }
 
     /**
@@ -491,7 +510,7 @@ class ZoneMappingController extends Controller
             $count++;
         }
 
-        return redirect()->route('zone-mappings.index')->with('status', "Imported {$count} domestic mappings" . ($skipped ? ", skipped {$skipped} (unknown state code)." : '.'));
+        return $this->redirectToZoneTab('domestic', null, "Imported {$count} domestic mappings" . ($skipped ? ", skipped {$skipped} (unknown state code)." : '.'));
     }
 
     public function exportInternational(): \Symfony\Component\HttpFoundation\StreamedResponse
@@ -511,7 +530,7 @@ class ZoneMappingController extends Controller
         $nigeria = Country::where('code', 'NG')->first();
 
         if (! $nigeria) {
-            return back()->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
+            return redirect()->route('zone-mappings.index', ['tab' => 'international'] + ['sub' => 'nigeria'])->withErrors(['country' => 'Nigeria isn\'t set up under Setups → Location → Countries yet.']);
         }
 
         $rows = $this->csv->parse($request->file('file'));
@@ -537,6 +556,6 @@ class ZoneMappingController extends Controller
             $count++;
         }
 
-        return redirect()->route('zone-mappings.index')->with('status', "Imported {$count} international mappings" . ($skipped ? ", skipped {$skipped} (unknown country code)." : '.'));
+        return $this->redirectToZoneTab('international', 'nigeria', "Imported {$count} international mappings" . ($skipped ? ", skipped {$skipped} (unknown country code)." : '.'));
     }
 }

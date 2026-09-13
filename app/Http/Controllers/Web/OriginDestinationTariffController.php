@@ -166,7 +166,7 @@ class OriginDestinationTariffController extends Controller
             $count++;
         }
 
-        return back()->with('status', "Imported {$count} route rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code or missing weight)." : '.'));
+        return redirect()->route('standard-billing.index', ['model' => 'origin-destination'])->with('status', "Imported {$count} route rates" . ($skipped ? ", skipped {$skipped} (unknown state/country/product code or missing weight)." : '.'));
     }
 
     private function formOptions(): array

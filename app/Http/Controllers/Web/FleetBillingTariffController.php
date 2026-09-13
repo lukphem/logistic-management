@@ -162,7 +162,7 @@ class FleetBillingTariffController extends Controller
             $count++;
         }
 
-        return back()->with('status', "Imported {$count} fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code or missing weight)." : '.'));
+        return redirect()->route('standard-billing.index', ['model' => 'fleet'])->with('status', "Imported {$count} fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code or missing weight)." : '.'));
     }
 
     private function formOptions(): array
