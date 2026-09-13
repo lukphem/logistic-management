@@ -317,11 +317,11 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/clients/{user}/documents', [ClientController::class, 'storeDocument'])->name('clients.documents.store');
         Route::delete('/clients/{user}/documents/{document}', [ClientController::class, 'destroyDocument'])->name('clients.documents.destroy');
 
-        Route::post('/clients/{user}/api-access', [ClientController::class, 'generateApiAccess'])->name('clients.api-access.generate');
-        Route::put('/clients/{user}/api-access', [ClientController::class, 'updateApiSettings'])->name('clients.api-access.update');
-        Route::post('/clients/{user}/ip-whitelist', [ClientController::class, 'storeIpWhitelist'])->name('clients.ip-whitelist.store');
+        Route::post('/clients/{user}/accounts/{account}/api-access', [ClientController::class, 'generateApiAccess'])->name('clients.api-access.generate');
+        Route::put('/clients/{user}/api-clients/{apiClient}', [ClientController::class, 'updateApiSettings'])->name('clients.api-access.update');
+        Route::post('/clients/{user}/api-clients/{apiClient}/ip-whitelist', [ClientController::class, 'storeIpWhitelist'])->name('clients.ip-whitelist.store');
         Route::delete('/clients/{user}/ip-whitelist/{ipWhitelist}', [ClientController::class, 'destroyIpWhitelist'])->name('clients.ip-whitelist.destroy');
-        Route::post('/clients/{user}/webhooks', [ClientController::class, 'storeWebhook'])->name('clients.webhooks.store');
+        Route::post('/clients/{user}/api-clients/{apiClient}/webhooks', [ClientController::class, 'storeWebhook'])->name('clients.webhooks.store');
         Route::delete('/clients/{user}/webhooks/{webhook}', [ClientController::class, 'destroyWebhook'])->name('clients.webhooks.destroy');
 
         Route::put('/clients/{user}/accounts/{account}/managerial', [ClientController::class, 'updateManagerial'])->name('clients.managerial.update');

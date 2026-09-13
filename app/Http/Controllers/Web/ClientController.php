@@ -244,7 +244,7 @@ class ClientController extends Controller
             'departments' => $isOrganization ? Department::where('client_account_id', $accountId)->orderBy('name')->get() : collect(),
             'subUsers' => $isOrganization ? User::whereHas('clientProfile', fn ($q) => $q->where('client_account_id', $accountId))->with('clientProfile.department')->orderBy('name')->get() : collect(),
             'documents' => ClientDocument::where('client_user_id', $user->id)->latest()->get(),
-            'apiClient' => ApiClient::where('client_user_id', $user->id)->with('ipWhitelists', 'webhookSubscriptions')->first(),
+            'apiClients' => ApiClient::where('client_account_id', $accountId)->with('ipWhitelists', 'webhookSubscriptions')->orderBy('mode')->get()->keyBy('mode'),
             'shipments' => $this->filteredTransactions($accountId),
             'transactionStatuses' => \App\Models\ScanStatus::all(),
             'accounts' => $user->accounts()->with('businessManager')->orderByDesc('is_default')->orderBy('account_name')->get(),
@@ -1467,46 +1467,50 @@ class ClientController extends Controller
     // external integration partners)
     // ---------------------------------------------------------------
 
-    public function generateApiAccess(Request $request, User $user): RedirectResponse
+    public function generateApiAccess(Request $request, User $user, ClientAccount $account): RedirectResponse
     {
-        abort_unless($user->user_type === 'client', 404);
+        abort_unless($account->client_user_id === $user->id, 404);
 
-        $result = ApiClient::generateFor($user->id, $user->defaultAccount?->company_name ?: $user->name);
+        $mode = $request->input('mode') === 'test' ? 'test' : 'live';
+
+        $result = ApiClient::generateFor($user->id, $account->id, $mode, $account->company_name ?: $account->account_name);
 
         // The plaintext secret only ever exists in this one response -
         // flashed to session for a single display, never persisted or
         // logged anywhere.
-        return $this->redirectToTab($user, 'security', 'API access generated — copy the secret now, it will not be shown again.')
+        return $this->redirectToTab($user, 'integrations', ucfirst($mode) . ' API access generated — copy the secret now, it will not be shown again.', $account)
             ->with('plaintext_api_secret', $result['plaintext_secret']);
     }
 
-    public function updateApiSettings(Request $request, User $user): RedirectResponse
+    public function updateApiSettings(Request $request, User $user, ApiClient $apiClient): RedirectResponse
     {
-        $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
+        abort_unless($apiClient->clientAccount?->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'api_response_format' => 'required|in:url,base64',
             'ip_whitelist_enabled' => 'sometimes|boolean',
             'rate_limit_per_minute' => 'required|integer|min:1|max:6000',
-        ]), $user, 'security');
+            'access_level' => 'required|in:read_only,full_access',
+        ]), $user, 'integrations', 'apiClient' . $apiClient->id);
 
         $apiClient->update([
             'api_response_format' => $data['api_response_format'],
             'ip_whitelist_enabled' => $request->boolean('ip_whitelist_enabled'),
             'rate_limit_per_minute' => $data['rate_limit_per_minute'],
+            'access_level' => $data['access_level'],
         ]);
 
-        return $this->redirectToTab($user, 'security', 'API settings updated.');
+        return $this->redirectToTab($user, 'integrations', ucfirst($apiClient->mode) . ' API settings updated.', $apiClient->clientAccount);
     }
 
-    public function storeIpWhitelist(Request $request, User $user): RedirectResponse
+    public function storeIpWhitelist(Request $request, User $user, ApiClient $apiClient): RedirectResponse
     {
-        $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
+        abort_unless($apiClient->clientAccount?->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'ip_or_cidr' => 'required|string|max:255',
             'label' => 'nullable|string|max:255',
-        ]), $user, 'security');
+        ]), $user, 'integrations', 'apiClient' . $apiClient->id);
 
         IpWhitelist::create([
             'api_client_id' => $apiClient->id,
@@ -1515,27 +1519,28 @@ class ClientController extends Controller
             'added_at' => now(),
         ]);
 
-        return $this->redirectToTab($user, 'security', 'IP added to whitelist.');
+        return $this->redirectToTab($user, 'integrations', 'IP added to whitelist.', $apiClient->clientAccount);
     }
 
     public function destroyIpWhitelist(User $user, IpWhitelist $ipWhitelist): RedirectResponse
     {
-        abort_unless($ipWhitelist->apiClient?->client_user_id === $user->id, 404);
+        abort_unless($ipWhitelist->apiClient?->clientAccount?->client_user_id === $user->id, 404);
 
+        $account = $ipWhitelist->apiClient?->clientAccount;
         $ipWhitelist->delete();
 
-        return $this->redirectToTab($user, 'security', 'IP removed from whitelist.');
+        return $this->redirectToTab($user, 'integrations', 'IP removed from whitelist.', $account);
     }
 
-    public function storeWebhook(Request $request, User $user): RedirectResponse
+    public function storeWebhook(Request $request, User $user, ApiClient $apiClient): RedirectResponse
     {
-        $apiClient = ApiClient::where('client_user_id', $user->id)->firstOrFail();
+        abort_unless($apiClient->clientAccount?->client_user_id === $user->id, 404);
 
         $data = $this->validated(Validator::make($request->all(), [
             'url' => 'required|url|max:500',
             'events' => 'required|array|min:1',
             'events.*' => 'string',
-        ]), $user, 'security');
+        ]), $user, 'integrations', 'apiClient' . $apiClient->id);
 
         WebhookSubscription::create([
             'api_client_id' => $apiClient->id,
@@ -1545,16 +1550,17 @@ class ClientController extends Controller
             'is_active' => true,
         ]);
 
-        return $this->redirectToTab($user, 'security', 'Webhook added.');
+        return $this->redirectToTab($user, 'integrations', 'Webhook added.', $apiClient->clientAccount);
     }
 
     public function destroyWebhook(User $user, WebhookSubscription $webhook): RedirectResponse
     {
-        abort_unless($webhook->apiClient?->client_user_id === $user->id, 404);
+        abort_unless($webhook->apiClient?->clientAccount?->client_user_id === $user->id, 404);
 
+        $account = $webhook->apiClient?->clientAccount;
         $webhook->delete();
 
-        return $this->redirectToTab($user, 'security', 'Webhook removed.');
+        return $this->redirectToTab($user, 'integrations', 'Webhook removed.', $account);
     }
 
     // ---------------------------------------------------------------

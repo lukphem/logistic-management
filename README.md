@@ -7659,3 +7659,78 @@ account's shipments never leak into another account's filtered view.
 app/Http/Controllers/Web/ClientController.php   (filteredTransactions())
 resources/views/clients/show.blade.php   (account selector, filter form, pagination)
 ```
+
+## Increment 132 — Security Tab Renamed to Integrations, Rebuilt Account-Scoped with Test/Live Keys
+
+### Rename + reorder
+
+"Security" → "Integrations" (kept the shield icon — IP whitelist and
+access control are still core to what the tab does). Sidebar
+reordered into a more logical grouping: Overview, Accounts, Billing
+Setup, Managerial services, Transactions, Department, User, Document,
+Integrations — billing-related tabs together, the most technical one
+last.
+
+### Account-scoped, with Test/Live keys
+
+`api_clients` now belongs to a specific account
+(`client_account_id`), not the client as a whole — the old unique
+constraint only allowed one row per client, ever; replaced with a
+unique constraint on `(client_account_id, mode)`, so an account can
+hold up to two keys: one Test, one Live, each independently
+generated, regenerated, and configured (own IP whitelist, own
+webhooks, own access level).
+
+### Test keys are real sandboxing, not just a label
+
+A shipment created with a Test key gets a real tracking number and
+can be tracked/cancelled — enough to exercise an integrator's code
+end-to-end — but is flagged `is_test` and is never a real, billable,
+operational shipment: excluded from the rider's real assigned-orders
+queue and from the invoice list unconditionally. Also fixed a related
+gap found while touching this code: API-created shipments never had
+`client_account_id` set at all, meaning they couldn't correctly reach
+their own account's rates — now resolved from the authenticating API
+client.
+
+### Access level: read-only vs full access
+
+A single toggle per key (per your call — simpler than granular
+per-action scopes) enforced in `CheckIpWhitelist`, not just cosmetic:
+`/shipments` (create), `/shipments/{id}/cancel`, and
+`/webhooks/subscribe` are blocked for a read-only key; `/quote` and
+`/shipments/{id}/track` remain allowed, since read-only should still
+be able to price and track.
+
+### Verified
+
+Balance-checked after every edit (large rebuild), nested-form scan
+clean. Full repo balance check, duplicate-method scan: clean across
+182 files. Verified end-to-end against live MySQL: a Test and Live
+key coexist correctly for the same account; the unique constraint
+correctly rejects a duplicate mode; the write-action classification
+matches intent for all 5 route cases (quote/track allowed read-only,
+create/cancel/webhook-subscribe blocked); a test shipment correctly
+stores `is_test=1` and is correctly excluded from both the invoice
+and rider-assignment queries.
+
+**Not built**: no separate "sandbox" UI/dashboard showing test
+shipments distinctly to the client themselves — they're excluded from
+the real operational/billing views as specified, but there's no
+dedicated test-mode view yet if that turns out to be wanted later.
+
+### Files
+
+```
+database/migrations/2026_03_09_000001_add_account_mode_access_to_api_clients_table.php
+database/migrations/2026_03_09_000002_add_is_test_to_shipments_table.php
+app/Models/ApiClient.php   (client_account_id, mode, access_level, generateFor() signature change)
+app/Models/Shipment.php   (is_test)
+app/Http/Middleware/CheckIpWhitelist.php   (read-only enforcement)
+app/Http/Controllers/Api/ClientShipmentController.php   (client_account_id + is_test on create)
+app/Http/Controllers/Api/RiderController.php   (excludes is_test from assignedOrders)
+app/Http/Controllers/Web/InvoiceController.php   (excludes is_test)
+app/Http/Controllers/Web/ClientController.php   (all API-management actions rewritten account/mode-aware)
+resources/views/clients/show.blade.php   (tab renamed/reordered, full Integrations UI rebuild with Test/Live cards)
+routes/web.php
+```

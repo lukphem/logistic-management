@@ -15,6 +15,7 @@ class RiderController extends Controller
     public function assignedOrders(Request $request): JsonResponse
     {
         $orders = Shipment::where('assigned_rider_id', $request->user()->id)
+            ->where('is_test', false)
             ->whereNotIn('current_status', ['delivered', 'returned'])
             ->latest()
             ->get();

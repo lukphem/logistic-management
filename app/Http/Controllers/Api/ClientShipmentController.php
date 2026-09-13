@@ -81,7 +81,13 @@ class ClientShipmentController extends Controller
         $data = $validator->validated();
         // Same reasoning as Api\ClientController::quote() - a logged-in
         // client gets their own special tariff applied automatically.
-        $data['client_user_id'] = $request->user()?->id;
+        // For a pure API-key request (no session user at all), resolve
+        // both from the api_client the CheckIpWhitelist middleware
+        // already matched instead — its client_account_id is what lets
+        // pricing correctly reach this specific account's own rates.
+        $apiClient = $request->attributes->get('api_client');
+        $data['client_user_id'] = $request->user()?->id ?? $apiClient?->client_user_id;
+        $data['client_account_id'] = $apiClient?->client_account_id;
 
         try {
             $quote = $this->pricingEngine->quote($data);
@@ -94,8 +100,13 @@ class ClientShipmentController extends Controller
 
         $shipment = Shipment::create([
             ...$data,
-            'client_user_id' => $request->user()?->id,
-            'api_client_id' => $request->attributes->get('api_client')?->id,
+            'client_user_id' => $data['client_user_id'],
+            'api_client_id' => $apiClient?->id,
+            // A shipment booked through a Test-mode key is real enough
+            // to exercise the integration end-to-end, but is never a
+            // real, billable, operational shipment — see the
+            // migration's note on everywhere that distinction matters.
+            'is_test' => $apiClient?->isTestMode() ?? false,
             'shipping_type' => $quote['shipping_type'],
             'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
             ...$pricing,

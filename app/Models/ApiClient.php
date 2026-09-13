@@ -14,6 +14,9 @@ class ApiClient extends Model
     protected $fillable = [
         'name',
         'client_user_id',
+        'client_account_id',
+        'mode',
+        'access_level',
         'api_key',
         'api_secret_hash',
         'api_response_format',
@@ -35,29 +38,49 @@ class ApiClient extends Model
         return $this->belongsTo(User::class, 'client_user_id');
     }
 
+    public function clientAccount(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ClientAccount::class);
+    }
+
+    public function isTestMode(): bool
+    {
+        return $this->mode === 'test';
+    }
+
+    public function isReadOnly(): bool
+    {
+        return $this->access_level === 'read_only';
+    }
+
     public function webhookSubscriptions(): HasMany
     {
         return $this->hasMany(WebhookSubscription::class);
     }
 
     /**
-     * Generates a fresh key + secret pair. The secret is returned only
+     * Generates a fresh key + secret pair for one specific account and
+     * mode — an account can hold up to two of these (one Test, one
+     * Live), matched by the (client_account_id, mode) unique
+     * constraint, so calling this again for the same account+mode
+     * regenerates rather than duplicates. The secret is returned only
      * here, in plaintext, for one-time display to whoever just
-     * generated it (Security tab) - never stored or shown again after
-     * this, only its hash. Regenerating replaces both; any code the
-     * client had saved stops working immediately, same as rotating any
-     * other API credential.
+     * generated it (Integrations tab) - never stored or shown again
+     * after this, only its hash. Regenerating replaces both; any code
+     * the client had saved stops working immediately, same as
+     * rotating any other API credential.
      *
      * @return array{api_client: self, plaintext_secret: string}
      */
-    public static function generateFor(?int $clientUserId, string $name): array
+    public static function generateFor(?int $clientUserId, ?int $clientAccountId, string $mode, string $name): array
     {
-        $apiKey = 'lm_' . \Illuminate\Support\Str::random(32);
+        $apiKey = 'lm_' . $mode . '_' . \Illuminate\Support\Str::random(28);
         $secret = \Illuminate\Support\Str::random(48);
 
         $apiClient = static::updateOrCreate(
-            ['client_user_id' => $clientUserId],
+            ['client_account_id' => $clientAccountId, 'mode' => $mode],
             [
+                'client_user_id' => $clientUserId,
                 'name' => $name,
                 'api_key' => $apiKey,
                 'api_secret_hash' => \Illuminate\Support\Facades\Hash::make($secret),

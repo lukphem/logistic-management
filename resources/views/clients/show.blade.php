@@ -79,8 +79,9 @@
                     $sections = [
                         'overview' => ['label' => 'Overview', 'icon' => 'dashboard'],
                         'accounts' => ['label' => 'Accounts', 'icon' => 'building'],
-                        'transactions' => ['label' => 'Transactions', 'icon' => 'box'],
                         'billing' => ['label' => 'Billing Setup', 'icon' => 'sliders'],
+                        'managerial' => ['label' => 'Managerial services', 'icon' => 'briefcase'],
+                        'transactions' => ['label' => 'Transactions', 'icon' => 'box'],
                     ];
                     if ($isOrganization) {
                         $sections['department'] = ['label' => 'Department', 'icon' => 'layers'];
@@ -88,8 +89,7 @@
                     }
                     $sections += [
                         'document' => ['label' => 'Document', 'icon' => 'document'],
-                        'security' => ['label' => 'Security', 'icon' => 'shield'],
-                        'managerial' => ['label' => 'Managerial services', 'icon' => 'briefcase'],
+                        'integrations' => ['label' => 'Integrations', 'icon' => 'shield'],
                     ];
                 @endphp
                 @foreach ($sections as $key => $section)
@@ -1669,100 +1669,148 @@
         </div>
     </div>
 
-    {{-- ============ SECURITY (API access) ============ --}}
-    <div id="tab-security" class="mt-5 max-w-2xl" style="display:none">
-        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <p class="mb-1 text-sm font-semibold text-ink-900">API access</p>
-            @if (! $apiClient)
-                <p class="mb-4 text-sm text-ink-500">No API access set up yet for this client.</p>
-                <form method="POST" action="{{ route('clients.api-access.generate', $user) }}">
-                    @csrf
-                    <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Generate API access</button>
-                </form>
-            @else
-                <div class="mb-4 space-y-2 text-sm">
-                    <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">API Key</span><code class="font-mono text-xs text-ink-900">{{ $apiClient->api_key }}</code></div>
-                    <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Status</span><span class="text-ink-900">{{ $apiClient->is_active ? 'Active' : 'Inactive' }}</span></div>
+    {{-- ============ INTEGRATIONS (API access) ============ --}}
+    <div id="tab-integrations" class="mt-5 max-w-3xl" style="display:none">
+        @if ($accounts->count() > 1)
+            <div class="mb-5 rounded-xl border border-line bg-surface-50 p-4">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink-500">Configuring integrations for</label>
+                <select onchange="if (this.value) window.location.href = this.value;" class="w-full max-w-sm rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    @foreach ($accounts as $acct)
+                        <option value="{{ route('clients.accounts.show', [$user, $acct]) }}?tab=integrations" @selected($acct->id === $account->id)>
+                            {{ $acct->account_name }}{{ $acct->is_default ? ' (Default)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-500">API keys, IP whitelist, and webhooks all belong to this specific account — no need to switch which one is Default first.</p>
+            </div>
+        @endif
+
+        @foreach (['live' => 'Live', 'test' => 'Test'] as $mode => $modeLabel)
+            @php $apiClient = $apiClients->get($mode); @endphp
+            <div class="mb-5 rounded-xl border border-line bg-surface-0 shadow-sm">
+                <div class="flex items-center justify-between border-b border-line px-5 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $mode === 'live' ? 'bg-status-delivered/10 text-status-delivered' : 'bg-status-exception/10 text-status-exception' }}">{{ $modeLabel }}</span>
+                        <p class="text-sm font-semibold text-ink-900">{{ $modeLabel }} API access</p>
+                    </div>
+                    @if ($mode === 'test')
+                        <span class="text-xs text-ink-400" title="Shipments created with a Test key get real tracking numbers and can be tracked/cancelled, but never reach a rider's real queue and never appear on an invoice.">ⓘ Sandboxed — never billed, never dispatched</span>
+                    @endif
                 </div>
-                <form method="POST" action="{{ route('clients.api-access.generate', $user) }}" class="mb-4" onsubmit="return confirm('Regenerate? The existing key/secret stop working immediately.');">
-                    @csrf
-                    <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Regenerate key/secret</button>
-                </form>
+                <div class="p-5">
+                    @if (! $apiClient)
+                        <p class="mb-4 text-sm text-ink-500">No {{ strtolower($modeLabel) }} API access set up yet for this account.</p>
+                        <form method="POST" action="{{ route('clients.api-access.generate', [$user, $account]) }}">
+                            @csrf
+                            <input type="hidden" name="mode" value="{{ $mode }}">
+                            <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 hover:shadow-md">Generate {{ $modeLabel }} API access</button>
+                        </form>
+                    @else
+                        <div class="mb-4 space-y-2 text-sm">
+                            <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">API Key</span><code class="font-mono text-xs text-ink-900">{{ $apiClient->api_key }}</code></div>
+                            <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Status</span><span class="text-ink-900">{{ $apiClient->is_active ? 'Active' : 'Inactive' }}</span></div>
+                        </div>
+                        <form method="POST" action="{{ route('clients.api-access.generate', [$user, $account]) }}" class="mb-4" onsubmit="return confirm('Regenerate the {{ $modeLabel }} key? The existing key/secret stop working immediately.');">
+                            @csrf
+                            <input type="hidden" name="mode" value="{{ $mode }}">
+                            <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Regenerate key/secret</button>
+                        </form>
 
-                <form method="POST" action="{{ route('clients.api-access.update', $user) }}" class="mb-6 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-3">
-                    @csrf
-                    @method('PUT')
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">Response format</label>
-                        <select name="api_response_format" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                            <option value="url" @selected($apiClient->api_response_format === 'url')>URL</option>
-                            <option value="base64" @selected($apiClient->api_response_format === 'base64')>Base64</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-ink-900">Rate limit / min</label>
-                        <input type="number" min="1" name="rate_limit_per_minute" value="{{ $apiClient->rate_limit_per_minute }}" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    </div>
-                    <div class="flex items-end">
-                        <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-900">
-                            <input type="checkbox" name="ip_whitelist_enabled" value="1" @checked($apiClient->ip_whitelist_enabled) class="rounded border-line">
-                            Enforce IP whitelist
-                        </label>
-                    </div>
-                    <div class="sm:col-span-3">
-                        <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Save settings</button>
-                    </div>
-                </form>
+                        @if ($errors->{'apiClient' . $apiClient->id}->any())
+                            <div class="mb-4 rounded-md border border-status-exception/30 bg-status-exception/5 p-3 text-sm text-status-exception">
+                                <ul class="list-disc space-y-0.5 pl-5">
+                                    @foreach ($errors->{'apiClient' . $apiClient->id}->all() as $message)
+                                        <li>{{ $message }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
 
-                <p class="mb-2 text-sm font-semibold text-ink-900">IP whitelist</p>
-                <ul class="mb-3 divide-y divide-line text-sm">
-                    @forelse ($apiClient->ipWhitelists as $entry)
-                        <li class="flex items-center justify-between py-2">
-                            <span class="text-ink-900">{{ $entry->ip_or_cidr }} <span class="text-xs text-ink-500">{{ $entry->label }}</span></span>
-                            <form method="POST" action="{{ route('clients.ip-whitelist.destroy', [$user, $entry]) }}">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
-                            </form>
-                        </li>
-                    @empty
-                        <li class="py-2 text-ink-500">No IPs whitelisted.</li>
-                    @endforelse
-                </ul>
-                <form method="POST" action="{{ route('clients.ip-whitelist.store', $user) }}" class="mb-6 flex items-end gap-2">
-                    @csrf
-                    <input type="text" name="ip_or_cidr" placeholder="e.g. 197.210.5.0/24" required class="flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <input type="text" name="label" placeholder="Label (optional)" class="flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add</button>
-                </form>
+                        <form method="POST" action="{{ route('clients.api-access.update', [$user, $apiClient]) }}" class="mb-6 grid grid-cols-1 gap-3 border-t border-line pt-4 sm:grid-cols-2">
+                            @csrf
+                            @method('PUT')
+                            <div>
+                                <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Access level
+                                    <span class="cursor-help text-ink-400" title="Read-only can generate quotes and track shipments, but can't create/cancel shipments or subscribe webhooks.">ⓘ</span>
+                                </label>
+                                <select name="access_level" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="full_access" @selected($apiClient->access_level === 'full_access')>Full access</option>
+                                    <option value="read_only" @selected($apiClient->access_level === 'read_only')>Read-only</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Response format</label>
+                                <select name="api_response_format" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                    <option value="url" @selected($apiClient->api_response_format === 'url')>URL</option>
+                                    <option value="base64" @selected($apiClient->api_response_format === 'base64')>Base64</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-ink-900">Rate limit / min</label>
+                                <input type="number" min="1" name="rate_limit_per_minute" value="{{ $apiClient->rate_limit_per_minute }}" class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            </div>
+                            <div class="flex items-end">
+                                <label class="flex cursor-pointer items-center gap-2 text-xs text-ink-900">
+                                    <input type="checkbox" name="ip_whitelist_enabled" value="1" @checked($apiClient->ip_whitelist_enabled) class="rounded border-line">
+                                    Enforce IP whitelist
+                                </label>
+                            </div>
+                            <div class="sm:col-span-2">
+                                <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Save settings</button>
+                            </div>
+                        </form>
 
-                <p class="mb-2 text-sm font-semibold text-ink-900">Webhooks</p>
-                <ul class="mb-3 divide-y divide-line text-sm">
-                    @forelse ($apiClient->webhookSubscriptions as $webhook)
-                        <li class="flex items-center justify-between py-2">
-                            <span class="text-ink-900 break-all">{{ $webhook->url }} <span class="text-xs text-ink-500">({{ implode(', ', $webhook->events) }})</span></span>
-                            <form method="POST" action="{{ route('clients.webhooks.destroy', [$user, $webhook]) }}">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="shrink-0 text-xs font-medium text-status-exception hover:underline">Remove</button>
-                            </form>
-                        </li>
-                    @empty
-                        <li class="py-2 text-ink-500">No webhooks configured.</li>
-                    @endforelse
-                </ul>
-                <form method="POST" action="{{ route('clients.webhooks.store', $user) }}" class="space-y-2">
-                    @csrf
-                    <input type="url" name="url" placeholder="https://example.com/webhook" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                    <div class="flex flex-wrap gap-3 text-xs text-ink-900">
-                        @foreach (['shipment.created', 'shipment.status_updated', 'shipment.delivered'] as $event)
-                            <label class="flex items-center gap-1"><input type="checkbox" name="events[]" value="{{ $event }}" class="rounded border-line">{{ $event }}</label>
-                        @endforeach
-                    </div>
-                    <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add webhook</button>
-                </form>
-            @endif
-        </div>
+                        <p class="mb-2 text-sm font-semibold text-ink-900">IP whitelist</p>
+                        <ul class="mb-3 divide-y divide-line text-sm">
+                            @forelse ($apiClient->ipWhitelists as $entry)
+                                <li class="flex items-center justify-between py-2">
+                                    <span class="text-ink-900">{{ $entry->ip_or_cidr }} <span class="text-xs text-ink-500">{{ $entry->label }}</span></span>
+                                    <form method="POST" action="{{ route('clients.ip-whitelist.destroy', [$user, $entry]) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                    </form>
+                                </li>
+                            @empty
+                                <li class="py-2 text-ink-500">No IPs whitelisted.</li>
+                            @endforelse
+                        </ul>
+                        <form method="POST" action="{{ route('clients.ip-whitelist.store', [$user, $apiClient]) }}" class="mb-6 flex items-end gap-2">
+                            @csrf
+                            <input type="text" name="ip_or_cidr" placeholder="e.g. 197.210.5.0/24" required class="flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <input type="text" name="label" placeholder="Label (optional)" class="flex-1 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add</button>
+                        </form>
+
+                        <p class="mb-2 text-sm font-semibold text-ink-900">Webhooks</p>
+                        <ul class="mb-3 divide-y divide-line text-sm">
+                            @forelse ($apiClient->webhookSubscriptions as $webhook)
+                                <li class="flex items-center justify-between py-2">
+                                    <span class="text-ink-900 break-all">{{ $webhook->url }} <span class="text-xs text-ink-500">({{ implode(', ', $webhook->events) }})</span></span>
+                                    <form method="POST" action="{{ route('clients.webhooks.destroy', [$user, $webhook]) }}">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="shrink-0 text-xs font-medium text-status-exception hover:underline">Remove</button>
+                                    </form>
+                                </li>
+                            @empty
+                                <li class="py-2 text-ink-500">No webhooks configured.</li>
+                            @endforelse
+                        </ul>
+                        <form method="POST" action="{{ route('clients.webhooks.store', [$user, $apiClient]) }}" class="space-y-2">
+                            @csrf
+                            <input type="url" name="url" placeholder="https://example.com/webhook" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                            <div class="flex flex-wrap gap-3 text-xs text-ink-900">
+                                @foreach (['shipment.created', 'shipment.status_updated', 'shipment.delivered'] as $event)
+                                    <label class="flex items-center gap-1"><input type="checkbox" name="events[]" value="{{ $event }}" class="rounded border-line">{{ $event }}</label>
+                                @endforeach
+                            </div>
+                            <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">Add webhook</button>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        @endforeach
     </div>
 
     {{-- ============ MANAGERIAL SERVICES ============ --}}

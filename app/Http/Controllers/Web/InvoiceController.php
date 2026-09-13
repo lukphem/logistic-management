@@ -20,7 +20,12 @@ class InvoiceController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Shipment::with(['clientUser', 'apiClient']);
+        // Test-mode shipments are real enough to exercise an
+        // integrator's own code, but were never real, billable
+        // shipments in the first place — excluded here unconditionally
+        // rather than behind a filter, since this list exists
+        // specifically to prepare real invoices.
+        $query = Shipment::with(['clientUser', 'apiClient'])->where('is_test', false);
 
         if ($request->filled('client_user_id')) {
             $query->where('client_user_id', $request->client_user_id);
