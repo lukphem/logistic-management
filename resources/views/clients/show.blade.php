@@ -1017,14 +1017,36 @@
                                                                 <option value="{{ $vehicleType->id }}" @selected($tariff->vehicle_type_id === $vehicleType->id)>{{ $vehicleType->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <select name="origin_state_id" required class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                        <select name="origin_type" onchange="this.closest('form').querySelector('[name=origin_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=origin_country_id]').classList.toggle('hidden', this.value==='state');" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                            <option value="state" @selected(! $tariff->origin_country_id)>Origin: State</option>
+                                                            <option value="country" @selected($tariff->origin_country_id)>Origin: Country</option>
+                                                        </select>
+                                                        <select name="destination_type" onchange="this.closest('form').querySelector('[name=destination_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=destination_country_id]').classList.toggle('hidden', this.value==='state');" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                            <option value="state" @selected(! $tariff->destination_country_id)>Destination: State</option>
+                                                            <option value="country" @selected($tariff->destination_country_id)>Destination: Country</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                        <select name="origin_state_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->origin_country_id ? 'hidden' : '' }}">
                                                             @foreach ($billingStates as $state)
                                                                 <option value="{{ $state->id }}" @selected($tariff->origin_state_id === $state->id)>{{ $state->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <select name="destination_state_id" required class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                                        <select name="origin_country_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->origin_country_id ? '' : 'hidden' }}">
+                                                            <option value="">—</option>
+                                                            @foreach ($billingCountries as $country)
+                                                                <option value="{{ $country->id }}" @selected($tariff->origin_country_id === $country->id)>{{ $country->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <select name="destination_state_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->destination_country_id ? 'hidden' : '' }}">
                                                             @foreach ($billingStates as $state)
                                                                 <option value="{{ $state->id }}" @selected($tariff->destination_state_id === $state->id)>{{ $state->name }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                        <select name="destination_country_id" class="rounded-md border border-line px-2 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] {{ $tariff->destination_country_id ? '' : 'hidden' }}">
+                                                            <option value="">—</option>
+                                                            @foreach ($billingCountries as $country)
+                                                                <option value="{{ $country->id }}" @selected($tariff->destination_country_id === $country->id)>{{ $country->name }}</option>
                                                             @endforeach
                                                         </select>
                                                     </div>
@@ -1089,11 +1111,11 @@
                                     <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
                                     <div class="flex gap-2">
                                         <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                                            <input type="radio" name="_route_type_fleet" value="domestic" checked onchange="filterServiceTypesByRoute(this, 'fleet')">
+                                            <input type="radio" name="_route_type_fleet" value="domestic" checked onchange="filterServiceTypesByRoute(this, 'fleet'); toggleFleetRouteFields(this)">
                                             Domestic
                                         </label>
                                         <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
-                                            <input type="radio" name="_route_type_fleet" value="international" onchange="filterServiceTypesByRoute(this, 'fleet')">
+                                            <input type="radio" name="_route_type_fleet" value="international" onchange="filterServiceTypesByRoute(this, 'fleet'); toggleFleetRouteFields(this)">
                                             International
                                         </label>
                                     </div>
@@ -1120,24 +1142,44 @@
                                         </select>
                                     </div>
                                     <div>
-                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin state
-                                            <span class="cursor-help text-ink-400" title="Fleet vehicles run domestic routes only — pick the state this route starts from.">ⓘ</span>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Origin
+                                            <span class="cursor-help text-ink-400" title="State for a domestic route. Switch Route above to International to pick a country instead.">ⓘ</span>
                                         </label>
+                                        <select name="origin_type" data-fleet-route-type-select onchange="this.closest('form').querySelector('[name=origin_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=origin_country_id]').classList.toggle('hidden', this.value==='state');" class="mb-1 hidden w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
                                         <select name="origin_state_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select state…</option>
                                             @foreach ($billingStates as $state)
                                                 <option value="{{ $state->id }}">{{ $state->name }}</option>
                                             @endforeach
                                         </select>
+                                        <select name="origin_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                                            @endforeach
+                                        </select>
                                     </div>
                                     <div>
-                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination state
-                                            <span class="cursor-help text-ink-400" title="Fleet vehicles run domestic routes only — pick the state this route ends at.">ⓘ</span>
+                                        <label class="mb-1 flex items-center gap-1 text-xs font-medium text-ink-900">Destination
+                                            <span class="cursor-help text-ink-400" title="State for a domestic route. Switch Route above to International to pick a country instead.">ⓘ</span>
                                         </label>
+                                        <select name="destination_type" data-fleet-route-type-select onchange="this.closest('form').querySelector('[name=destination_state_id]').classList.toggle('hidden', this.value==='country'); this.closest('form').querySelector('[name=destination_country_id]').classList.toggle('hidden', this.value==='state');" class="mb-1 hidden w-full rounded-md border border-line px-2 py-1 text-xs outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="state">State</option>
+                                            <option value="country">Country</option>
+                                        </select>
                                         <select name="destination_state_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select state…</option>
                                             @foreach ($billingStates as $state)
                                                 <option value="{{ $state->id }}">{{ $state->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <select name="destination_country_id" class="mt-1 hidden w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                            <option value="">Select country…</option>
+                                            @foreach ($billingCountries as $country)
+                                                <option value="{{ $country->id }}">{{ $country->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -1612,6 +1654,33 @@
             if (select.selectedOptions[0]?.style.display === 'none') {
                 select.value = '';
             }
+        }
+
+        /**
+         * Fleet vehicles only cross a border on an International route
+         * — for Domestic, Origin/Destination are always a State, with
+         * no State-vs-Country choice shown at all (Country wouldn't
+         * mean anything there). Switching to International reveals
+         * the same type toggle Origin-to-Destination already offers,
+         * defaulting back to State until the person picks Country.
+         * Switching back to Domestic forces both back to State and
+         * re-hides the toggle and any country dropdown, so a stale
+         * country selection can never be submitted alongside a
+         * Domestic route.
+         */
+        function toggleFleetRouteFields(radio) {
+            const form = radio.closest('form');
+            if (!form) return;
+            const isInternational = radio.value === 'international';
+
+            form.querySelectorAll('[data-fleet-route-type-select]').forEach(function (typeSelect) {
+                typeSelect.classList.toggle('hidden', !isInternational);
+
+                if (!isInternational) {
+                    typeSelect.value = 'state';
+                    typeSelect.dispatchEvent(new Event('change'));
+                }
+            });
         }
 
         // Generic — every "Add another zone" button on the page (the

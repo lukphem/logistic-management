@@ -687,8 +687,12 @@ class ClientController extends Controller
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'vehicle_type_id' => 'required|exists:vehicle_types,id',
-            'origin_state_id' => 'required|exists:states,id',
-            'destination_state_id' => 'required|exists:states,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
             'min_weight' => 'required|numeric|min:0',
             'max_weight' => 'required|numeric|min:0',
             'max_weight_limit' => 'required|numeric|gt:min_weight',
@@ -714,13 +718,32 @@ class ClientController extends Controller
 
         $data = $this->validated($validator, $user, 'billing', 'fleetTariff');
 
+        // Same "state XOR country" clearing as Origin-to-Destination —
+        // a route is one or the other, never both. Fleet only reaches
+        // 'country' at all when the form's Route toggle was set to
+        // International (domestic forces the type select back to
+        // 'state' client-side), but this server-side clearing is what
+        // actually guarantees the stored row never carries both.
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
         \App\Models\ClientFleetBillingTariff::create([
             'client_account_id' => $account->id,
             'client_user_id' => $user->id,
             'service_type_id' => $data['service_type_id'],
             'vehicle_type_id' => $data['vehicle_type_id'],
             'origin_state_id' => $data['origin_state_id'],
+            'origin_country_id' => $data['origin_country_id'],
             'destination_state_id' => $data['destination_state_id'],
+            'destination_country_id' => $data['destination_country_id'],
             'min_weight' => $data['min_weight'],
             'max_weight' => $data['max_weight'],
             'max_weight_limit' => $data['max_weight_limit'],
@@ -753,8 +776,12 @@ class ClientController extends Controller
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
             'vehicle_type_id' => 'required|exists:vehicle_types,id',
-            'origin_state_id' => 'required|exists:states,id',
-            'destination_state_id' => 'required|exists:states,id',
+            'origin_type' => 'required|in:state,country',
+            'origin_state_id' => 'required_if:origin_type,state|nullable|exists:states,id',
+            'origin_country_id' => 'required_if:origin_type,country|nullable|exists:countries,id',
+            'destination_type' => 'required|in:state,country',
+            'destination_state_id' => 'required_if:destination_type,state|nullable|exists:states,id',
+            'destination_country_id' => 'required_if:destination_type,country|nullable|exists:countries,id',
             'min_weight' => 'required|numeric|min:0',
             'max_weight' => 'required|numeric|min:0',
             'max_weight_limit' => 'required|numeric|gt:min_weight',
@@ -781,11 +808,24 @@ class ClientController extends Controller
 
         $data = $this->validated($validator, $user, 'billing', 'fleetTariff' . $tariff->id);
 
+        if ($data['origin_type'] === 'country') {
+            $data['origin_state_id'] = null;
+        } else {
+            $data['origin_country_id'] = null;
+        }
+        if ($data['destination_type'] === 'country') {
+            $data['destination_state_id'] = null;
+        } else {
+            $data['destination_country_id'] = null;
+        }
+
         $tariff->update([
             'service_type_id' => $data['service_type_id'],
             'vehicle_type_id' => $data['vehicle_type_id'],
             'origin_state_id' => $data['origin_state_id'],
+            'origin_country_id' => $data['origin_country_id'],
             'destination_state_id' => $data['destination_state_id'],
+            'destination_country_id' => $data['destination_country_id'],
             'min_weight' => $data['min_weight'],
             'max_weight' => $data['max_weight'],
             'max_weight_limit' => $data['max_weight_limit'],
@@ -996,24 +1036,32 @@ class ClientController extends Controller
             $minWeight = $row['base_weight'] ?? null;
             $maxWeightLimit = $row['max_weight_limit'] ?? null;
 
-            // Fleet vehicles run domestic routes only — state, never
-            // country (that's what Origin-to-Destination is for).
-            $originState = ! empty($row['origin_state_code'])
+            $originCountry = ! empty($row['origin_country_code'])
+                ? Country::where('code', strtoupper(trim($row['origin_country_code'])))->first()
+                : null;
+            $originState = ! $originCountry && ! empty($row['origin_state_code'])
                 ? State::where('short_code', strtoupper(trim($row['origin_state_code'])))->first()
                 : null;
-            $destinationState = ! empty($row['destination_state_code'])
+
+            $destinationCountry = ! empty($row['destination_country_code'])
+                ? Country::where('code', strtoupper(trim($row['destination_country_code'])))->first()
+                : null;
+            $destinationState = ! $destinationCountry && ! empty($row['destination_state_code'])
                 ? State::where('short_code', strtoupper(trim($row['destination_state_code'])))->first()
                 : null;
 
-            if (! $vehicleType || ! $serviceType || ! $originState || ! $destinationState || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
+            $originResolved = $originCountry || $originState;
+            $destinationResolved = $destinationCountry || $destinationState;
+
+            if (! $vehicleType || ! $serviceType || ! $originResolved || ! $destinationResolved || ! is_numeric($minWeight) || ! is_numeric($maxWeightLimit)) {
                 $skipped++;
                 continue;
             }
 
-            $originCity = ! empty($row['origin_city_code'])
+            $originCity = ($originState && ! empty($row['origin_city_code']))
                 ? City::where('state_id', $originState->id)->where('short_code', strtoupper(trim($row['origin_city_code'])))->first()
                 : null;
-            $destinationCity = ! empty($row['destination_city_code'])
+            $destinationCity = ($destinationState && ! empty($row['destination_city_code']))
                 ? City::where('state_id', $destinationState->id)->where('short_code', strtoupper(trim($row['destination_city_code'])))->first()
                 : null;
 
@@ -1023,10 +1071,12 @@ class ClientController extends Controller
             $overlaps = \App\Models\ClientFleetBillingTariff::where('client_account_id', $account->id)
                 ->where('service_type_id', $serviceType->id)
                 ->where('vehicle_type_id', $vehicleType->id)
-                ->where('origin_state_id', $originState->id)
+                ->where('origin_state_id', $originState?->id)
                 ->where('origin_city_id', $originCity?->id)
-                ->where('destination_state_id', $destinationState->id)
+                ->where('origin_country_id', $originCountry?->id)
+                ->where('destination_state_id', $destinationState?->id)
                 ->where('destination_city_id', $destinationCity?->id)
+                ->where('destination_country_id', $destinationCountry?->id)
                 ->where('is_active', true)
                 ->where(fn ($q) => $q->where('min_weight', '!=', $minWeight)->orWhere('max_weight_limit', '!=', $maxWeightLimit))
                 ->get(['min_weight', 'max_weight_limit'])
@@ -1042,10 +1092,12 @@ class ClientController extends Controller
                     'client_account_id' => $account->id,
                     'service_type_id' => $serviceType->id,
                     'vehicle_type_id' => $vehicleType->id,
-                    'origin_state_id' => $originState->id,
+                    'origin_state_id' => $originState?->id,
                     'origin_city_id' => $originCity?->id,
-                    'destination_state_id' => $destinationState->id,
+                    'origin_country_id' => $originCountry?->id,
+                    'destination_state_id' => $destinationState?->id,
                     'destination_city_id' => $destinationCity?->id,
+                    'destination_country_id' => $destinationCountry?->id,
                     'min_weight' => $minWeight,
                     'max_weight_limit' => $maxWeightLimit,
                 ],
@@ -1065,7 +1117,7 @@ class ClientController extends Controller
             $count++;
         }
 
-        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/product code, overlapping range, or missing weight)." : '.'));
+        return $this->redirectToTab($user, 'billing', "Imported {$count} special Fleet rates" . ($skipped ? ", skipped {$skipped} (unknown vehicle/state/country/product code, overlapping range, or missing weight)." : '.'));
     }
 
     /**
@@ -1085,8 +1137,8 @@ class ClientController extends Controller
                 [['ISF', 'LA', '', '', 'FC', '', '', 0, 10, 10, 1, 5500, 400, 2]]
             ),
             'fleet' => $this->csv->download('special-rate-fleet-template.csv',
-                ['product_code', 'vehicle_type_code', 'origin_state_code', 'origin_city_code', 'destination_state_code', 'destination_city_code', 'base_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'weight_base_charge', 'additional_charge', 'fuel_surcharge_percentage', 'empty_return_charge_type', 'empty_return_charge_value', 'transit_days'],
-                [['FLT', 'VAN', 'LA', '', 'FC', '', 0, 500, 500, 1, 15000, 80, 0, 'flat', 0, 2]]
+                ['product_code', 'vehicle_type_code', 'origin_state_code', 'origin_city_code', 'origin_country_code', 'destination_state_code', 'destination_city_code', 'destination_country_code', 'base_weight', 'max_weight', 'max_weight_limit', 'additional_weight', 'weight_base_charge', 'additional_charge', 'fuel_surcharge_percentage', 'empty_return_charge_type', 'empty_return_charge_value', 'transit_days'],
+                [['FLT', 'VAN', 'LA', '', '', 'FC', '', '', 0, 500, 500, 1, 15000, 80, 0, 'flat', 0, 2]]
             ),
             default => abort(404),
         };

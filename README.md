@@ -7224,3 +7224,42 @@ resources/views/clients/show.blade.php   (Standard Billing reorder x2, Fleet sta
 resources/views/standard-billing/form.blade.php   (company-level reorder)
 app/Http/Controllers/Web/ClientController.php   (Fleet store/update/import simplified)
 ```
+
+## Increment 125 — Correction: Fleet Country Support Restored for International
+
+Increment 124 removed Country from Fleet's Origin/Destination
+entirely. Correction, per direct feedback: Country should stay
+available when the route is International — it just shouldn't apply
+to Domestic.
+
+Restored the State-vs-Country toggle and Country dropdowns on both
+the Add and Edit forms, the CSV import, and the CSV template — but
+wired the Add form's existing Route (Domestic/International) toggle
+to control it: the State-vs-Country choice stays hidden and locked to
+State while Domestic is selected, and only appears once International
+is chosen. Switching back to Domestic forces the type back to State
+and re-hides any Country dropdown, so a stale Country selection can
+never be submitted alongside a Domestic route. The Edit form (which
+has no Route toggle of its own) shows the picker directly, defaulting
+to whichever the existing rate already has — same as
+Origin-to-Destination's edit form.
+
+Controller validation and the `create()`/`update()` calls restored to
+accept `origin_type`/`destination_type` and clear whichever side isn't
+selected, matching Origin-to-Destination's pattern exactly.
+
+### Verified
+
+Balance-checked after every edit, nested-form scan clean. Verified
+end-to-end against live MySQL: a Fleet rate stored with a state
+origin and a country destination (the International case) now
+coexists correctly alongside a pure state/state domestic rate, with
+each row's unused columns correctly `NULL`. Full repo balance check,
+duplicate-method scan: clean across 176 files.
+
+### Files
+
+```
+resources/views/clients/show.blade.php   (Add form: Route-toggle-driven visibility; Edit form: full picker restored)
+app/Http/Controllers/Web/ClientController.php   (store/update/import validation and logic restored)
+```
