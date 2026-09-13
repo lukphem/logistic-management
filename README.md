@@ -6995,3 +6995,53 @@ system, for visual consistency.
 ```
 app/Http/Controllers/Web/ClientController.php
 ```
+
+## Increment 121 — Special-Rate Displays Match the Company-Level Table Format
+
+Closes the visual-consistency request: all three special-rate
+displays (Standard Billing, Origin-to-Destination, Fleet) now use the
+exact table structure and column layout already established at the
+company level, instead of the card-list format built earlier this
+session.
+
+- **Standard Billing**: mirrors `_tariff-table.blade.php` exactly —
+  Service type / Weight band / Additional wt. / Zone / Charge /
+  Additional charge / Transit days / Status / Actions, with the same
+  `rowspan` technique for a multi-zone rate's shared columns.
+- **Origin-to-Destination**: mirrors `_route-rate-table.blade.php` —
+  Service type / Origin / Destination / Weight band / Base charge /
+  Additional / Transit days / Status / Actions.
+- **Fleet**: same reference file's Fleet variant — adds Vehicle
+  alongside the same route/weight/status columns.
+
+The inline "Edit" convenience (unique to this client-specific
+version — the company-level pages use separate edit pages instead)
+is preserved as an expandable table row beneath each rate, using
+`colspan` to span every column, rather than being lost in the switch
+to table layout.
+
+### A real splice error caught by the same balance-checking discipline
+
+Converting Fleet's block (this session's largest, most delicate edit)
+initially left a stray, orphaned `@endforelse` behind from the old
+block's boundary — a leftover of the text-splice operation, not
+something a person would have typed. Caught immediately by the same
+programmatic balance check this project has relied on throughout,
+before it ever reached a delivered bundle.
+
+### Verified
+
+Full balance check across every Blade construct and HTML tag pair
+(`@if`, `@unless`, `@foreach`, `@forelse`, `@php`, `<div>`, `<form>`,
+`<select>`, `<table>`, `<tr>`, `<td>`, `<script>`) after the
+conversion and again after the orphaned-tag fix — all matched
+exactly. Nested-form scan: zero. Full repo balance check,
+duplicate-method scan: clean across 176 files.
+
+**This closes out every item raised in this billing thread.**
+
+### Files
+
+```
+resources/views/clients/show.blade.php
+```
