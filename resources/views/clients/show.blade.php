@@ -751,13 +751,26 @@
 
                             <div>
                                 <p class="mb-2 text-xs font-semibold text-ink-700">Product &amp; route</p>
+                                <div class="mb-3">
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
+                                    <div class="flex gap-2">
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_od" value="domestic" checked onchange="filterServiceTypesByRoute(this, 'od')">
+                                            Domestic
+                                        </label>
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_od" value="international" onchange="filterServiceTypesByRoute(this, 'od')">
+                                            International
+                                        </label>
+                                    </div>
+                                </div>
                                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                     <div>
                                         <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <select name="service_type_id" data-route-select="od" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select…</option>
                                             @foreach ($modelServiceTypes as $serviceType)
-                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                                <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @style(['display: none' => $serviceType->route_type !== 'domestic'])>{{ $serviceType->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -984,13 +997,26 @@
 
                             <div>
                                 <p class="mb-2 text-xs font-semibold text-ink-700">Product, vehicle &amp; route</p>
+                                <div class="mb-3">
+                                    <label class="mb-1 block text-xs font-medium text-ink-900">Route</label>
+                                    <div class="flex gap-2">
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_fleet" value="domestic" checked onchange="filterServiceTypesByRoute(this, 'fleet')">
+                                            Domestic
+                                        </label>
+                                        <label class="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs text-ink-900 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                                            <input type="radio" name="_route_type_fleet" value="international" onchange="filterServiceTypesByRoute(this, 'fleet')">
+                                            International
+                                        </label>
+                                    </div>
+                                </div>
                                 <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                     <div>
                                         <label class="mb-1 block text-xs font-medium text-ink-900">Service type</label>
-                                        <select name="service_type_id" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                                        <select name="service_type_id" data-route-select="fleet" required class="w-full rounded-md border border-line px-2 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                                             <option value="">Select…</option>
                                             @foreach ($modelServiceTypes as $serviceType)
-                                                <option value="{{ $serviceType->id }}">{{ $serviceType->name }}</option>
+                                                <option value="{{ $serviceType->id }}" data-route-type="{{ $serviceType->route_type }}" @style(['display: none' => $serviceType->route_type !== 'domestic'])>{{ $serviceType->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -1484,6 +1510,31 @@
                 btn.classList.toggle('text-[var(--brand-primary)]', active);
                 btn.classList.toggle('text-ink-500', !active);
             });
+        }
+
+        /**
+         * Same Domestic/International separation Rate Checker already
+         * uses for its Service Type list — each Add-a-special-rate form
+         * is already scoped to one billing model (via the sub-tabs
+         * above), so this only needs to filter by route_type, not also
+         * by billing model the way Rate Checker's version does. $key
+         * ('standard'/'od'/'fleet') scopes this to the one select
+         * sharing that key, since the page can have all three forms —
+         * each with their own independent Route toggle — at once.
+         */
+        function filterServiceTypesByRoute(radio, key) {
+            const form = radio.closest('form');
+            const select = form?.querySelector('select[data-route-select="' + key + '"]');
+            if (!select) return;
+
+            select.querySelectorAll('option').forEach(function (option) {
+                if (!option.value) return;
+                option.style.display = option.dataset.routeType === radio.value ? '' : 'none';
+            });
+
+            if (select.selectedOptions[0]?.style.display === 'none') {
+                select.value = '';
+            }
         }
 
         // Generic — every "Add another zone" button on the page (the

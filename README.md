@@ -6907,3 +6907,32 @@ than a dedicated label method.
 app/Models/FleetBillingTariff.php
 app/Models/OriginDestinationTariff.php
 ```
+
+## Increment 119 — Domestic/International Separation on Special-Rate Forms
+
+Completes the piece that was left half-done in Increment 118's commit
+(a mixup on my end bundled the in-progress start of this work into
+that crash-fix commit — the Standard Billing toggle existed but
+referenced a JS function that didn't exist yet. Finished properly now.)
+
+Matches the pattern already established in Rate Checker: a Route
+(Domestic/International) toggle above the Service Type dropdown on
+all three "Add a special rate" forms, filtering which service types
+show based on each one's own `route_type`.
+
+**Deliberately a focused subset of Rate Checker's full pattern, not a
+literal 1:1 copy** — each Billing Setup form is already scoped to one
+billing model via the sub-tabs, so the "filter by billing model"
+dimension Rate Checker also has doesn't apply here. The Export/Import/
+Cross-Trade sub-step was left out too: that exists in Rate Checker to
+determine which named field (origin vs destination) carries Nigeria
+for a shipment being priced *right now* — but for defining a rate,
+the existing per-side State/Country toggle already lets staff pick
+either side freely, for any combination, without needing a named
+"trade direction" concept layered on top.
+
+### Files
+
+```
+resources/views/clients/show.blade.php
+```
