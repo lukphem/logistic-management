@@ -1297,7 +1297,7 @@ class ClientController extends Controller
             'name' => 'required|string|max:255',
         ]), $user, 'department');
 
-        Department::create(['client_account_id' => $account->id, 'name' => $data['name']]);
+        Department::create(['client_user_id' => $user->id, 'client_account_id' => $account->id, 'name' => $data['name']]);
 
         return $this->redirectToTab($user, 'department', 'Department added.', $account);
     }

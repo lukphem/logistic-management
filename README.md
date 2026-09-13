@@ -7580,3 +7580,45 @@ app/Http/Controllers/Web/ClientController.php   (redirectToTab() account-aware f
 resources/views/clients/show.blade.php   (Department/Users/Managerial account-selectors, Managerial UI restructured, both outdated statements corrected)
 routes/web.php
 ```
+
+## Increment 130 — Fix: Department Creation Crash
+
+Real crash, confirmed from the error report: creating a department
+threw `Field 'client_user_id' doesn't have a default value`.
+
+Traced to its root: `departments.client_user_id` was never made
+nullable when `client_account_id` was added to the table (the
+migration that added it says so explicitly — "the old client_user_id
+columns... stay, unused... until the final cleanup phase" — that
+cleanup phase evidently never ran for this table). Checked the other
+3 tables from that same migration
+(`client_service_discounts`, `client_special_tariffs`,
+`client_service_subscriptions`) for the identical issue: all three
+still have the same unconverted `client_user_id` column, but their
+own store actions (`storeDiscount()`, `storeSpecialTariff()`,
+`storeServiceSubscription()`) already correctly populate it alongside
+`client_account_id` — only `storeDepartment()`, rewritten in the
+previous increment, dropped it. Fixed to populate both, matching the
+three working examples, rather than a broader migration touching
+columns nothing else was tripping over.
+
+Also confirmed the flow you described — a department created under
+one account being selectable when adding a user under that same
+account — was already fully and correctly built (`storeSubUser()`
+already validates the picked department belongs to the exact account
+being configured, and correctly saves both `client_account_id` and
+`department_id`). It was simply unreachable before now, since no
+department could ever be created to test it against.
+
+### Verified
+
+Balance-checked, full repo balance check and duplicate-method scan
+clean. Reproduced the exact insert from the error report directly
+against live MySQL — succeeds now. Confirmed the created department
+is correctly scoped and visible only under its own account.
+
+### Files
+
+```
+app/Http/Controllers/Web/ClientController.php
+```
