@@ -8277,3 +8277,46 @@ routes/web.php
 
 (`resources/views/shipments/waybill/` from Increment 139 removed —
 superseded by `label/`.)
+
+## Increment 141 — Label Size Selectable at Print Time
+
+Size was previously locked to whatever Settings had configured —
+staff had to go change Settings and come back just to print the
+other size. Both sizes are now available at once, right on the
+label page itself.
+
+### What changed
+
+- `ShipmentController::label()` now reads an optional `?size=`
+  query param (`4x6` or `2x1`), falling back to Settings' own default
+  only when it's absent or invalid — Settings' value is now just the
+  pre-selected starting point, not a hard lock.
+- All three designs get a size toggle next to the Print button —
+  two links, the active size highlighted, each just reloading the
+  same page with `?size=` changed. No JS state, no extra request
+  beyond the page load itself.
+- Removed the auto-print-on-load behavior all three had. With a size
+  choice now available at this page, auto-triggering the print dialog
+  the instant the page loads would fire again on every size switch,
+  before the person's actually decided which one to print — printing
+  is now an explicit click, same as it always was on the Waybill
+  document.
+
+### Verified
+
+Balance-checked and duplicate-scanned after every edit — including
+re-scanning all three files for the exact crash pattern from the
+previous increment (`@if`/`@endif` jammed against adjacent text) a
+second time, since these were edited again; zero matches, same as
+before. Full repo balance check: clean across 188 files. Simulated
+the size-resolution logic against four cases (explicit 4×6, explicit
+2×1, no param, invalid param) — all resolve exactly as intended.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (label() reads ?size=)
+resources/views/shipments/label/classic.blade.php   (size toggle, printSize)
+resources/views/shipments/label/modern.blade.php   (size toggle, printSize)
+resources/views/shipments/label/compact.blade.php   (size toggle, printSize)
+```

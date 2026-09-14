@@ -106,12 +106,39 @@ class ShipmentController extends Controller
      * shipment, it's just whatever that specific booking account has
      * uploaded, or absent entirely for a walk-in customer.
      */
-    public function label(Shipment $shipment): View
+    /**
+     * One of three layouts (Classic/Modern/Compact), each adaptive to
+     * both thermal sizes (4×6 gets full content, 2×1 drops to
+     * essentials only — same template, not a separate file per size,
+     * so the three styles can't drift out of sync with each other).
+     * Which DESIGN prints is deployment-wide (Settings → Shipping
+     * label), but which SIZE prints is chosen right here, at print
+     * time — a hub might genuinely need either size for the same
+     * shipment depending on what's loaded in the printer that day, so
+     * this isn't locked to Settings' own default the way the design
+     * choice is. Settings' value is only the pre-selected starting
+     * point when no ?size= is given.
+     *
+     * The code payload is just the tracking number either way (QR or
+     * 1D barcode, per Settings → Code on label), same value a rider
+     * or hub scans in manually, so any generic scanner — not just
+     * this app's own scan flow — reads it back correctly.
+     *
+     * A registered client's own logo (ClientAccount::logo_url) prints
+     * alongside the company's own — nothing to configure per
+     * shipment, it's just whatever that specific booking account has
+     * uploaded, or absent entirely for a walk-in customer.
+     */
+    public function label(Request $request, Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
         $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientAccount']);
         $settings = Setting::current();
+
+        $printSize = in_array($request->query('size'), ['4x6', '2x1'], true)
+            ? $request->query('size')
+            : $settings->waybill_thermal_size;
 
         $codeSvg = null;
         if ($settings->waybill_show_qr) {
@@ -123,7 +150,7 @@ class ShipmentController extends Controller
         $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
         $clientLogoUrl = $shipment->clientAccount?->logo_url;
 
-        return view("shipments.label.{$design}", compact('shipment', 'settings', 'codeSvg', 'clientLogoUrl'));
+        return view("shipments.label.{$design}", compact('shipment', 'settings', 'codeSvg', 'clientLogoUrl', 'printSize'));
     }
 
     /**

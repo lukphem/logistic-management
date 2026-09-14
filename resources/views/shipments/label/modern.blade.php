@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Label {{ $shipment->tracking_number }}</title>
     <style>
-        @page { size: {{ $settings->waybill_thermal_size === '2x1' ? '2in 1in' : '4in 6in' }}; margin: 0.15in; }
+        @page { size: {{ $printSize === '2x1' ? '2in 1in' : '4in 6in' }}; margin: 0.15in; }
         * { box-sizing: border-box; }
         body { font-family: Arial, Helvetica, sans-serif; color: #111; margin: 0; padding: 0; font-size: 11px; }
         .accent-bar { height: 6px; background: {{ $settings->color_primary ?? '#1F3864' }}; }
@@ -27,17 +27,24 @@
         .mini .tracking-number { font-size: 14px; margin-top: 2px; }
         .mini .party-name { font-size: 11px; }
         .mini .company-name { font-size: 9px; margin-bottom: 3px; }
+        .size-toggle a { display: inline-block; padding: 6px 14px; font-size: 12px; border: 1px solid #999; text-decoration: none; color: #333; }
+        .size-toggle a.active { background: #111; color: #fff; border-color: #111; }
+        .size-toggle a:first-child { border-radius: 4px 0 0 4px; }
+        .size-toggle a:last-child { border-radius: 0 4px 4px 0; border-left: none; }
         @media print { .no-print { display: none; } }
     </style>
 </head>
-<body class="{{ $settings->waybill_thermal_size === '2x1' ? 'mini' : '' }}">
-    <div class="no-print" style="padding: 12px;">
+<body class="{{ $printSize === '2x1' ? 'mini' : '' }}">
+    <div class="no-print" style="padding: 12px; display: flex; align-items: center; gap: 12px;">
+        <span class="size-toggle">
+            <a href="?size=4x6" class="{{ $printSize === '4x6' ? 'active' : '' }}">4×6"</a><a href="?size=2x1" class="{{ $printSize === '2x1' ? 'active' : '' }}">2×1"</a>
+        </span>
         <button onclick="window.print()" style="padding: 8px 16px; font-size: 13px;">Print</button>
     </div>
 
     <div class="accent-bar"></div>
     <div class="content">
-        @if ($settings->waybill_thermal_size === '2x1')
+        @if ($printSize === '2x1')
             {{-- Minimal content only — receiver and tracking, no sender/company detail at this size --}}
             @if ($codeSvg)
                 <div class="code-block">{!! $codeSvg !!}</div>
@@ -110,6 +117,5 @@
         @endif
     </div>
 
-    <script>window.onload = function () { window.print(); };</script>
 </body>
 </html>

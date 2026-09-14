@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Label {{ $shipment->tracking_number }}</title>
     <style>
-        @page { size: {{ $settings->waybill_thermal_size === '2x1' ? '2in 1in' : '4in 6in' }}; margin: 0.08in; }
+        @page { size: {{ $printSize === '2x1' ? '2in 1in' : '4in 6in' }}; margin: 0.08in; }
         * { box-sizing: border-box; }
         body { font-family: 'Arial Narrow', Arial, Helvetica, sans-serif; color: #000; margin: 0; padding: 4px; font-size: 9px; line-height: 1.25; }
         .code-row { text-align: center; margin-bottom: 2px; }
@@ -17,11 +17,18 @@
         .sender-line { font-size: 8px; color: #444; margin-bottom: 3px; }
         .pkg-line { font-size: 8px; border-top: 1px dashed #999; padding-top: 2px; }
         .route-line { font-size: 8px; color: #444; }
+        .size-toggle a { display: inline-block; padding: 5px 10px; font-size: 10px; border: 1px solid #999; text-decoration: none; color: #333; }
+        .size-toggle a.active { background: #111; color: #fff; border-color: #111; }
+        .size-toggle a:first-child { border-radius: 4px 0 0 4px; }
+        .size-toggle a:last-child { border-radius: 0 4px 4px 0; border-left: none; }
         @media print { .no-print { display: none; } }
     </style>
 </head>
 <body>
-    <div class="no-print" style="margin-bottom: 8px;">
+    <div class="no-print" style="margin-bottom: 8px; display: flex; align-items: center; gap: 10px;">
+        <span class="size-toggle">
+            <a href="?size=4x6" class="{{ $printSize === '4x6' ? 'active' : '' }}">4×6"</a><a href="?size=2x1" class="{{ $printSize === '2x1' ? 'active' : '' }}">2×1"</a>
+        </span>
         <button onclick="window.print()" style="padding: 6px 12px; font-size: 11px;">Print</button>
     </div>
 
@@ -49,7 +56,7 @@
         <div class="receiver-detail">{{ $shipment->destination_address }}</div>
     </div>
 
-    @if ($settings->waybill_thermal_size !== '2x1')
+    @if ($printSize !== '2x1')
         <div class="sender-line">From: {{ $shipment->sender_name }} · {{ $shipment->sender_phone }}</div>
         <div class="route-line">Route: {{ $shipment->originHub?->code ?? $shipment->originCity?->name ?? '—' }} → {{ $shipment->destinationHub?->code ?? $shipment->destinationCity?->name ?? '—' }}</div>
 
@@ -64,6 +71,5 @@
         </div>
     @endif
 
-    <script>window.onload = function () { window.print(); };</script>
 </body>
 </html>
