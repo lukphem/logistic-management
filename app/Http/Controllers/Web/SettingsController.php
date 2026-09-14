@@ -37,6 +37,7 @@ class SettingsController extends Controller
             'allow_manual_account_number' => 'sometimes|boolean',
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
+            'label_design' => 'required|in:classic,modern,compact',
             'waybill_show_qr' => 'sometimes|boolean',
             'operating_regions' => 'nullable|string',
             'invoice_header' => 'nullable|string|max:2000',

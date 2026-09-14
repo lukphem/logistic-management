@@ -54,6 +54,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
+    Route::get('/shipments/{shipment}/waybill', [ShipmentController::class, 'waybill'])->name('shipments.waybill');
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');

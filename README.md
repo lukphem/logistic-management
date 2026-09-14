@@ -8109,3 +8109,74 @@ resources/views/shipments/show.blade.php   (comprehensive rebuild)
 resources/views/shipments/edit.blade.php   (new)
 routes/web.php
 ```
+
+## Increment 139 — Waybill Printing: 3 Selectable Label Designs
+
+Built on top of groundwork that already existed but was never wired
+up — `Setting` already had `waybill_thermal_size`, `waybill_show_qr`,
+company logo/colors, and both `barryvdh/laravel-dompdf` and
+`simplesoftwareio/simple-qrcode` were installed but referenced
+nowhere in the app.
+
+### Three designs, one deployment-wide choice
+
+New `label_design` setting (Settings → Waybill design), applying to
+every shipment's waybill — not per-shipment, since every label a
+company prints should look consistent:
+
+- **Classic** — traditional courier layout: logo + company name top
+  left, tracking number top right, sender/receiver side by side,
+  full details table below. Built for 4×6" labels.
+- **Modern** — QR code and tracking number front and center, brand
+  color accent bar (`color_primary`/`color_secondary`), sender/
+  receiver stacked rather than side by side.
+- **Compact** — no logo, smallest possible footprint, receiver
+  details prioritized over sender. Built for 2×1" thermal labels
+  specifically.
+
+All three respect `waybill_thermal_size` for the actual print
+dimensions via CSS `@page`, and `waybill_show_qr` for whether the QR
+code renders at all. The QR payload is just the tracking number, so
+any generic QR reader — not only this app's own scan flow — can read
+it back correctly.
+
+"Print Waybill" button added to the shipment show page (opens in a
+new tab, auto-triggers the browser print dialog) — available to
+anyone who can already view the shipment, same as viewing itself.
+
+### A mid-edit mistake caught and fixed before it shipped
+
+While inserting the new `waybill()` method, an automated edit
+accidentally consumed the `edit()` method's own function signature
+line, leaving an orphaned code block with no declaration — a real
+syntax error that the balance checker's brace-counting alone didn't
+catch (braces still matched; the bug was structural, not
+unbalanced). Caught by inspecting the method boundaries directly
+after the edit rather than trusting the balance check alone, and
+fixed before running any further checks.
+
+### Verified
+
+Balance-checked and duplicate-method-scanned after every edit,
+including the one that required the fix above. Full repo balance
+check: clean across 187 files. Verified against live MySQL: the
+`label_design` column accepts all three valid values, correctly
+defaults to 'classic', and rejects an invalid value at the database
+level (on top of the same check already enforced in validation) —
+and the controller's own fallback logic covers every case (valid
+value, null, invalid) correctly too.
+
+### Files
+
+```
+database/migrations/2026_03_13_000001_add_label_design_to_settings_table.php
+app/Models/Setting.php   (label_design)
+app/Http/Controllers/Web/SettingsController.php   (validation)
+app/Http/Controllers/Web/ShipmentController.php   (new waybill())
+resources/views/settings/edit.blade.php   (label design selector)
+resources/views/shipments/waybill/classic.blade.php   (new)
+resources/views/shipments/waybill/modern.blade.php   (new)
+resources/views/shipments/waybill/compact.blade.php   (new)
+resources/views/shipments/show.blade.php   (Print Waybill button)
+routes/web.php
+```

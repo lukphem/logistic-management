@@ -227,6 +227,25 @@
                     </label>
                 </div>
             </div>
+            <div class="mt-4">
+                <label class="mb-2 block text-sm font-medium text-ink-900">Label design <x-required /></label>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    @foreach ([
+                        'classic' => ['Classic', 'Traditional courier layout — logo and tracking number at the top, sender/receiver side by side, full details table below. Best on 4×6" labels.'],
+                        'modern' => ['Modern', 'QR code and tracking number front and center, sender/receiver stacked, brand color accents. A cleaner, more visual layout.'],
+                        'compact' => ['Compact', 'Dense, no logo, smallest possible footprint — receiver details prioritized over sender. Built for 2×1" thermal labels.'],
+                    ] as $value => [$label, $description])
+                        <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-line p-3 text-sm has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <span class="flex items-center gap-2 font-medium text-ink-900">
+                                <input type="radio" name="label_design" value="{{ $value }}" @checked(old('label_design', $settings->label_design) === $value) class="border-line">
+                                {{ $label }}
+                            </span>
+                            <span class="text-xs text-ink-500">{{ $description }}</span>
+                        </label>
+                    @endforeach
+                </div>
+                <p class="mt-2 text-xs text-ink-500">Applies to every shipment's waybill — print any shipment's waybill after saving to see it in effect.</p>
+            </div>
         </div>
 
         <div class="flex justify-end">

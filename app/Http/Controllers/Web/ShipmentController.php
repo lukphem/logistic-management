@@ -87,6 +87,49 @@ class ShipmentController extends Controller
      * a shipment that's already been delivered has no real use and
      * would just quietly rewrite history on the record.
      */
+    /**
+     * One of three layouts (Classic/Modern/Compact), chosen deployment-
+     * wide via Settings → Waybill design, never per-shipment — every
+     * label a company prints should look consistent. QR payload is
+     * just the tracking number (same value a rider or hub scans in
+     * manually), so any generic QR reader — not just this app's own
+     * scan flow — can read it back correctly.
+     */
+    public function waybill(Shipment $shipment): View
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub']);
+        $settings = Setting::current();
+
+        $qrSvg = null;
+        if ($settings->waybill_show_qr) {
+            $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($shipment->tracking_number);
+        }
+
+        $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
+
+        return view("shipments.waybill.{$design}", compact('shipment', 'settings', 'qrSvg'));
+    }
+
+
+    /**
+     * Deliberately limited to fields that don't touch pricing — sender/
+     * receiver contact info, addresses, package description, special
+     * instructions, packaging. Weight/dimensions/service type are
+     * excluded on purpose: those are exactly what the frozen
+     * base_amount/surcharge_amount/total_amount were calculated from,
+     * and changing them here without re-running the whole pricing
+     * pipeline would silently leave the shipment's price wrong. A
+     * shipment that needs re-pricing is a cancel-and-rebook, not an
+     * edit.
+     *
+     * Blocked once a shipment has reached a terminal status — same
+     * "delivered"/"returned" list RiderController::assignedOrders()
+     * uses for "no longer active" — editing sender/receiver details on
+     * a shipment that's already been delivered has no real use and
+     * would just quietly rewrite history on the record.
+     */
     public function edit(Shipment $shipment): RedirectResponse|View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
