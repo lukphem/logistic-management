@@ -37,18 +37,27 @@ class ClientShipmentController extends Controller
      * Refuses to book (422, no shipment created) when the route/tariff
      * isn't configured — never books at a guessed or zero price.
      */
+    /**
+     * Same rules, same reasoning, as Web\ShipmentController's copy —
+     * see that file's constants for the phone/name pattern notes.
+     */
+    private const PHONE_RULE = 'required|string|regex:/^\+?[0-9\s\-()]{7,20}$/';
+    private const OPTIONAL_PHONE_RULE = 'nullable|string|regex:/^\+?[0-9\s\-()]{7,20}$/';
+    private const NAME_RULE = 'required|string|max:255|regex:/^[\p{L}\s\-\'.]+$/u';
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'service_type_id' => 'required|exists:service_types,id',
-            'sender_name' => 'required|string|max:255',
-            'sender_phone' => 'required|string|max:255',
+            'sender_name' => self::NAME_RULE,
+            'sender_phone' => self::PHONE_RULE,
             'sender_email' => 'nullable|email|max:255',
-            'receiver_name' => 'required|string|max:255',
-            'receiver_phone' => 'required|string|max:255',
+            'receiver_name' => self::NAME_RULE,
+            'receiver_phone' => self::PHONE_RULE,
+            'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
             'receiver_email' => 'nullable|email|max:255',
             'package_description' => 'required|string|max:1000',
-            'special_instructions' => 'nullable|string',
+            'special_instructions' => 'nullable|string|max:2000',
             'origin_address' => 'required|string|max:2000',
             'origin_zone_id' => 'nullable|exists:zones,id',
             'origin_city_id' => 'nullable|exists:cities,id',
@@ -61,17 +70,18 @@ class ClientShipmentController extends Controller
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',
             'destination_country_id' => 'nullable|exists:countries,id',
-            'distance_km' => 'nullable|numeric',
-            'weight_kg' => 'nullable|numeric',
+            'distance_km' => 'nullable|numeric|min:0',
+            'weight_kg' => 'nullable|numeric|min:0|max:50000',
             'quantity' => 'nullable|integer|min:1',
             'carton_size' => 'nullable|in:small,medium,large',
-            'length_cm' => 'nullable|numeric',
-            'width_cm' => 'nullable|numeric',
-            'height_cm' => 'nullable|numeric',
+            'length_cm' => 'nullable|numeric|min:0|max:10000',
+            'width_cm' => 'nullable|numeric|min:0|max:10000',
+            'height_cm' => 'nullable|numeric|min:0|max:10000',
             'is_cod' => 'sometimes|boolean',
-            'cod_amount' => 'nullable|numeric',
+            'is_pickup_requested' => 'sometimes|boolean',
+            'cod_amount' => 'nullable|numeric|min:0',
             'insured' => 'sometimes|boolean',
-            'declared_value' => 'nullable|numeric',
+            'declared_value' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {

@@ -7977,3 +7977,89 @@ app/Http/Controllers/Api/ClientShipmentController.php   (validation)
 app/Http/Controllers/Web/QuoteController.php   (returns account_number)
 resources/views/shipments/create.blade.php   (resequenced, searchable account datalist, quote auto-populate)
 ```
+
+## Increment 137 — Comprehensive Shipment Form Validation + Pickup Fee + Packaging
+
+### Phone/name/numeric validation, applied consistently
+
+Same shared rules across all three shipment-creation paths (web + 2
+API controllers): phone numbers now require a genuinely valid format
+(digits, optional leading +, spaces/hyphens/parens, 7-20 characters —
+catches things like the "080" that would previously sail straight
+through with no format check at all), names are letters/spaces/
+hyphens/apostrophes only, and every numeric field (weight,
+dimensions, COD amount, declared value, distance) now has `min:0` so
+none of them silently accept a negative number. Verified the phone
+pattern against 9 realistic cases including the exact failure from
+your earlier error report.
+
+### New: Receiver alternate phone
+
+Second contact number for the receiver only (not the sender) — often
+needed when the primary number is unreachable at delivery. New
+migration, model, validation, and form field.
+
+### A real bug found and fixed along the way
+
+`is_cod`/`cod_amount` were never in `Shipment`'s `$fillable` array —
+meaning Cash on Delivery data has been silently dropped on every
+single shipment ever created through the web form, regardless of
+what staff actually selected. Fixed, and verified end-to-end against
+live MySQL that it now persists correctly.
+
+### COD is now gated correctly
+
+The Cash on Delivery option is hidden by default and only appears
+once a real, registered account is selected *and* that account has
+COD explicitly turned on (Accounts → Account Details → Managerial
+services) — never for a walk-in customer or an account without it
+enabled.
+
+### Pickup fee, wired into pricing for real
+
+`is_pickup_chargeable`/`pickup_charge` (added to accounts back in
+Increment 128) were stored configuration with nothing ever reading
+them. New "Request pickup" option on the shipment form, wired into
+`ShipmentPricingService` the same way insurance already works — the
+fee (and its VAT) is calculated fresh at booking time from the
+selected account's own charge, shown on the checkbox label before
+you even select it once an account is looked up, and layered onto a
+quote's frozen price correctly when booking from a Quote ID (pickup,
+like COD, is a booking-time decision, never frozen into the quote
+itself).
+
+### Packaging is now selectable
+
+`carton_size` (Small/Medium/Large) and `quantity` existed in
+validation but had no field on the form at all — added both.
+
+### A real UX gap fixed while touching this area
+
+None of the account-based filtering (billing model, service type,
+COD, pickup fee) ever re-applied after a validation failure on a
+*different* field reloaded the page with the account number
+preserved — the filtering only ever ran on the field's blur event.
+Now re-triggers automatically on page load whenever the account
+field already has a value.
+
+### Verified
+
+Balance-checked after every edit, nested-form scan clean. Full repo
+balance check and duplicate-method scan: clean across 186 files.
+Verified end-to-end against live MySQL: the phone regex, the pickup
+fee + VAT calculation, the COD/pickup account data resolution, and a
+full shipment insert covering every new field — including confirming
+`is_cod`/`cod_amount` now actually persist.
+
+### Files
+
+```
+database/migrations/2026_03_12_000001_add_receiver_alternate_phone_to_shipments_table.php
+database/migrations/2026_03_12_000002_add_pickup_request_to_shipments_table.php
+app/Models/Shipment.php   (fillable/casts fix + additions)
+app/Services/ShipmentPricingService.php   (calculatePickupFee())
+app/Http/Controllers/Web/ShipmentController.php   (validation, accountBillingOptions() extended, pickup calc in storeFromQuote())
+app/Http/Controllers/Api/ShipmentController.php   (validation)
+app/Http/Controllers/Api/ClientShipmentController.php   (validation)
+resources/views/shipments/create.blade.php   (packaging/quantity fields, alternate phone, COD/pickup visibility JS, pattern/maxlength attributes, reload-state fix)
+```

@@ -73,6 +73,7 @@ class ShipmentPricingService
         $discountedFreight = ($baseAmount + $surchargeAmount) - $discountAmount;
         $insuranceAmount = $this->calculateInsurance($context);
         $onforwardingAmount = $this->calculateOnforwarding($context);
+        $pickupAmount = $this->calculatePickupFee($context);
         $additionalServices = $this->calculateAdditionalServices($context, $baseAmount);
         $additionalServicesAmount = round($additionalServices['vatable'] + $additionalServices['non_vatable'], 2);
 
@@ -80,8 +81,10 @@ class ShipmentPricingService
         // Only the vatable portion of additional services enters the VAT
         // base — a non-vatable option (Setups → Billing → Additional
         // Services, per-option) still gets charged in full below, just
-        // never taxed.
-        $vatableSubtotal = $discountedFreight + $insuranceAmount + $onforwardingAmount + $additionalServices['vatable'];
+        // never taxed. Pickup is treated as vatable, same as insurance
+        // and onforwarding — a service fee, not a negotiated freight
+        // rate.
+        $vatableSubtotal = $discountedFreight + $insuranceAmount + $onforwardingAmount + $pickupAmount + $additionalServices['vatable'];
         $vatAmount = round($vatableSubtotal * ($vatPercentage / 100), 2);
 
         $total = round($vatableSubtotal + $additionalServices['non_vatable'] + $vatAmount, 2);
@@ -91,6 +94,7 @@ class ShipmentPricingService
             'surcharge_amount' => round($surchargeAmount, 2),
             'surcharges_breakdown' => $surcharges['breakdown'],
             'onforwarding_amount' => round($onforwardingAmount, 2),
+            'pickup_amount' => round($pickupAmount, 2),
             'additional_services_amount' => round($additionalServicesAmount, 2),
             'additional_services_breakdown' => $additionalServices['breakdown'],
             'discount_amount' => $discountAmount,
@@ -200,6 +204,30 @@ class ShipmentPricingService
         $rate = (float) ($context['insurance_rate_percentage'] ?? 1); // default 1% of declared value
 
         return round(((float) $context['declared_value']) * ($rate / 100), 2);
+    }
+
+    /**
+     * Requesting pickup is always available — whether it actually
+     * costs anything depends entirely on the booking account's own
+     * Billing & Invoicing → is_pickup_chargeable/pickup_charge, same
+     * as how a walk-in customer with no account attached simply never
+     * gets charged for it (nothing to charge against). Referenced the
+     * same way Additional Services fees are: an optional line the
+     * requester opts into, not something automatically added.
+     */
+    public function calculatePickupFee(array $context): float
+    {
+        if (empty($context['is_pickup_requested'])) {
+            return 0.0;
+        }
+
+        $account = $this->resolveClientAccount($context);
+
+        if (! $account || ! $account->is_pickup_chargeable) {
+            return 0.0;
+        }
+
+        return round((float) ($account->pickup_charge ?? 0), 2);
     }
 
     /**

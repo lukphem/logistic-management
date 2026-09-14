@@ -307,6 +307,23 @@
                 <p class="mt-1 text-xs text-ink-500">Dimensions are optional — if given, priced by whichever is greater, actual weight or the volumetric weight they work out to.</p>
             </div>
 
+            <div class="flex flex-wrap items-end gap-3">
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Quantity <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                    <input type="number" step="1" min="1" name="quantity" value="{{ old('quantity') }}" placeholder="1"
+                           class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Packaging <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                    <select name="carton_size" class="w-36 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">Not specified</option>
+                        <option value="small" @selected(old('carton_size') === 'small')>Small</option>
+                        <option value="medium" @selected(old('carton_size') === 'medium')>Medium</option>
+                        <option value="large" @selected(old('carton_size') === 'large')>Large</option>
+                    </select>
+                </div>
+            </div>
+
             @if ($additionalServices->isNotEmpty())
                 <div>
                     <label class="mb-2 block text-sm font-medium text-ink-900">Additional services <span class="text-xs font-normal text-ink-500">(optional)</span></label>
@@ -339,17 +356,19 @@
                     <p class="text-sm font-semibold text-ink-900">Sender</p>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Full name <x-required /></label>
-                        <input type="text" name="sender_name" value="{{ old('sender_name') }}" required
+                        <input type="text" name="sender_name" value="{{ old('sender_name') }}" required maxlength="255"
+                               pattern="[A-Za-z\s\-'.]+" title="Letters, spaces, hyphens, and apostrophes only"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Phone <x-required /></label>
-                        <input type="text" name="sender_phone" value="{{ old('sender_phone') }}" required
+                        <input type="tel" name="sender_phone" value="{{ old('sender_phone') }}" required maxlength="20" inputmode="tel"
+                               pattern="\+?[0-9\s\-()]{7,20}" title="A valid phone number, 7-20 characters — digits, with an optional leading + and spaces/hyphens/parentheses"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Email <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                        <input type="email" name="sender_email" value="{{ old('sender_email') }}"
+                        <input type="email" name="sender_email" value="{{ old('sender_email') }}" maxlength="255"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
@@ -362,17 +381,27 @@
                     <p class="text-sm font-semibold text-ink-900">Receiver</p>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Full name <x-required /></label>
-                        <input type="text" name="receiver_name" value="{{ old('receiver_name') }}" required
+                        <input type="text" name="receiver_name" value="{{ old('receiver_name') }}" required maxlength="255"
+                               pattern="[A-Za-z\s\-'.]+" title="Letters, spaces, hyphens, and apostrophes only"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
-                    <div>
-                        <label class="mb-1 block text-sm font-medium text-ink-900">Phone <x-required /></label>
-                        <input type="text" name="receiver_phone" value="{{ old('receiver_phone') }}" required
-                               class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Phone <x-required /></label>
+                            <input type="tel" name="receiver_phone" value="{{ old('receiver_phone') }}" required maxlength="20" inputmode="tel"
+                                   pattern="\+?[0-9\s\-()]{7,20}" title="A valid phone number, 7-20 characters — digits, with an optional leading + and spaces/hyphens/parentheses"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-ink-900">Alternate phone <span class="text-xs font-normal text-ink-500">(optional)</span></label>
+                            <input type="tel" name="receiver_alternate_phone" value="{{ old('receiver_alternate_phone') }}" maxlength="20" inputmode="tel"
+                                   pattern="\+?[0-9\s\-()]{7,20}" title="A valid phone number, 7-20 characters — digits, with an optional leading + and spaces/hyphens/parentheses"
+                                   class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        </div>
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-ink-900">Email <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                        <input type="email" name="receiver_email" value="{{ old('receiver_email') }}"
+                        <input type="email" name="receiver_email" value="{{ old('receiver_email') }}" maxlength="255"
                                class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                     </div>
                     <div>
@@ -391,21 +420,22 @@
                 </div>
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Special instructions <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <input type="text" name="special_instructions" value="{{ old('special_instructions') }}"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <textarea name="special_instructions" rows="2" maxlength="2000"
+                              class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('special_instructions') }}</textarea>
                 </div>
             </div>
 
             <div class="rounded-lg border border-dashed border-line p-4">
                 <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Not on a standard courier waybill — specific to this business</p>
                 <div class="flex flex-wrap gap-6">
-                    <div>
+                    <div id="cod-section" class="hidden">
                         <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
                             <input type="checkbox" id="is-cod" name="is_cod" value="1" @checked(old('is_cod')) class="rounded border-line">
                             Cash on delivery
                         </label>
                         <input type="number" step="0.01" min="0" id="cod-amount" name="cod_amount" value="{{ old('cod_amount') }}" placeholder="Amount to collect"
                                class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('is_cod') ? '' : 'disabled' }}>
+                        <p class="mt-1 text-xs text-ink-500">Only available for a registered account with Cash on Delivery turned on (Accounts → Account Details → Managerial services).</p>
                     </div>
                     <div>
                         <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
@@ -415,6 +445,13 @@
                         <input type="number" step="0.01" min="0" id="declared-value" name="declared_value" value="{{ old('declared_value') }}" placeholder="Declared value"
                                class="mt-2 w-40 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" {{ old('insured') ? '' : 'disabled' }}>
                         <p class="mt-1 text-xs text-ink-500">1% of declared value. Entered here, at booking — never part of a Quote ID's frozen price, so this is always added fresh.</p>
+                    </div>
+                    <div id="pickup-section">
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="checkbox" id="is-pickup-requested" name="is_pickup_requested" value="1" @checked(old('is_pickup_requested')) class="rounded border-line">
+                            <span id="pickup-label">Request pickup</span>
+                        </label>
+                        <p id="pickup-note" class="mt-1 text-xs text-ink-500">Free unless the selected account has a pickup charge configured.</p>
                     </div>
                 </div>
             </div>
@@ -686,6 +723,40 @@
             function resetOptions() {
                 billingModelSelect.querySelectorAll('option').forEach(o => o.style.display = '');
                 serviceTypeSelect.querySelectorAll('option').forEach(o => o.style.display = '');
+                resetCodAndPickup();
+            }
+
+            function resetCodAndPickup() {
+                const codSection = document.getElementById('cod-section');
+                const codCheckbox = document.getElementById('is-cod');
+                const codAmount = document.getElementById('cod-amount');
+                codSection.classList.add('hidden');
+                codCheckbox.checked = false;
+                codAmount.value = '';
+                codAmount.disabled = true;
+                document.getElementById('pickup-label').textContent = 'Request pickup';
+                document.getElementById('pickup-note').textContent = 'Free unless the selected account has a pickup charge configured.';
+            }
+
+            function applyCodAndPickup(data) {
+                const codSection = document.getElementById('cod-section');
+                if (data.cod_enabled) {
+                    codSection.classList.remove('hidden');
+                } else {
+                    codSection.classList.add('hidden');
+                    document.getElementById('is-cod').checked = false;
+                    document.getElementById('cod-amount').value = '';
+                    document.getElementById('cod-amount').disabled = true;
+                }
+                const pickupLabel = document.getElementById('pickup-label');
+                const pickupNote = document.getElementById('pickup-note');
+                if (data.is_pickup_chargeable && data.pickup_charge) {
+                    pickupLabel.textContent = 'Request pickup (fee: ' + Number(data.pickup_charge).toLocaleString() + ')';
+                    pickupNote.textContent = 'This account is charged for pickup — the fee above is added to the total if selected.';
+                } else {
+                    pickupLabel.textContent = 'Request pickup';
+                    pickupNote.textContent = 'No pickup charge configured for this account — free if selected.';
+                }
             }
 
             function applyFilter(data) {
@@ -702,9 +773,10 @@
                 // visibly needs a fresh, valid pick instead.
                 if (billingModelSelect.selectedOptions[0]?.style.display === 'none') billingModelSelect.value = '';
                 if (serviceTypeSelect.selectedOptions[0]?.style.display === 'none') { serviceTypeSelect.value = ''; syncFieldsForServiceType(); }
+                applyCodAndPickup(data);
             }
 
-            field.addEventListener('blur', function () {
+            function lookupAccount() {
                 const value = field.value.trim();
                 if (!value) {
                     resetOptions();
@@ -730,7 +802,19 @@
                         status.textContent = 'Could not look up this account — try again.';
                         status.className = 'mt-1 text-xs text-status-exception';
                     });
-            });
+            }
+
+            field.addEventListener('blur', lookupAccount);
+
+            // A validation failure on some OTHER field reloads this page
+            // with the account number preserved (old('account_number'))
+            // but no blur event ever fires — without this, COD/pickup/
+            // billing-model filtering would silently revert to showing
+            // everything, even though the account is still the same one
+            // just picked.
+            if (field.value.trim()) {
+                lookupAccount();
+            }
         })();
 
         (function () {

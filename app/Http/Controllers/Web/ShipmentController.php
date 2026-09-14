@@ -148,6 +148,14 @@ class ShipmentController extends Controller
             'client_name' => $account->client?->name,
             'billing_models' => $enabledModels,
             'service_type_ids' => $allowedServiceTypeIds,
+            // Gates the COD checkbox — only ever shown for a real,
+            // registered account that's had Cash on Delivery
+            // explicitly turned on for it (Accounts tab → Account
+            // Details → Managerial services), never for a walk-in
+            // customer with no account at all.
+            'cod_enabled' => (bool) $account->cod_enabled,
+            'is_pickup_chargeable' => (bool) $account->is_pickup_chargeable,
+            'pickup_charge' => $account->pickup_charge,
         ]);
     }
 
@@ -369,6 +377,25 @@ class ShipmentController extends Controller
             ? \App\Models\ClientAccount::find($resolvedClientAccountId)?->client_user_id
             : ($data['client_user_id'] ?? null);
 
+        // Pickup, same reasoning as insurance just above — a booking-time
+        // add-on, never part of a quote's frozen context, layered on
+        // top rather than recalculated through the whole pipeline.
+        $pickupAmount = 0.0;
+        if (! empty($data['is_pickup_requested'])) {
+            $pickupAmount = $this->pricingService->calculatePickupFee([
+                'is_pickup_requested' => true,
+                'client_account_id' => $resolvedClientAccountId,
+            ]);
+
+            if ($pickupAmount > 0) {
+                $vatPercentage = (float) Setting::current()->vat_percentage;
+                $vatOnPickup = round($pickupAmount * ($vatPercentage / 100), 2);
+
+                $result['vat_amount'] = round(($result['vat_amount'] ?? 0) + $vatOnPickup, 2);
+                $result['total_amount'] = round(($result['total_amount'] ?? 0) + $pickupAmount + $vatOnPickup, 2);
+            }
+        }
+
         $shipment = Shipment::create([
             'client_user_id' => $resolvedClientUserId,
             'client_account_id' => $resolvedClientAccountId,
@@ -377,6 +404,7 @@ class ShipmentController extends Controller
             'sender_email' => $data['sender_email'] ?? null,
             'receiver_name' => $data['receiver_name'],
             'receiver_phone' => $data['receiver_phone'],
+            'receiver_alternate_phone' => $data['receiver_alternate_phone'] ?? null,
             'receiver_email' => $data['receiver_email'] ?? null,
             'package_description' => $data['package_description'],
             'special_instructions' => $data['special_instructions'] ?? null,
@@ -397,6 +425,8 @@ class ShipmentController extends Controller
             'carton_size' => $data['carton_size'] ?? null,
             'is_cod' => $data['is_cod'] ?? false,
             'cod_amount' => $data['cod_amount'] ?? 0,
+            'is_pickup_requested' => $data['is_pickup_requested'] ?? false,
+            'pickup_amount' => $pickupAmount,
             'base_amount' => $result['base_amount'] ?? 0,
             'surcharge_amount' => $result['surcharge_amount'] ?? 0,
             'onforwarding_amount' => $result['onforwarding_amount'] ?? 0,
@@ -416,6 +446,24 @@ class ShipmentController extends Controller
         return redirect()->route('shipments.show', $shipment)->with('status', "Shipment {$shipment->tracking_number} created from quote {$quote->quote_number}.");
     }
 
+    /**
+     * Shared across sender/receiver name and phone fields, and the
+     * two API controllers that validate the same shipment payload —
+     * kept as class constants so the three copies can't drift apart
+     * the way the address max: rule did before it was added anywhere.
+     *
+     * PHONE_RULE: digits, with an optional leading +, and optional
+     * spaces/hyphens/parens for however someone naturally formats a
+     * number (mobile, landline, or +234 international) — 7-15 digits
+     * covers the shortest real phone numbers up to full E.164, not
+     * tied to one country's specific format. Catches things like
+     * "080" (3 characters — not enough digits to be a real number)
+     * that a bare "required|string" rule let straight through before.
+     */
+    private const PHONE_RULE = 'required|string|regex:/^\+?[0-9\s\-()]{7,20}$/';
+    private const OPTIONAL_PHONE_RULE = 'nullable|string|regex:/^\+?[0-9\s\-()]{7,20}$/';
+    private const NAME_RULE = 'required|string|max:255|regex:/^[\p{L}\s\-\'.]+$/u';
+
     private function validateShipment(Request $request): array
     {
         $validator = Validator::make($request->all(), [
@@ -423,8 +471,8 @@ class ShipmentController extends Controller
             'service_type_id' => 'required_without:quote_number|nullable|exists:service_types,id',
             'client_user_id' => 'nullable|exists:users,id',
             'account_number' => 'nullable|string|max:255',
-            'sender_name' => 'required|string|max:255',
-            'sender_phone' => 'required|string|max:255',
+            'sender_name' => self::NAME_RULE,
+            'sender_phone' => self::PHONE_RULE,
             'sender_email' => 'nullable|email|max:255',
             'origin_address' => 'required|string|max:2000',
             'origin_zone_id' => 'nullable|exists:zones,id',
@@ -434,31 +482,33 @@ class ShipmentController extends Controller
             'origin_state_id' => 'nullable|exists:states,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'destination_hub_id' => 'nullable|exists:hubs,id',
-            'receiver_name' => 'required|string|max:255',
-            'receiver_phone' => 'required|string|max:255',
+            'receiver_name' => self::NAME_RULE,
+            'receiver_phone' => self::PHONE_RULE,
+            'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
             'receiver_email' => 'nullable|email|max:255',
             'package_description' => 'required|string|max:1000',
-            'special_instructions' => 'nullable|string',
+            'special_instructions' => 'nullable|string|max:2000',
             'destination_address' => 'required|string|max:2000',
             'destination_zone_id' => 'nullable|exists:zones,id',
             'destination_city_id' => 'nullable|exists:cities,id',
             'destination_district_id' => 'nullable|exists:districts,id',
             'destination_country_id' => 'nullable|exists:countries,id',
             'destination_state_id' => 'nullable|exists:states,id',
-            'distance_km' => 'nullable|numeric',
-            'weight_kg' => 'nullable|numeric',
+            'distance_km' => 'nullable|numeric|min:0',
+            'weight_kg' => 'nullable|numeric|min:0|max:50000',
             'quantity' => 'nullable|integer|min:1',
             'carton_size' => 'nullable|in:small,medium,large',
-            'length_cm' => 'nullable|numeric',
-            'width_cm' => 'nullable|numeric',
-            'height_cm' => 'nullable|numeric',
+            'length_cm' => 'nullable|numeric|min:0|max:10000',
+            'width_cm' => 'nullable|numeric|min:0|max:10000',
+            'height_cm' => 'nullable|numeric|min:0|max:10000',
             'additional_service_option_ids' => 'nullable|array',
             'vehicle_type_id' => 'nullable|exists:vehicle_types,id',
             'is_empty_return' => 'sometimes|boolean',
             'is_cod' => 'sometimes|boolean',
-            'cod_amount' => 'nullable|numeric',
+            'is_pickup_requested' => 'sometimes|boolean',
+            'cod_amount' => 'nullable|numeric|min:0',
             'insured' => 'sometimes|boolean',
-            'declared_value' => 'nullable|numeric',
+            'declared_value' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -472,6 +522,7 @@ class ShipmentController extends Controller
         $data['is_cod'] = $request->boolean('is_cod');
         $data['insured'] = $request->boolean('insured');
         $data['is_empty_return'] = $request->boolean('is_empty_return');
+        $data['is_pickup_requested'] = $request->boolean('is_pickup_requested');
 
         return $data;
     }
