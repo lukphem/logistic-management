@@ -20,7 +20,7 @@
         .page { width: 3.8in; padding: 0.06in; page-break-after: always; }
         .page:last-child { page-break-after: auto; }
 
-        .fit-content { overflow-wrap: break-word; word-break: break-word; }
+        .fit-content { overflow-wrap: break-word; }
 
         .piece-tag { font-size: 9px; font-weight: bold; text-align: center; border: 1px solid #000; padding: 2px; margin-bottom: 4px; }
         .top-line { display: flex; justify-content: space-between; font-size: 8px; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 3px; }

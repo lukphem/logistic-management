@@ -20,7 +20,7 @@
         .page { width: 3.76in; padding: 0.06in; page-break-after: always; }
         .page:last-child { page-break-after: auto; }
 
-        .fit-content { overflow-wrap: break-word; word-break: break-word; }
+        .fit-content { overflow-wrap: break-word; }
 
         .piece-tag { font-size: 10px; font-weight: bold; text-align: center; padding: 2px 0; background: #111; color: #fff; letter-spacing: 1px; margin-bottom: 6px; }
 

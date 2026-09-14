@@ -17,7 +17,7 @@
            @page margin above is what actually controls print output,
            so this screen-only padding/shadow is removed at print time
            to avoid doubling up the whitespace. */
-        .paper { max-width: 8.27in; margin: 24px auto; padding: 0.6in; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.2); overflow-wrap: break-word; word-break: break-word; }
+        .paper { max-width: 8.27in; margin: 24px auto; padding: 0.6in; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.2); overflow-wrap: break-word; }
         @media print {
             body { background: #fff; }
             .paper { max-width: none; margin: 0; padding: 0; box-shadow: none; }

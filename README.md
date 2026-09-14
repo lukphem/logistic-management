@@ -8639,3 +8639,40 @@ new controller created this session.
 ```
 app/Http/Controllers/Web/PaymentController.php   (add missing use App\Http\Controllers\Controller;)
 ```
+
+## Increment 147 — Fix: Mid-Word Breaking on Waybill/Label Print Views
+
+Spotted in a real printout: "Sunday" wrapped mid-word as "Sunda" /
+"y" in the Waybill's sender field. Cause: every print view had both
+`overflow-wrap: break-word` (correct — only breaks a word that's
+genuinely too long to fit on its own line) and `word-break:
+break-word` (too aggressive — breaks words on any tight line even
+when the word would fit fine wrapped normally, which is exactly what
+happened in a `dt`/`dd` flex row with limited space for the value
+side). Removed the redundant, overly-aggressive property from all 9
+print views (3 waybill designs, 6 label templates) — `overflow-wrap:
+break-word` alone still fully protects against the original concern
+this was meant to solve (a genuinely unbreakable long token, like a
+long word-run address, overflowing the physical page).
+
+### Verified
+
+Balance-checked and crash-pattern-rescanned across all 9 files after
+the edit — clean. Confirmed `overflow-wrap: break-word` remains
+present everywhere it was before (nothing lost), and `word-break:
+break-word` is fully gone (zero remaining occurrences). Full repo
+balance check: clean across 193 files.
+
+### Files
+
+```
+resources/views/shipments/waybill/classic.blade.php
+resources/views/shipments/waybill/compact.blade.php
+resources/views/shipments/waybill/modern.blade.php
+resources/views/shipments/label/classic-4x6.blade.php
+resources/views/shipments/label/classic-2x1.blade.php
+resources/views/shipments/label/modern-4x6.blade.php
+resources/views/shipments/label/modern-2x1.blade.php
+resources/views/shipments/label/compact-4x6.blade.php
+resources/views/shipments/label/compact-2x1.blade.php
+```

@@ -22,7 +22,7 @@
         .accent-bar { height: 3px; background: {{ $settings->color_primary ?? '#1F3864' }}; }
         .inner { padding: 0.04in; }
 
-        .fit-content { overflow-wrap: break-word; word-break: break-word; }
+        .fit-content { overflow-wrap: break-word; }
 
         .piece-tag { font-size: 7px; font-weight: bold; text-align: center; color: {{ $settings->color_secondary ?? '#F2A900' }}; margin-bottom: 1px; }
         .barcode-zone { text-align: center; line-height: 1; }

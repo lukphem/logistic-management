@@ -13,7 +13,7 @@
         .print-btn { padding: 8px 16px; font-size: 13px; border: 1px solid #111; background: #111; color: #fff; border-radius: 4px; cursor: pointer; }
         @media print { .toolbar { display: none !important; } }
 
-        .paper { max-width: 8.27in; margin: 24px auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.2); overflow-wrap: break-word; word-break: break-word; }
+        .paper { max-width: 8.27in; margin: 24px auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.2); overflow-wrap: break-word; }
         @media print {
             body { background: #fff; }
             .paper { max-width: none; margin: 0; box-shadow: none; }
