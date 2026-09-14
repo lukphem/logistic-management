@@ -1,8 +1,24 @@
 <x-layouts.app :title="'Shipment ' . $shipment->tracking_number">
 
+    @if (session('status'))
+        <div class="mb-4 rounded-xl border border-status-delivered/30 bg-status-delivered/5 px-4 py-3 text-sm text-status-delivered">
+            {{ session('status') }}
+        </div>
+    @endif
+    @if ($errors->any())
+        <div class="mb-4 rounded-xl border border-status-exception/30 bg-status-exception/5 px-4 py-3 text-sm text-status-exception">
+            {{ $errors->first() }}
+        </div>
+    @endif
+
     <div class="mb-6 flex items-start justify-between">
         <div>
-            <p class="font-mono text-2xl font-semibold text-ink-900">{{ $shipment->tracking_number }}</p>
+            <p class="font-mono text-2xl font-semibold text-ink-900">
+                {{ $shipment->tracking_number }}
+                @if ($shipment->is_test)
+                    <span class="ml-2 inline-flex items-center rounded-full bg-status-exception/10 px-2 py-0.5 text-xs font-medium text-status-exception align-middle">Test</span>
+                @endif
+            </p>
             @if ($shipment->originHub || $shipment->destinationHub)
                 <p class="text-xs text-ink-500">
                     @if ($shipment->originHub && $shipment->destinationHub)
@@ -18,7 +34,14 @@
                 {{ $shipment->destinationCity?->name ?? $shipment->destinationZone?->name ?? $shipment->destination_address }}
             </p>
         </div>
-        <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />
+        <div class="flex items-center gap-3">
+            @can('shipments:update')
+                @if (! in_array($shipment->current_status, ['delivered', 'returned'], true))
+                    <a href="{{ route('shipments.edit', $shipment) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Edit</a>
+                @endif
+            @endcan
+            <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />
+        </div>
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -27,16 +50,91 @@
         <div class="space-y-6 lg:col-span-2">
 
             <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-                <h2 class="mb-4 text-sm font-semibold text-ink-900">Shipment details</h2>
+                <h2 class="mb-4 text-sm font-semibold text-ink-900">Client &amp; account</h2>
                 <dl class="grid grid-cols-2 gap-y-3 text-sm">
-                    <dt class="text-ink-500">Service type</dt>
-                    <dd class="text-ink-900">{{ $shipment->serviceType->name ?? '—' }}</dd>
+                    <dt class="text-ink-500">Client</dt>
+                    <dd class="text-ink-900">{{ $shipment->clientUser?->name ?? 'Walk-in customer' }}</dd>
+
+                    <dt class="text-ink-500">Account</dt>
+                    <dd class="text-ink-900">{{ $shipment->clientAccount?->account_name ?? '—' }} {{ $shipment->clientAccount?->account_number ? '(' . $shipment->clientAccount->account_number . ')' : '' }}</dd>
+
+                    <dt class="text-ink-500">Payment type</dt>
+                    <dd class="text-ink-900">{{ $shipment->clientAccount?->payment_type === 'credit' ? 'Credit' : ($shipment->clientAccount ? 'Cash' : '—') }}</dd>
+
+                    <dt class="text-ink-500">Booked via</dt>
+                    <dd class="text-ink-900">{{ $shipment->apiClient ? $shipment->apiClient->name . ' (' . ucfirst($shipment->apiClient->mode) . ' API)' : 'Web' }}</dd>
+                </dl>
+            </div>
+
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                <h2 class="mb-4 text-sm font-semibold text-ink-900">Sender</h2>
+                <dl class="grid grid-cols-2 gap-y-3 text-sm">
+                    <dt class="text-ink-500">Name</dt>
+                    <dd class="text-ink-900">{{ $shipment->sender_name }}</dd>
+
+                    <dt class="text-ink-500">Phone</dt>
+                    <dd class="text-ink-900 font-mono">{{ $shipment->sender_phone }}</dd>
+
+                    <dt class="text-ink-500">Email</dt>
+                    <dd class="text-ink-900">{{ $shipment->sender_email ?? '—' }}</dd>
+
+                    <dt class="text-ink-500">Address</dt>
+                    <dd class="text-ink-900">{{ $shipment->origin_address }}</dd>
+                </dl>
+            </div>
+
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                <h2 class="mb-4 text-sm font-semibold text-ink-900">Receiver</h2>
+                <dl class="grid grid-cols-2 gap-y-3 text-sm">
+                    <dt class="text-ink-500">Name</dt>
+                    <dd class="text-ink-900">{{ $shipment->receiver_name }}</dd>
+
+                    <dt class="text-ink-500">Phone</dt>
+                    <dd class="text-ink-900 font-mono">{{ $shipment->receiver_phone }}</dd>
+
+                    @if ($shipment->receiver_alternate_phone)
+                        <dt class="text-ink-500">Alternate phone</dt>
+                        <dd class="text-ink-900 font-mono">{{ $shipment->receiver_alternate_phone }}</dd>
+                    @endif
+
+                    <dt class="text-ink-500">Email</dt>
+                    <dd class="text-ink-900">{{ $shipment->receiver_email ?? '—' }}</dd>
+
+                    <dt class="text-ink-500">Address</dt>
+                    <dd class="text-ink-900">{{ $shipment->destination_address }}</dd>
+                </dl>
+            </div>
+
+            <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+                <h2 class="mb-4 text-sm font-semibold text-ink-900">Package</h2>
+                <dl class="grid grid-cols-2 gap-y-3 text-sm">
+                    <dt class="text-ink-500">Description</dt>
+                    <dd class="text-ink-900">{{ $shipment->package_description }}</dd>
+
+                    @if ($shipment->special_instructions)
+                        <dt class="text-ink-500">Special instructions</dt>
+                        <dd class="text-ink-900">{{ $shipment->special_instructions }}</dd>
+                    @endif
 
                     <dt class="text-ink-500">Weight</dt>
                     <dd class="text-ink-900">{{ $shipment->weight_kg ?? '—' }} kg</dd>
 
                     <dt class="text-ink-500">Chargeable weight</dt>
                     <dd class="text-ink-900">{{ $shipment->chargeable_weight_kg ?? '—' }} kg</dd>
+
+                    @if ($shipment->length_cm || $shipment->width_cm || $shipment->height_cm)
+                        <dt class="text-ink-500">Dimensions (L×W×H)</dt>
+                        <dd class="text-ink-900">{{ $shipment->length_cm ?? '—' }} × {{ $shipment->width_cm ?? '—' }} × {{ $shipment->height_cm ?? '—' }} cm</dd>
+                    @endif
+
+                    <dt class="text-ink-500">Quantity</dt>
+                    <dd class="text-ink-900">{{ $shipment->quantity ?? 1 }}</dd>
+
+                    <dt class="text-ink-500">Packaging</dt>
+                    <dd class="text-ink-900">{{ $shipment->carton_size ? ucfirst($shipment->carton_size) : '—' }}</dd>
+
+                    <dt class="text-ink-500">Service type</dt>
+                    <dd class="text-ink-900">{{ $shipment->serviceType->name ?? '—' }}</dd>
 
                     <dt class="text-ink-500">Assigned rider</dt>
                     <dd class="text-ink-900">{{ $shipment->assignedRider?->name ?? 'Unassigned' }}</dd>
@@ -62,10 +160,27 @@
                         @endif
                     </dd>
 
+                    <dt class="text-ink-500">Pickup requested</dt>
+                    <dd class="text-ink-900">
+                        @if ($shipment->is_pickup_requested)
+                            Yes {{ $shipment->pickup_amount > 0 ? '(' . number_format($shipment->pickup_amount, 2) . ')' : '(no charge)' }}
+                        @else
+                            No
+                        @endif
+                    </dd>
+
                     <dt class="text-ink-500">SLA</dt>
                     <dd class="{{ $shipment->sla_breached ? 'text-status-exception font-medium' : 'text-ink-900' }}">
                         {{ $shipment->sla_breached ? 'Breached' : 'On track' }}
                     </dd>
+
+                    <dt class="text-ink-500">Booked</dt>
+                    <dd class="text-ink-900">{{ $shipment->created_at->format('d M Y · H:i') }}</dd>
+
+                    @if ($shipment->promised_delivery_at)
+                        <dt class="text-ink-500">Promised delivery</dt>
+                        <dd class="text-ink-900">{{ $shipment->promised_delivery_at->format('d M Y') }}</dd>
+                    @endif
                 </dl>
             </div>
 
@@ -76,6 +191,9 @@
                     <div class="flex justify-between"><dt class="text-ink-500">Surcharges</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->surcharge_amount, 2) }}</dd></div>
                     @if ($shipment->onforwarding_amount > 0)
                         <div class="flex justify-between"><dt class="text-ink-500">Onforwarding</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->onforwarding_amount, 2) }}</dd></div>
+                    @endif
+                    @if ($shipment->pickup_amount > 0)
+                        <div class="flex justify-between"><dt class="text-ink-500">Pickup fee</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->pickup_amount, 2) }}</dd></div>
                     @endif
                     @if ($shipment->discount_amount > 0)
                         <div class="flex justify-between"><dt class="text-ink-500">Discount</dt><dd class="font-mono text-status-delivered">−{{ number_format($shipment->discount_amount, 2) }}</dd></div>

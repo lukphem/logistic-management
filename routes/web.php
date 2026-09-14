@@ -54,6 +54,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
+    Route::middleware('can:shipments:update')->group(function () {
+        Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
+        Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
+    });
 
     // System setup — gated to whoever holds settings:update (Super Admin, Finance-read only sees nothing here).
     Route::middleware('can:settings:update')->group(function () {

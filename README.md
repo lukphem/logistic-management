@@ -8063,3 +8063,49 @@ app/Http/Controllers/Api/ShipmentController.php   (validation)
 app/Http/Controllers/Api/ClientShipmentController.php   (validation)
 resources/views/shipments/create.blade.php   (packaging/quantity fields, alternate phone, COD/pickup visibility JS, pattern/maxlength attributes, reload-state fix)
 ```
+
+## Increment 138 — Detailed Shipment View + Permission-Gated Edit
+
+### Shipment view page now shows everything entered at booking
+
+Was missing sender/receiver contact details, addresses, package
+description, special instructions, dimensions, quantity, packaging,
+client/account context, payment type, which API key (if any) booked
+it, pickup fee, and the test-shipment badge — all added. The old
+"Shipment details" card is now three: Client & account, Sender,
+Receiver, plus an expanded Package card with everything that used to
+be scattered or missing.
+
+### Shipments can now be edited — gated on the existing `shipments:update` permission
+
+New Edit button on the show page (visible only to accounts with that
+permission, same one your Hub Staff role already has). Deliberately
+limited to fields that don't touch pricing: sender/receiver contact
+info, addresses, package description, special instructions, quantity,
+packaging. Weight, dimensions, and service type are excluded on
+purpose — changing those without re-running the whole pricing
+pipeline would leave the shipment's frozen price silently wrong. A
+shipment that genuinely needs re-pricing is a cancel-and-rebook, not
+an edit.
+
+Blocked once a shipment reaches a terminal status (delivered/
+returned) — editing sender/receiver details on something already
+delivered has no real use and would just rewrite history on the
+record.
+
+### Verified
+
+Balance-checked, nested-form scan clean on both the show and edit
+views. Full repo balance check, duplicate-method scan: clean across
+186 files. Verified against live MySQL: a non-terminal shipment's
+update persists correctly, and the terminal-status block logic
+matches intent across five status values.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (show() eager-loads more, new edit()/update())
+resources/views/shipments/show.blade.php   (comprehensive rebuild)
+resources/views/shipments/edit.blade.php   (new)
+routes/web.php
+```

@@ -65,9 +65,66 @@ class ShipmentController extends Controller
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
-        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'serviceType', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'assignedRider', 'currentOutlet', 'originHub', 'destinationHub']);
+        $shipment->load(['scanEvents.handler', 'scanEvents.outlet', 'serviceType', 'originZone', 'destinationZone', 'originCity', 'destinationCity', 'originDistrict', 'destinationDistrict', 'assignedRider', 'currentOutlet', 'currentHub', 'originHub', 'destinationHub', 'clientUser', 'clientAccount', 'apiClient']);
 
         return view('shipments.show', compact('shipment'));
+    }
+
+    /**
+     * Deliberately limited to fields that don't touch pricing — sender/
+     * receiver contact info, addresses, package description, special
+     * instructions, packaging. Weight/dimensions/service type are
+     * excluded on purpose: those are exactly what the frozen
+     * base_amount/surcharge_amount/total_amount were calculated from,
+     * and changing them here without re-running the whole pricing
+     * pipeline would silently leave the shipment's price wrong. A
+     * shipment that needs re-pricing is a cancel-and-rebook, not an
+     * edit.
+     *
+     * Blocked once a shipment has reached a terminal status — same
+     * "delivered"/"returned" list RiderController::assignedOrders()
+     * uses for "no longer active" — editing sender/receiver details on
+     * a shipment that's already been delivered has no real use and
+     * would just quietly rewrite history on the record.
+     */
+    public function edit(Shipment $shipment): RedirectResponse|View
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        if (in_array($shipment->current_status, ['delivered', 'returned'], true)) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => 'This shipment has already been delivered/returned and can no longer be edited.']);
+        }
+
+        return view('shipments.edit', compact('shipment'));
+    }
+
+    public function update(Request $request, Shipment $shipment): RedirectResponse
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        if (in_array($shipment->current_status, ['delivered', 'returned'], true)) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => 'This shipment has already been delivered/returned and can no longer be edited.']);
+        }
+
+        $data = $request->validate([
+            'sender_name' => self::NAME_RULE,
+            'sender_phone' => self::PHONE_RULE,
+            'sender_email' => 'nullable|email|max:255',
+            'origin_address' => 'required|string|max:2000',
+            'receiver_name' => self::NAME_RULE,
+            'receiver_phone' => self::PHONE_RULE,
+            'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
+            'receiver_email' => 'nullable|email|max:255',
+            'destination_address' => 'required|string|max:2000',
+            'package_description' => 'required|string|max:1000',
+            'special_instructions' => 'nullable|string|max:2000',
+            'carton_size' => 'nullable|in:small,medium,large',
+            'quantity' => 'nullable|integer|min:1',
+        ]);
+
+        $shipment->update($data);
+
+        return redirect()->route('shipments.show', $shipment)->with('status', 'Shipment details updated.');
     }
 
     /**
