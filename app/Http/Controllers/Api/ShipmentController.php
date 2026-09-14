@@ -142,7 +142,7 @@ class ShipmentController extends Controller
             'destination_country_id' => 'nullable|exists:countries,id',
             'distance_km' => 'nullable|numeric|min:0',
             'weight_kg' => 'nullable|numeric|min:0|max:50000',
-            'quantity' => 'nullable|integer|min:1',
+            'quantity' => 'required|integer|min:1|max:200',
             'carton_size' => 'nullable|in:small,medium,large',
             'length_cm' => 'nullable|numeric|min:0|max:10000',
             'width_cm' => 'nullable|numeric|min:0|max:10000',

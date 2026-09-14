@@ -31,6 +31,9 @@
         .size-toggle a.active { background: #111; color: #fff; border-color: #111; }
         .size-toggle a:first-child { border-radius: 4px 0 0 4px; }
         .size-toggle a:last-child { border-radius: 0 4px 4px 0; border-left: none; }
+        .piece-tag { font-size: 10px; font-weight: bold; color: {{ $settings->color_secondary ?? '#F2A900' }}; text-align: center; margin-bottom: 4px; }
+        .page { page-break-after: always; }
+        .page:last-child { page-break-after: auto; }
         @media print { .no-print { display: none; } }
     </style>
 </head>
@@ -39,17 +42,22 @@
         <span class="size-toggle">
             <a href="?size=4x6" class="{{ $printSize === '4x6' ? 'active' : '' }}">4×6"</a><a href="?size=2x1" class="{{ $printSize === '2x1' ? 'active' : '' }}">2×1"</a>
         </span>
-        <button onclick="window.print()" style="padding: 8px 16px; font-size: 13px;">Print</button>
+        <button onclick="window.print()" style="padding: 8px 16px; font-size: 13px;">Print{{ count($pieces) > 1 ? ' all ' . count($pieces) . ' pieces' : '' }}</button>
     </div>
 
+    @foreach ($pieces as $piece)
+    <div class="page">
     <div class="accent-bar"></div>
     <div class="content">
+        @if ($piece['total'] > 1)
+            <div class="piece-tag">PIECE {{ $piece['number'] }} OF {{ $piece['total'] }}</div>
+        @endif
         @if ($printSize === '2x1')
             {{-- Minimal content only — receiver and tracking, no sender/company detail at this size --}}
-            @if ($codeSvg)
-                <div class="code-block">{!! $codeSvg !!}</div>
+            @if ($piece['codeSvg'])
+                <div class="code-block">{!! $piece['codeSvg'] !!}</div>
             @endif
-            <div class="tracking-number">{{ $shipment->tracking_number }}</div>
+            <div class="tracking-number">{{ $piece['code'] }}</div>
             <div class="party">
                 <div class="party-label">To</div>
                 <div class="party-name">{{ $shipment->receiver_name }}</div>
@@ -67,10 +75,10 @@
             </div>
             <div class="company-name">{{ $settings->company_name }}</div>
 
-            @if ($codeSvg)
-                <div class="code-block">{!! $codeSvg !!}</div>
+            @if ($piece['codeSvg'])
+                <div class="code-block">{!! $piece['codeSvg'] !!}</div>
             @endif
-            <div class="tracking-number">{{ $shipment->tracking_number }}</div>
+            <div class="tracking-number">{{ $piece['code'] }}</div>
             <div class="service-type">{{ $shipment->serviceType?->name ?? $shipment->shipping_type }}</div>
 
             <hr class="divider">
@@ -116,6 +124,8 @@
             <div class="footer">Booked {{ $shipment->created_at->format('d M Y') }}</div>
         @endif
     </div>
+    </div>
+    @endforeach
 
 </body>
 </html>

@@ -129,6 +129,35 @@ class ShipmentController extends Controller
      * shipment, it's just whatever that specific booking account has
      * uploaded, or absent entirely for a walk-in customer.
      */
+    /**
+     * One of three layouts (Classic/Modern/Compact), each adaptive to
+     * both thermal sizes (4×6 gets full content, 2×1 drops to
+     * essentials only — same template, not a separate file per size,
+     * so the three styles can't drift out of sync with each other).
+     * Which DESIGN prints is deployment-wide (Settings → Shipping
+     * label), but which SIZE prints is chosen right here, at print
+     * time — a hub might genuinely need either size for the same
+     * shipment depending on what's loaded in the printer that day, so
+     * this isn't locked to Settings' own default the way the design
+     * choice is. Settings' value is only the pre-selected starting
+     * point when no ?size= is given.
+     *
+     * For a multi-piece shipment (quantity > 1), one label prints per
+     * piece — each carries its own code (tracking number + piece
+     * suffix, e.g. "LM260913ULRDZ1-2/3"), not just a repeat of the
+     * shipment's own tracking number, so a piece that gets separated
+     * from the rest of its shipment (lost, mis-routed, opened for
+     * inspection) can still be identified as specifically piece 2 of
+     * 3, not just "part of shipment X" with no way to tell which
+     * part. Each piece gets its own printed page (CSS page-break),
+     * one continuous print job rather than requiring a separate trip
+     * to this page per piece.
+     *
+     * A registered client's own logo (ClientAccount::logo_url) prints
+     * alongside the company's own — nothing to configure per
+     * shipment, it's just whatever that specific booking account has
+     * uploaded, or absent entirely for a walk-in customer.
+     */
     public function label(Request $request, Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
@@ -140,17 +169,26 @@ class ShipmentController extends Controller
             ? $request->query('size')
             : $settings->waybill_thermal_size;
 
-        $codeSvg = null;
-        if ($settings->waybill_show_qr) {
-            $codeSvg = $settings->label_barcode_type === 'barcode'
-                ? (new \Picqer\Barcode\BarcodeGeneratorSVG())->getBarcode($shipment->tracking_number, \Picqer\Barcode\BarcodeGeneratorSVG::TYPE_CODE_128)
-                : \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($shipment->tracking_number);
+        $totalPieces = max((int) ($shipment->quantity ?? 1), 1);
+
+        $pieces = [];
+        for ($i = 1; $i <= $totalPieces; $i++) {
+            $pieceCode = $totalPieces > 1 ? "{$shipment->tracking_number}-{$i}/{$totalPieces}" : $shipment->tracking_number;
+
+            $codeSvg = null;
+            if ($settings->waybill_show_qr) {
+                $codeSvg = $settings->label_barcode_type === 'barcode'
+                    ? (new \Picqer\Barcode\BarcodeGeneratorSVG())->getBarcode($pieceCode, \Picqer\Barcode\BarcodeGeneratorSVG::TYPE_CODE_128)
+                    : \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($pieceCode);
+            }
+
+            $pieces[] = ['number' => $i, 'total' => $totalPieces, 'code' => $pieceCode, 'codeSvg' => $codeSvg];
         }
 
         $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
         $clientLogoUrl = $shipment->clientAccount?->logo_url;
 
-        return view("shipments.label.{$design}", compact('shipment', 'settings', 'codeSvg', 'clientLogoUrl', 'printSize'));
+        return view("shipments.label.{$design}", compact('shipment', 'settings', 'clientLogoUrl', 'printSize', 'pieces'));
     }
 
     /**
@@ -223,7 +261,7 @@ class ShipmentController extends Controller
             'package_description' => 'required|string|max:1000',
             'special_instructions' => 'nullable|string|max:2000',
             'carton_size' => 'nullable|in:small,medium,large',
-            'quantity' => 'nullable|integer|min:1',
+            'quantity' => 'required|integer|min:1|max:200',
         ]);
 
         $shipment->update($data);
@@ -657,7 +695,7 @@ class ShipmentController extends Controller
             'destination_state_id' => 'nullable|exists:states,id',
             'distance_km' => 'nullable|numeric|min:0',
             'weight_kg' => 'nullable|numeric|min:0|max:50000',
-            'quantity' => 'nullable|integer|min:1',
+            'quantity' => 'required|integer|min:1|max:200',
             'carton_size' => 'nullable|in:small,medium,large',
             'length_cm' => 'nullable|numeric|min:0|max:10000',
             'width_cm' => 'nullable|numeric|min:0|max:10000',

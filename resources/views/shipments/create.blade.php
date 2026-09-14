@@ -309,8 +309,8 @@
 
             <div class="flex flex-wrap items-end gap-3">
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-ink-900">Quantity <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <input type="number" step="1" min="1" name="quantity" value="{{ old('quantity') }}" placeholder="1"
+                    <label class="mb-1 block text-xs font-medium text-ink-900">Quantity (pieces) <x-required /></label>
+                    <input type="number" step="1" min="1" name="quantity" value="{{ old('quantity', 1) }}" required
                            class="w-24 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
                 </div>
                 <div>

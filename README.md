@@ -8320,3 +8320,59 @@ resources/views/shipments/label/classic.blade.php   (size toggle, printSize)
 resources/views/shipments/label/modern.blade.php   (size toggle, printSize)
 resources/views/shipments/label/compact.blade.php   (size toggle, printSize)
 ```
+
+## Increment 142 — Piece Count Enforced at Entry + Per-Piece Label Tagging
+
+### Quantity is now required at booking
+
+Was `nullable` everywhere — a multi-piece shipment could be booked
+with no piece count recorded at all, and the create form had no
+`required` attribute despite showing a `min="1"`. Now `required` with
+a sensible `max:200` safety cap, across all three shipment-creation
+paths and the edit form, consistently. Create form defaults to 1
+rather than leaving it blank, since most shipments are single-piece.
+
+### Each piece gets its own tagged label
+
+For any shipment with `quantity > 1`, printing the label now
+generates one label *per piece* in a single continuous print job —
+each carrying its own code, `{tracking_number}-{piece}/{total}`
+(e.g. `LM260913ULRDZ1-2/3`), not just a repeat of the shipment's own
+tracking number. A piece that gets separated from the rest of its
+shipment — lost, mis-routed, opened for inspection at a checkpoint —
+can still be identified as specifically piece 2 of 3, not just "part
+of shipment X" with no way to tell which part. A visible "PIECE 2 OF
+3" tag sits above the rest of each label's content too, and the
+Print button reflects the total ("Print all 3 pieces") so it's clear
+before printing that more than one label is coming out. Pages break
+automatically between pieces (CSS `page-break-after`), so a thermal
+printer feeds one sticker per piece without any manual intervention.
+
+A single-piece shipment (the overwhelming majority) is completely
+unaffected — one label, plain tracking number, exactly as before.
+
+### Verified
+
+Balance-checked and duplicate-scanned after every edit — re-scanned
+all three label views for the exact crash pattern from two
+increments back a third time, since they were edited again; zero
+matches, consistent with before. Full repo balance check: clean
+across 188 files. Simulated the piece-generation loop against
+single-piece, legacy-null, and 3-piece cases — all match the
+controller's logic exactly, including that a single piece correctly
+gets no `-1/1` suffix. Simulated the validation rule
+(`required|integer|min:1|max:200`) against nine edge cases — all
+resolve as intended.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (quantity required, per-piece code generation in label())
+app/Http/Controllers/Api/ShipmentController.php   (quantity required)
+app/Http/Controllers/Api/ClientShipmentController.php   (quantity required)
+resources/views/shipments/create.blade.php   (quantity required, defaults to 1)
+resources/views/shipments/edit.blade.php   (quantity required)
+resources/views/shipments/label/classic.blade.php   (per-piece iteration, page breaks)
+resources/views/shipments/label/modern.blade.php   (per-piece iteration, page breaks)
+resources/views/shipments/label/compact.blade.php   (per-piece iteration, page breaks)
+```
