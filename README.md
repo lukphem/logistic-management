@@ -8475,3 +8475,44 @@ resources/views/shipments/waybill/compact.blade.php   (new)
 `modern.blade.php`, `compact.blade.php` and
 `resources/views/shipments/waybill-document.blade.php` from
 Increments 140/141 removed — superseded by the above.)
+
+## Increment 144 — Onforwarding Fee Wired Into Pricing
+
+`is_onforwarding_chargeable`/`onforwarding_charge` (added to
+`ClientAccount` back in Increment 128, same shape as pickup fee)
+were stored configuration that nothing ever read. Traced the
+existing "onforwarding" naming carefully before touching anything —
+there's already a completely separate, pre-existing mechanism
+(`OnforwardingClassification`, keyed by city/district) that applies
+a geography-based surcharge to *any* shipment touching a classified
+area, regardless of whose account it's on. The account-level field
+is a genuinely different thing: a flat fee some accounts have
+negotiated to pay for onforwarding regardless of geography. Both are
+legitimate and can apply to the same shipment for different reasons,
+so they're summed into the same `onforwarding_amount` total rather
+than one replacing the other.
+
+Unlike pickup fee, this isn't something staff opt into per shipment
+— an account either has it configured or doesn't, so it's applied
+automatically whenever `calculateAccountOnforwardingFee()` finds the
+resolved account has `is_onforwarding_chargeable` set, the same way
+the geography-based surcharge already applies automatically. No
+special handling needed for quotes booked later, either — since this
+runs inside the same `priceShipment()` call quotes already go
+through, a quote generated after this change already has the correct
+combined figure baked into its frozen price.
+
+### Verified
+
+Balance-checked, full repo balance check and duplicate-method scan
+clean across 189 files. Simulated the combined calculation across
+four cases (neither applies, only the account fee, only the
+geographic surcharge, both applying together and correctly summing)
+— all match intent. Verified account-level data persists and
+resolves correctly against live MySQL.
+
+### Files
+
+```
+app/Services/ShipmentPricingService.php   (calculateAccountOnforwardingFee(), summed into priceShipment())
+```

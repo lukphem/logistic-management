@@ -72,7 +72,7 @@ class ShipmentPricingService
         // rate, so neither is ever discounted.
         $discountedFreight = ($baseAmount + $surchargeAmount) - $discountAmount;
         $insuranceAmount = $this->calculateInsurance($context);
-        $onforwardingAmount = $this->calculateOnforwarding($context);
+        $onforwardingAmount = $this->calculateOnforwarding($context) + $this->calculateAccountOnforwardingFee($context);
         $pickupAmount = $this->calculatePickupFee($context);
         $additionalServices = $this->calculateAdditionalServices($context, $baseAmount);
         $additionalServicesAmount = round($additionalServices['vatable'] + $additionalServices['non_vatable'], 2);
@@ -237,6 +237,29 @@ class ShipmentPricingService
      * classification takes priority over city classification when a
      * district is set, since it's the more specific match.
      */
+    /**
+     * A separate, account-specific onforwarding fee — distinct from
+     * the geography-based surcharge just above, which applies to any
+     * shipment touching a classified district/city regardless of
+     * whose account it's on. This one is the opposite: a flat amount
+     * some accounts have negotiated to pay for onforwarding
+     * regardless of geography, gated by the account's own
+     * is_onforwarding_chargeable — same shape as pickup fee, but
+     * applied automatically rather than opted into per shipment,
+     * since onforwarding isn't a choice staff make at booking time
+     * the way requesting a pickup is.
+     */
+    private function calculateAccountOnforwardingFee(array $context): float
+    {
+        $account = $this->resolveClientAccount($context);
+
+        if (! $account || ! $account->is_onforwarding_chargeable) {
+            return 0.0;
+        }
+
+        return round((float) ($account->onforwarding_charge ?? 0), 2);
+    }
+
     private function calculateOnforwarding(array $context): float
     {
         return $this->resolveOnforwardingFee($context['origin_district_id'] ?? null, $context['origin_city_id'] ?? null)
