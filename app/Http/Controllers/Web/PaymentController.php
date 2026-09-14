@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\Shipment;
 use App\Services\PaystackService;

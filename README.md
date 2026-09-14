@@ -8614,3 +8614,28 @@ routes/web.php   (payments.pay, payments.callback, payments.webhook)
 resources/views/settings/edit.blade.php   (Payments section)
 resources/views/shipments/show.blade.php   (Pay with Paystack button, payment status row)
 ```
+
+## Increment 146 — Hotfix: PaymentController Missing Base Controller Import
+
+`PaymentController` extended `Controller` without importing
+`App\Http\Controllers\Controller` — PHP resolved the bare name
+against the controller's own namespace (`App\Http\Controllers\Web`)
+instead, and no such class exists there, so every route on this
+controller (`pay`, `callback`, `webhook`) 500'd immediately.
+
+A real gap in this session's verification: balance-checking confirms
+brace/paren matching, not that every referenced class actually
+resolves — this bug was syntactically valid PHP, so nothing in the
+checks used throughout this session would have caught it without
+either running the code or specifically checking for it. Caught
+immediately once a live server actually hit the route.
+
+Scanned every controller in the codebase for the same missing-import
+pattern once found — confirmed isolated to this one file, the only
+new controller created this session.
+
+### Files
+
+```
+app/Http/Controllers/Web/PaymentController.php   (add missing use App\Http\Controllers\Controller;)
+```
