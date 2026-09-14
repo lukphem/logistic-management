@@ -263,6 +263,24 @@
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <h2 class="mb-4 text-sm font-semibold text-ink-900">Waybill document</h2>
             <p class="mb-4 text-xs text-ink-500">The comprehensive contract and receipt issued for a shipment — sender/receiver declarations, full billing breakdown, and your own terms below. Separate from the shipping label above.</p>
+            <div class="mb-4">
+                <label class="mb-2 block text-sm font-medium text-ink-900">Waybill design <x-required /></label>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    @foreach ([
+                        'classic' => ['Classic', 'Traditional formal contract layout — two-column declarations, a bordered billing table, signature lines at the bottom.'],
+                        'modern' => ['Modern', 'Brand-colored header band, card-style sections, a cleaner and more visual take on the same content.'],
+                        'compact' => ['Compact', 'Denser layout for companies that prefer a shorter, single-page-guaranteed document with less whitespace.'],
+                    ] as $value => [$label, $description])
+                        <label class="flex cursor-pointer flex-col gap-1 rounded-lg border border-line p-3 text-sm has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
+                            <span class="flex items-center gap-2 font-medium text-ink-900">
+                                <input type="radio" name="waybill_design" value="{{ $value }}" @checked(old('waybill_design', $settings->waybill_design) === $value) class="border-line">
+                                {{ $label }}
+                            </span>
+                            <span class="text-xs text-ink-500">{{ $description }}</span>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Terms &amp; conditions <span class="text-xs font-normal text-ink-500">(optional — printed on every Waybill)</span></label>
                 <textarea name="waybill_terms" rows="6" placeholder="Liability limits, claims process, prohibited items, or whatever terms your business has settled on. Printed exactly as entered, one paragraph per line."

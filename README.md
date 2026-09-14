@@ -8376,3 +8376,102 @@ resources/views/shipments/label/classic.blade.php   (per-piece iteration, page b
 resources/views/shipments/label/modern.blade.php   (per-piece iteration, page breaks)
 resources/views/shipments/label/compact.blade.php   (per-piece iteration, page breaks)
 ```
+
+## Increment 143 — Full Redesign: 6 Genuinely Separate Labels + 3 Waybill Designs + Print Bug Fixed
+
+### The print-toggle-on-paper bug, fixed at the root
+
+The size toggle/Print button showed up on actual printed output
+despite `@media print { .no-print { display: none; } }`. Root cause:
+the toolbar had an inline `style="display: flex"` — inline styles
+beat a class selector's rule regardless of media query, so the
+inline style won even when printing. Fixed everywhere by moving all
+toolbar styling into CSS classes (no inline `style` attributes left
+on any toolbar) and adding `!important` on the print-hide rule as a
+second layer of defense.
+
+### Labels: 6 genuinely separate templates, not 3 size-adaptive ones
+
+Previously one template per style tried to adapt to both sizes with
+an if/else. Now each style has two purpose-built templates —
+`classic-4x6`/`classic-2x1`, `modern-4x6`/`modern-2x1`,
+`compact-4x6`/`compact-2x1` — the 2×1 ones built from the ground up
+around "barcode + tracking number + receiver only," not a shrunk
+copy of the 4×6 layout. All three 4×6 designs got a real visual
+redesign along the way: a dominant "Deliver to" box (delivery is what
+matters most), a secondary "From" box, a service-type badge, and a
+tracking-number strip — matching how real courier labels are
+actually structured, not just three CSS re-skins of the same box
+layout.
+
+### Long content now genuinely never overflows the physical label
+
+Every template combines two layers of protection: `overflow-wrap:
+break-word` throughout (so a single very long word/URL wraps instead
+of pushing past the label's edge), plus a small auto-fit script that
+measures actual rendered content height against the label's fixed
+physical size and progressively shrinks the font until it fits or
+hits a legibility floor. This is a real constraint of physical label
+sizes, not something CSS alone can guarantee for arbitrarily long
+text — the auto-fit script is what makes "always fits" actually true
+rather than aspirational.
+
+### Waybill: same 3-design treatment, plus a real margin fix
+
+New `waybill_design` setting (Settings → Waybill document), same
+deployment-wide-choice pattern as the label. Classic (the original
+two-column layout, refined), Modern (brand-colored header band,
+card-style sections), Compact (dense grid-table layout, smaller
+margins, built to keep most waybills on a single page). The "no
+margin" issue was `@page margin` only ever applying at actual print
+time — viewed in a browser (which is how you'd check it before
+printing), the content spanned the full window with nothing simulating
+a page. All three now render inside a centered, shadowed "paper" div
+on screen that matches how the document will actually look once
+printed, with that screen-only styling stripped out via `@media
+print` so it never doubles up with the real `@page` margin.
+
+### A second crash-pattern instance caught before shipping
+
+While building the Compact waybill, the exact same `@if` jammed
+against `}}` pattern that crashed a prior increment showed up again
+in a new spot. Caught by actually running the crash-pattern scan
+against every new file rather than assuming the earlier fix pattern
+was being followed correctly — fixed before delivery by breaking the
+inline conditional onto its own lines, same remedy as before.
+
+### Verified
+
+Balance-checked and crash-pattern-scanned individually after every
+file, then re-scanned all 9 touched print views together as a final
+pass — zero matches anywhere. Full repo balance check and
+duplicate-method scan: clean across 189 files. Verified against live
+MySQL: `waybill_design` persists correctly across all three values,
+and the view-resolution fallback logic (valid/null/invalid) matches
+intent for both `label_design` and `waybill_design`. Confirmed via
+direct grep that no toolbar anywhere still carries an inline `style`
+attribute, and that every print-hide rule carries `!important`.
+
+### Files
+
+```
+database/migrations/2026_03_15_000001_add_waybill_design_to_settings_table.php
+app/Models/Setting.php   (waybill_design)
+app/Http/Controllers/Web/SettingsController.php   (validation)
+app/Http/Controllers/Web/ShipmentController.php   (label() resolves {design}-{size} view, waybillDocument() resolves waybill design)
+resources/views/settings/edit.blade.php   (Waybill design selector)
+resources/views/shipments/label/classic-4x6.blade.php   (new, redesigned)
+resources/views/shipments/label/classic-2x1.blade.php   (new, purpose-built)
+resources/views/shipments/label/modern-4x6.blade.php   (new, redesigned)
+resources/views/shipments/label/modern-2x1.blade.php   (new, purpose-built)
+resources/views/shipments/label/compact-4x6.blade.php   (new, redesigned)
+resources/views/shipments/label/compact-2x1.blade.php   (new, purpose-built)
+resources/views/shipments/waybill/classic.blade.php   (new, refined + margin fix)
+resources/views/shipments/waybill/modern.blade.php   (new)
+resources/views/shipments/waybill/compact.blade.php   (new)
+```
+
+(`resources/views/shipments/label/classic.blade.php`,
+`modern.blade.php`, `compact.blade.php` and
+`resources/views/shipments/waybill-document.blade.php` from
+Increments 140/141 removed — superseded by the above.)

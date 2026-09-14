@@ -188,7 +188,13 @@ class ShipmentController extends Controller
         $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
         $clientLogoUrl = $shipment->clientAccount?->logo_url;
 
-        return view("shipments.label.{$design}", compact('shipment', 'settings', 'clientLogoUrl', 'printSize', 'pieces'));
+        // 4×6 and 2×1 are genuinely separate templates per design, not
+        // one adaptive template — a 4×6 has room for a proper visual
+        // hierarchy (FROM/TO boxes, a details table, a service-type
+        // banner); a 2×1 has to be built from the ground up around
+        // "receiver + tracking only fits," not a shrunk-down copy of
+        // the bigger layout.
+        return view("shipments.label.{$design}-{$printSize}", compact('shipment', 'settings', 'clientLogoUrl', 'printSize', 'pieces'));
     }
 
     /**
@@ -201,6 +207,21 @@ class ShipmentController extends Controller
      * wording of a liability/claims clause is a legal decision this
      * system has no business making for anyone.
      */
+    /**
+     * The comprehensive contract/receipt — legally distinct from the
+     * label above, which is only the routing sticker. Full sender/
+     * receiver declaration, the complete billing breakdown already
+     * shown on the shipment page, and whatever terms & conditions the
+     * company has entered (Settings → Waybill document → Terms &
+     * conditions) — printed exactly as entered, since the specific
+     * wording of a liability/claims clause is a legal decision this
+     * system has no business making for anyone.
+     *
+     * One of three designs (Settings → Waybill document → Waybill
+     * design), same deployment-wide-choice pattern as the label — a
+     * company issuing Waybills that looked different shipment to
+     * shipment would look unprofessional/inconsistent.
+     */
     public function waybillDocument(Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
@@ -208,7 +229,9 @@ class ShipmentController extends Controller
         $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientUser', 'clientAccount']);
         $settings = Setting::current();
 
-        return view('shipments.waybill-document', compact('shipment', 'settings'));
+        $design = in_array($settings->waybill_design, ['classic', 'modern', 'compact'], true) ? $settings->waybill_design : 'classic';
+
+        return view("shipments.waybill.{$design}", compact('shipment', 'settings'));
     }
 
 
