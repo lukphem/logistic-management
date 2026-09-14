@@ -206,9 +206,10 @@
             </div>
         </div>
 
-        {{-- Waybill --}}
+        {{-- Shipping label (the small sticker on the package) --}}
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
-            <h2 class="mb-4 text-sm font-semibold text-ink-900">Waybill design</h2>
+            <h2 class="mb-4 text-sm font-semibold text-ink-900">Shipping label</h2>
+            <p class="mb-4 text-xs text-ink-500">The barcode/QR sticker attached to the package for scanning and routing — not the Waybill document below, which is the full contract/receipt.</p>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-ink-900">Thermal label size <x-required /></label>
@@ -219,11 +220,20 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="flex items-end pb-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Code on label <x-required /></label>
+                    <select name="label_barcode_type"
+                            class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="qr" @selected(old('label_barcode_type', $settings->label_barcode_type) === 'qr')>QR code</option>
+                        <option value="barcode" @selected(old('label_barcode_type', $settings->label_barcode_type) === 'barcode')>1D barcode (Code128)</option>
+                    </select>
+                    <p class="mt-1 text-xs text-ink-500">QR for phone-camera scanning; 1D barcode for dedicated warehouse scanner hardware that only reads Code128.</p>
+                </div>
+                <div class="flex items-end pb-2 sm:col-span-2">
                     <label class="flex items-center gap-2 text-sm text-ink-900">
                         <input type="checkbox" name="waybill_show_qr" value="1"
                                @checked(old('waybill_show_qr', $settings->waybill_show_qr)) class="rounded border-line">
-                        Show QR code on waybill
+                        Show the code on the label at all
                     </label>
                 </div>
             </div>
@@ -244,7 +254,19 @@
                         </label>
                     @endforeach
                 </div>
-                <p class="mt-2 text-xs text-ink-500">Applies to every shipment's waybill — print any shipment's waybill after saving to see it in effect.</p>
+                <p class="mt-2 text-xs text-ink-500">A registered client's own logo prints alongside yours automatically when the shipment's booked against their account — nothing to configure here for that.</p>
+                <p class="mt-1 text-xs text-ink-500">Applies to every shipment's label — print any shipment's label after saving to see it in effect.</p>
+            </div>
+        </div>
+
+        {{-- Waybill (the full contract/receipt document) --}}
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <h2 class="mb-4 text-sm font-semibold text-ink-900">Waybill document</h2>
+            <p class="mb-4 text-xs text-ink-500">The comprehensive contract and receipt issued for a shipment — sender/receiver declarations, full billing breakdown, and your own terms below. Separate from the shipping label above.</p>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-ink-900">Terms &amp; conditions <span class="text-xs font-normal text-ink-500">(optional — printed on every Waybill)</span></label>
+                <textarea name="waybill_terms" rows="6" placeholder="Liability limits, claims process, prohibited items, or whatever terms your business has settled on. Printed exactly as entered, one paragraph per line."
+                          class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('waybill_terms', $settings->waybill_terms) }}</textarea>
             </div>
         </div>
 

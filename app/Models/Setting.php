@@ -12,8 +12,8 @@ class Setting extends Model
         'vat_percentage', 'maximum_delivery_attempts', 'volumetric_divisor', 'quote_validity_days', 'currency',
         'tracking_number_format', 'next_tracking_sequence',
         'account_number_format', 'allow_manual_account_number',
-        'waybill_thermal_size', 'waybill_show_qr', 'label_design',
-        'operating_regions', 'invoice_header', 'invoice_footer',
+        'waybill_thermal_size', 'waybill_show_qr', 'label_design', 'label_barcode_type',
+        'operating_regions', 'invoice_header', 'invoice_footer', 'waybill_terms',
         'supported_billing_models',
     ];
 

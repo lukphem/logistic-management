@@ -88,28 +88,62 @@ class ShipmentController extends Controller
      * would just quietly rewrite history on the record.
      */
     /**
-     * One of three layouts (Classic/Modern/Compact), chosen deployment-
-     * wide via Settings → Waybill design, never per-shipment — every
-     * label a company prints should look consistent. QR payload is
-     * just the tracking number (same value a rider or hub scans in
-     * manually), so any generic QR reader — not just this app's own
-     * scan flow — can read it back correctly.
+     * One of three layouts (Classic/Modern/Compact), each adaptive to
+     * both thermal sizes (4×6 gets full content, 2×1 drops to
+     * essentials only — same template, not a separate file per size,
+     * so the three styles can't drift out of sync with each other).
+     * Chosen deployment-wide via Settings → Shipping label, never
+     * per-shipment — every label a company prints should look
+     * consistent.
+     *
+     * The code payload is just the tracking number either way (QR or
+     * 1D barcode, per Settings → Code on label), same value a rider
+     * or hub scans in manually, so any generic scanner — not just
+     * this app's own scan flow — reads it back correctly.
+     *
+     * A registered client's own logo (ClientAccount::logo_url) prints
+     * alongside the company's own — nothing to configure per
+     * shipment, it's just whatever that specific booking account has
+     * uploaded, or absent entirely for a walk-in customer.
      */
-    public function waybill(Shipment $shipment): View
+    public function label(Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
 
-        $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub']);
+        $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientAccount']);
         $settings = Setting::current();
 
-        $qrSvg = null;
+        $codeSvg = null;
         if ($settings->waybill_show_qr) {
-            $qrSvg = \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($shipment->tracking_number);
+            $codeSvg = $settings->label_barcode_type === 'barcode'
+                ? (new \Picqer\Barcode\BarcodeGeneratorSVG())->getBarcode($shipment->tracking_number, \Picqer\Barcode\BarcodeGeneratorSVG::TYPE_CODE_128)
+                : \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($shipment->tracking_number);
         }
 
         $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
+        $clientLogoUrl = $shipment->clientAccount?->logo_url;
 
-        return view("shipments.waybill.{$design}", compact('shipment', 'settings', 'qrSvg'));
+        return view("shipments.label.{$design}", compact('shipment', 'settings', 'codeSvg', 'clientLogoUrl'));
+    }
+
+    /**
+     * The comprehensive contract/receipt — legally distinct from the
+     * label above, which is only the routing sticker. Full sender/
+     * receiver declaration, the complete billing breakdown already
+     * shown on the shipment page, and whatever terms & conditions the
+     * company has entered (Settings → Waybill document → Terms &
+     * conditions) — printed exactly as entered, since the specific
+     * wording of a liability/claims clause is a legal decision this
+     * system has no business making for anyone.
+     */
+    public function waybillDocument(Shipment $shipment): View
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientUser', 'clientAccount']);
+        $settings = Setting::current();
+
+        return view('shipments.waybill-document', compact('shipment', 'settings'));
     }
 
 

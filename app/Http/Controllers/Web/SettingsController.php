@@ -38,6 +38,8 @@ class SettingsController extends Controller
             'currency' => 'required|string|size:3',
             'waybill_thermal_size' => 'required|in:2x1,4x6',
             'label_design' => 'required|in:classic,modern,compact',
+            'label_barcode_type' => 'required|in:qr,barcode',
+            'waybill_terms' => 'nullable|string|max:5000',
             'waybill_show_qr' => 'sometimes|boolean',
             'operating_regions' => 'nullable|string',
             'invoice_header' => 'nullable|string|max:2000',

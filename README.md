@@ -8180,3 +8180,100 @@ resources/views/shipments/waybill/compact.blade.php   (new)
 resources/views/shipments/show.blade.php   (Print Waybill button)
 routes/web.php
 ```
+
+## Increment 140 — Fix Crash + Correct Label/Waybill Distinction + Real Waybill Document
+
+### The crash, fixed properly
+
+Traced the actual cause: `@if`/`@endif` sitting directly against
+adjacent text/interpolation with no whitespace on a dense line
+confuses Blade's directive parser in a way its brace-counting alone
+doesn't catch — braces stayed matched, the bug was structural.
+Rebuilt every conditional in these views as its own line rather than
+crammed inline; verified with a direct scan across all 4 new files
+for the exact pattern that caused it — zero matches.
+
+### The bigger correction: Label and Waybill are genuinely different documents
+
+What Increment 139 built and called "waybill" was actually the
+shipping label — confirmed and corrected. Now properly separated:
+
+**Shipping Label** (`shipments.label`) — the barcode/QR sticker for
+the outside of the package. Same three designs (Classic/Modern/
+Compact), but each is now **size-adaptive**: at 4×6" they show full
+content, at 2×1" they automatically drop to receiver + tracking
+number only — there's no room for sender/company branding at that
+size, so rather than overflow or shrink into unreadable text, the
+content itself changes. One template per style handles both sizes,
+so the three can't drift out of sync with each other over time.
+
+**Waybill** (`shipments.waybill`) — new, genuinely separate A4
+document: full sender/receiver declaration, the complete billing
+breakdown, a goods declaration, your own terms & conditions
+(Settings → Waybill document, printed exactly as entered — the
+specific wording of a liability/claims clause is a legal decision
+this system has no business making for anyone), and signature lines
+for sender and receiver.
+
+### Barcode or QR, your choice
+
+New Settings → Shipping label → "Code on label" toggle (QR vs 1D
+Code128 barcode) — QR for phone-camera scanning, 1D barcode for
+dedicated warehouse scanner hardware that only reads Code128. Added
+`picqer/php-barcode-generator` as a new dependency for this
+(**`composer install` needed** after pulling — this one wasn't
+already present, unlike dompdf/simple-qrcode from the last
+increment).
+
+### Client logo on the label
+
+A registered client's own logo (already existed on `ClientAccount`,
+unused until now) now prints alongside the company's own on the
+label automatically, resolved from whichever account actually booked
+the shipment — nothing to configure per shipment or account, and
+correctly absent for a walk-in customer.
+
+### More delivery-helpful information on the label
+
+Route (origin/destination hub codes or city names), promised
+delivery date, and packaging size added to the fuller (4×6) layouts
+— previously the label only showed addresses as raw text with no
+quick-glance routing or timing information.
+
+### Verified
+
+Balance-checked and duplicate-scanned after every edit. Full repo
+balance check: clean across 188 files. Directly scanned all 4 new
+print views for the exact crash pattern — zero matches. Verified
+against live MySQL: both new settings fields persist correctly, the
+full shipment → account → logo resolution chain works end to end,
+and the barcode/QR selection logic covers all three cases correctly.
+
+### What I couldn't verify
+
+Same limitation as last time — no PHP available in this sandbox to
+actually render and visually inspect the output, or to confirm
+`picqer/php-barcode-generator`'s exact API surface against a live
+install. The code follows that package's well-documented, stable
+API, but this is worth a real look — and a real `composer install`
+— before relying on it for a print run.
+
+### Files
+
+```
+database/migrations/2026_03_14_000001_add_label_barcode_and_waybill_terms_to_settings_table.php
+composer.json   (new dependency: picqer/php-barcode-generator)
+app/Models/Setting.php   (label_barcode_type, waybill_terms)
+app/Http/Controllers/Web/SettingsController.php   (validation)
+app/Http/Controllers/Web/ShipmentController.php   (waybill() renamed to label(), new waybillDocument())
+resources/views/settings/edit.blade.php   (Shipping label + Waybill document sections)
+resources/views/shipments/label/classic.blade.php   (rebuilt, size-adaptive)
+resources/views/shipments/label/modern.blade.php   (rebuilt, size-adaptive)
+resources/views/shipments/label/compact.blade.php   (rebuilt)
+resources/views/shipments/waybill-document.blade.php   (new)
+resources/views/shipments/show.blade.php   (Print Label + Print Waybill buttons)
+routes/web.php
+```
+
+(`resources/views/shipments/waybill/` from Increment 139 removed —
+superseded by `label/`.)

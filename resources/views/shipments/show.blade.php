@@ -35,6 +35,7 @@
             </p>
         </div>
         <div class="flex items-center gap-3">
+            <a href="{{ route('shipments.label', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Label</a>
             <a href="{{ route('shipments.waybill', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Waybill</a>
             @can('shipments:update')
                 @if (! in_array($shipment->current_status, ['delivered', 'returned'], true))
