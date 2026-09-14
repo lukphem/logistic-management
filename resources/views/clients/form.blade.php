@@ -218,7 +218,28 @@
             </div>
         </div>
 
-        {{-- ============ 5. STAFF ASSIGNMENT — internal, decided last ============ --}}
+        {{-- ============ 5. PAYMENT — cash or credit, decided at setup ============ --}}
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <p class="text-sm font-semibold text-ink-900">Payment <x-required /></p>
+            <p class="mt-0.5 mb-3 text-xs text-ink-500">How this account settles for shipments — set once here, editable later from the Accounts tab if it ever changes.</p>
+            <div class="flex flex-wrap gap-4">
+                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                    <input type="radio" name="payment_type" value="cash" @checked(old('payment_type', $profile->payment_type ?? 'cash') === 'cash') class="border-line" onchange="document.getElementById('client-credit-limit-field').classList.add('hidden')">
+                    Cash
+                </label>
+                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                    <input type="radio" name="payment_type" value="credit" @checked(old('payment_type', $profile->payment_type ?? 'cash') === 'credit') class="border-line" onchange="document.getElementById('client-credit-limit-field').classList.remove('hidden')">
+                    Credit
+                </label>
+            </div>
+            <div id="client-credit-limit-field" class="mt-3 max-w-xs {{ old('payment_type', $profile->payment_type ?? 'cash') === 'credit' ? '' : 'hidden' }}">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Credit limit <x-required /></label>
+                <input type="number" step="0.01" min="0" name="credit_limit" value="{{ old('credit_limit', $profile->credit_limit) }}"
+                       class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+            </div>
+        </div>
+
+        {{-- ============ 6. STAFF ASSIGNMENT — internal, decided last ============ --}}
         <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
             <p class="text-sm font-semibold text-ink-900">Staff assignment</p>
             <p class="mt-0.5 mb-3 text-xs text-ink-500">Who owns this client relationship day to day.</p>

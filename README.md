@@ -8676,3 +8676,80 @@ resources/views/shipments/label/modern-2x1.blade.php
 resources/views/shipments/label/compact-4x6.blade.php
 resources/views/shipments/label/compact-2x1.blade.php
 ```
+
+## Increment 148 — Outlet Configuration (Cash, Billing Methods, Service Types, Discount) + Payment Type Required at Client Setup
+
+### Outlets get real configuration for the first time
+
+Was just name/code/hub/location before this — `can_collect_cash`,
+`disabled_billing_models`, `disabled_service_type_ids`, and
+`discount_percentage` added, mirroring `ClientAccount`'s own
+established patterns exactly rather than inventing new shapes:
+
+- **Cash collection** — simple yes/no, defaults to yes (nothing
+  newly blocked for any outlet that's never had this touched)
+- **Billing methods** — same "null/empty = unrestricted" opt-out
+  shape as `ClientAccount::disabled_billing_models`. The form itself
+  shows the intuitive inverse (which methods are *enabled*, checked
+  by default) and the controller computes the disabled set from
+  what's missing — same UX pattern already used for client accounts
+  (`ClientController::updateDisabledBillingModels`), so an outlet
+  configured for "Fleet and Origin-to-Destination only, no Zoning and
+  Weight for walk-ins" looks and works the same way a client
+  account's own billing restriction does
+- **Service types** — same enabled/disabled shape, keyed to real
+  `service_types.id` values rather than a name/code match
+- **Discount** — flat percentage off the standard tariff, deliberately
+  simpler than `ClientAccount`'s discount mechanism (which has a
+  whole per-service-type table behind it) — this is a single number
+  for a walk-in shipment booked at this outlet, not a contracted
+  client relationship with negotiated per-service rates
+
+Wiring these into actual shipment pricing/validation (which billing
+models a walk-in can actually pick at a given outlet, applying the
+outlet's discount) is the natural next step, but needs one more
+thing confirmed first: how a walk-in shipment's booking outlet gets
+determined in the first place (the logged-in staff member's own
+outlet seems like the obvious answer, but wanted to flag rather than
+assume before wiring pricing around it).
+
+### Payment type now required at setup, for every client account
+
+`payment_type`/`credit_limit` already existed and were already
+`required` — but only on the *edit* action
+(`updateAccountBillingInfo`), never on creation. A brand-new account
+(the client's own Default Account at registration, or any secondary
+account added later) could sit with whatever the database column
+default happened to be until someone went and explicitly edited it.
+Now required at both points: the client registration form gets a new
+Payment section (Cash/Credit radio, credit limit field that only
+appears when Credit is picked), and the "+ Add account" form gets the
+same. Every existing account already has a `payment_type` value from
+the column's original default, so this doesn't break editing any
+account created before this change — the edit form correctly
+pre-selects whatever's already saved.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned, and nested-form-checked after
+every edit. Full repo balance check and duplicate-method scan: clean
+across 194 files. Verified outlet configuration persists correctly
+against live MySQL. Simulated the enabled→disabled inversion logic
+across four cases, including the exact "Fleet + Origin-to-Destination
+enabled, Zoning and Weight disabled" scenario — matches intent.
+Simulated the `payment_type`/`credit_limit` validation across five
+cases. Confirmed every existing client account already has a
+`payment_type` value, so the newly-required validation doesn't strand
+any existing account's edit flow.
+
+### Files
+
+```
+database/migrations/2026_03_17_000001_add_configuration_to_outlets_table.php
+app/Models/Outlet.php   (fillable/casts, usesBillingModel(), allowsServiceType(), discountFraction())
+app/Http/Controllers/Web/OutletController.php   (validation, enabled->disabled inversion)
+resources/views/outlets/form.blade.php   (cash/billing-methods/service-types/discount fields)
+app/Http/Controllers/Web/ClientController.php   (payment_type/credit_limit required in validateForm(), accountData(), storeAccount())
+resources/views/clients/form.blade.php   (Payment section)
+resources/views/clients/show.blade.php   (Payment section on Add-account form)
+```

@@ -621,6 +621,24 @@
                 </div>
                 <p class="text-xs text-ink-500">State/City/Outlet assignment, tax/VAT, and charges can be set from this account's Profile and Billing &amp; Invoicing sections once it's created.</p>
 
+                <div>
+                    <label class="mb-2 block text-xs font-medium text-ink-900">Payment <x-required /></label>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="radio" name="payment_type" value="cash" checked class="border-line" onchange="document.getElementById('new-account-credit-limit').classList.add('hidden')">
+                            Cash
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="radio" name="payment_type" value="credit" class="border-line" onchange="document.getElementById('new-account-credit-limit').classList.remove('hidden')">
+                            Credit
+                        </label>
+                    </div>
+                    <div id="new-account-credit-limit" class="mt-2 hidden max-w-xs">
+                        <label class="mb-1 block text-xs font-medium text-ink-900">Credit limit <x-required /></label>
+                        <input type="number" step="0.01" min="0" name="credit_limit" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                    </div>
+                </div>
+
                 <div class="flex justify-end">
                     <button type="submit" class="rounded-md border border-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-[var(--brand-primary)] transition hover:bg-[var(--brand-primary)]/5">+ Add account</button>
                 </div>

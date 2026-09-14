@@ -330,6 +330,8 @@ class ClientController extends Controller
             'logo' => 'nullable|image|max:2048',
             'address' => 'nullable|string|max:1000',
             'billing_address' => 'nullable|string|max:1000',
+            'payment_type' => 'required|in:cash,credit',
+            'credit_limit' => 'required_if:payment_type,credit|nullable|numeric|min:0',
         ]);
         $data = $this->validated($validator, $user, 'accounts');
 
@@ -353,6 +355,8 @@ class ClientController extends Controller
             'address' => $data['address'] ?? null,
             'billing_address' => $data['billing_address'] ?? null,
             'created_by' => auth()->id(),
+            'payment_type' => $data['payment_type'],
+            'credit_limit' => $data['payment_type'] === 'credit' ? $data['credit_limit'] : null,
         ]);
 
         return $this->redirectToTab($user, 'accounts', "Account \"{$data['account_name']}\" created — its Billing Setup, Profile, and other details are already configurable directly, no need to switch to it first.");
@@ -1990,6 +1994,8 @@ class ClientController extends Controller
             'alternate_phone' => $data['alternate_phone'] ?? null,
             'billing_address' => $data['billing_address'] ?? null,
             'business_manager_id' => $data['business_manager_id'] ?? null,
+            'payment_type' => $data['payment_type'],
+            'credit_limit' => $data['payment_type'] === 'credit' ? ($data['credit_limit'] ?? null) : null,
         ];
     }
 
@@ -2048,6 +2054,8 @@ class ClientController extends Controller
             'alternate_phone' => 'nullable|string|max:30',
             'billing_address' => 'nullable|string|max:1000',
             'business_manager_id' => 'nullable|exists:users,id',
+            'payment_type' => 'required|in:cash,credit',
+            'credit_limit' => 'required_if:payment_type,credit|nullable|numeric|min:0',
         ]);
 
         $data = $validator->validate();

@@ -7,9 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Outlet extends Model
 {
-    protected $fillable = ['hub_id', 'name', 'code', 'short_code', 'address', 'latitude', 'longitude', 'is_active'];
+    protected $fillable = ['hub_id', 'name', 'code', 'short_code', 'address', 'latitude', 'longitude', 'is_active', 'can_collect_cash', 'disabled_billing_models', 'disabled_service_type_ids', 'discount_percentage'];
 
-    protected $casts = ['is_active' => 'boolean'];
+    protected $casts = [
+        'is_active' => 'boolean',
+        'can_collect_cash' => 'boolean',
+        'disabled_billing_models' => 'array',
+        'disabled_service_type_ids' => 'array',
+        'discount_percentage' => 'float',
+    ];
 
     protected static function booted(): void
     {
@@ -40,5 +46,32 @@ class Outlet extends Model
     public function hub(): BelongsTo
     {
         return $this->belongsTo(Hub::class);
+    }
+
+    /**
+     * Same "null/empty = unrestricted" shape as
+     * ClientAccount::usesBillingModel() — an outlet that's never had
+     * this touched allows every billing model the company itself
+     * supports.
+     */
+    public function usesBillingModel(string $billingModel): bool
+    {
+        return ! in_array($billingModel, $this->disabled_billing_models ?? [], true);
+    }
+
+    public function allowsServiceType(int $serviceTypeId): bool
+    {
+        return ! in_array($serviceTypeId, $this->disabled_service_type_ids ?? [], true);
+    }
+
+    /**
+     * Flat, not per-service-type — a single negotiated-in-house
+     * discount off the standard tariff for a walk-in shipment booked
+     * at this outlet, not a contracted client relationship. See
+     * ShipmentPricingService for where this actually gets applied.
+     */
+    public function discountFraction(): float
+    {
+        return $this->discount_percentage / 100;
     }
 }

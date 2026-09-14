@@ -68,6 +68,48 @@
             Active
         </label>
 
+        <label class="flex items-center gap-2 text-sm text-ink-900">
+            <input type="checkbox" name="can_collect_cash" value="1" @checked(old('can_collect_cash', $outlet->can_collect_cash ?? true)) class="rounded border-line">
+            Can collect cash
+        </label>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-ink-900">Billing methods available here</label>
+            <div class="flex flex-wrap gap-4">
+                @foreach (\App\Models\Setting::current()->supportedBillingModels() as $value => $label)
+                    @php $enabled = old('enabled_billing_models', array_diff(array_keys(\App\Models\Setting::current()->supportedBillingModels()), $outlet->disabled_billing_models ?? [])); @endphp
+                    <label class="flex items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" name="enabled_billing_models[]" value="{{ $value }}" @checked(in_array($value, $enabled)) class="rounded border-line">
+                        {{ $label }}
+                    </label>
+                @endforeach
+            </div>
+            <p class="mt-1 text-xs text-ink-500">Which billing methods a walk-in shipment booked at this outlet can use — e.g. an agent counter that only ever does Fleet or Origin-to-Destination for walk-ins, never Zoning and Weight.</p>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-ink-900">Service types available here</label>
+            <div class="flex flex-wrap gap-4">
+                @foreach ($serviceTypes as $serviceType)
+                    @php $enabledTypes = old('enabled_service_type_ids', array_diff($serviceTypes->pluck('id')->all(), $outlet->disabled_service_type_ids ?? [])); @endphp
+                    <label class="flex items-center gap-2 text-sm text-ink-900">
+                        <input type="checkbox" name="enabled_service_type_ids[]" value="{{ $serviceType->id }}" @checked(in_array($serviceType->id, $enabledTypes)) class="rounded border-line">
+                        {{ $serviceType->name }}
+                    </label>
+                @endforeach
+            </div>
+        </div>
+
+        <div>
+            <label class="mb-1 block text-sm font-medium text-ink-900">Discount on standard tariff <x-required /></label>
+            <div class="flex items-center gap-2">
+                <input type="number" step="0.01" min="0" max="100" name="discount_percentage" value="{{ old('discount_percentage', $outlet->discount_percentage ?? 0) }}"
+                       class="w-28 rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <span class="text-sm text-ink-500">%</span>
+            </div>
+            <p class="mt-1 text-xs text-ink-500">Applied to the standard tariff for a walk-in shipment booked at this outlet — 0 means no discount.</p>
+        </div>
+
         <div class="flex justify-end gap-3 pt-2">
             <a href="{{ route('outlets.index') }}" class="rounded-md px-4 py-2 text-sm font-medium text-ink-500 hover:bg-surface-50">Cancel</a>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
