@@ -40,6 +40,7 @@ class SettingsController extends Controller
             'label_design' => 'required|in:classic,modern,compact',
             'label_barcode_type' => 'required|in:qr,barcode',
             'waybill_terms' => 'nullable|string|max:5000',
+            'waybill_design' => 'required|in:classic,modern,compact',
             'waybill_show_qr' => 'sometimes|boolean',
             'operating_regions' => 'nullable|string',
             'invoice_header' => 'nullable|string|max:2000',
