@@ -37,6 +37,13 @@
         <div class="flex items-center gap-3">
             <a href="{{ route('shipments.label', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Label</a>
             <a href="{{ route('shipments.waybill', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Waybill</a>
+            @if (\App\Models\Setting::current()->paystack_enabled)
+                @if ($shipment->payment_status === 'paid')
+                    <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-3 py-1 text-sm font-medium text-status-delivered">Paid</span>
+                @else
+                    <a href="{{ route('payments.pay', $shipment) }}" class="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90">Pay with Paystack</a>
+                @endif
+            @endif
             @can('shipments:update')
                 @if (! in_array($shipment->current_status, ['delivered', 'returned'], true))
                     <a href="{{ route('shipments.edit', $shipment) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Edit</a>
@@ -203,6 +210,15 @@
                     <div class="flex justify-between"><dt class="text-ink-500">Insurance</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->insurance_amount, 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-ink-500">VAT</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->vat_amount, 2) }}</dd></div>
                     <div class="flex justify-between border-t border-line pt-2 font-semibold"><dt class="text-ink-900">Total</dt><dd class="font-mono text-ink-900">{{ number_format($shipment->total_amount, 2) }}</dd></div>
+                    <div class="flex justify-between pt-1">
+                        <dt class="text-ink-500">Payment status</dt>
+                        <dd class="{{ $shipment->payment_status === 'paid' ? 'text-status-delivered' : ($shipment->payment_status === 'failed' ? 'text-status-exception' : 'text-ink-500') }} font-medium">
+                            {{ ucfirst($shipment->payment_status) }}
+                            @if ($shipment->paid_at)
+                                <span class="font-normal text-ink-500">({{ $shipment->paid_at->format('d M Y') }})</span>
+                            @endif
+                        </dd>
+                    </div>
                 </dl>
             </div>
         </div>

@@ -15,6 +15,7 @@ class Setting extends Model
         'waybill_thermal_size', 'waybill_show_qr', 'label_design', 'label_barcode_type',
         'operating_regions', 'invoice_header', 'invoice_footer', 'waybill_terms', 'waybill_design',
         'supported_billing_models',
+        'paystack_enabled', 'paystack_public_key', 'paystack_secret_key',
     ];
 
     protected $casts = [
@@ -27,6 +28,12 @@ class Setting extends Model
         'next_tracking_sequence' => 'integer',
         'allow_manual_account_number' => 'boolean',
         'supported_billing_models' => 'array',
+        'paystack_enabled' => 'boolean',
+        // Encrypted at rest — this is a live credential capable of
+        // initiating real charges, not something to sit in the
+        // database as plain text the way most other settings do.
+        // Laravel handles encrypt/decrypt transparently on read/write.
+        'paystack_secret_key' => 'encrypted',
     ];
 
     /**

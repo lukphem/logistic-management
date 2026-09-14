@@ -8516,3 +8516,101 @@ resolves correctly against live MySQL.
 ```
 app/Services/ShipmentPricingService.php   (calculateAccountOnforwardingFee(), summed into priceShipment())
 ```
+
+## Increment 145 — Paystack Payment Integration
+
+Built against Paystack's actual current docs (fetched directly
+rather than working from memory) — the redirect flow specifically
+(https://paystack.com/docs/payments/accept-payments/#redirect), not
+Popup/InlineJS, since this app is server-rendered Blade with no
+reason to add frontend JS just for this.
+
+### Settings → Payments
+
+New section: enable toggle, public key, secret key (encrypted at
+rest via Laravel's `encrypted` cast — this is a live credential
+capable of initiating real charges, not something to sit in the
+database as plain text the way most other settings do), and a
+read-only webhook URL to paste into Paystack's dashboard. No
+separate test/live mode toggle — Paystack's own key prefixes
+(pk_test_/sk_test_ vs pk_live_/sk_live_) already say which mode a
+given pair is for, enforced via validation
+(`starts_with:pk_test_,pk_live_` etc.), so a redundant mode flag
+would just be one more place the two could drift out of sync. The
+secret key is never re-displayed once saved (same pattern as a
+password field) — leaving it blank on save keeps the existing key
+rather than wiping it.
+
+### The three-part flow
+
+- **`pay()`** — generates a fresh reference per attempt (not per
+  shipment, since retrying a failed/abandoned payment needs a new
+  one — Paystack rejects a reused reference outright), initializes
+  the transaction for the shipment's own `total_amount`, stores the
+  reference immediately, redirects to Paystack's checkout
+- **`callback()`** — where the browser lands back after checkout.
+  Never trusted as proof of payment on its own, per Paystack's own
+  documentation — always re-verified against their records before a
+  shipment is ever marked paid here
+- **`webhook()`** — the actual source of truth, independent of
+  whether the person ever made it back to the callback URL at all
+  (closed tab, lost connection). Signature-verified first (HMAC
+  SHA512 of the raw request body against the secret key, per
+  https://paystack.com/docs/payments/webhooks/#signature-validation)
+  before anything else runs, and the paid amount is checked against
+  what was actually owed before marking anything paid — an
+  underpayment doesn't silently get accepted as settled
+
+### A few things worth being explicit about
+
+- The webhook route needed a CSRF exception (`bootstrap/app.php`) —
+  it's a server-to-server POST from Paystack's own infrastructure,
+  not a browser form submission, so trust comes from signature
+  verification inside the controller instead
+- Amount is naira everywhere a caller touches this — the kobo
+  conversion (Paystack's API requires amounts in the currency's
+  subunit) happens in exactly one place, `PaystackService`, so it
+  can't accidentally happen twice or be missed somewhere else
+- "Pay with Paystack" only shows on the shipment page when Paystack
+  is actually enabled, and only when the shipment isn't already paid
+  — a paid shipment shows a status pill instead, not another pay
+  button
+
+### Verified
+
+Balance-checked and duplicate-scanned after every file. Full repo
+balance check: clean across 195 files. Simulated the full lifecycle
+against live MySQL (reference stored on initiate → verified → marked
+paid, matching the sequence the real controller follows). Verified
+the amount-mismatch safety check across four cases including
+overpayment and underpayment. Verified the HMAC SHA512 signature
+computation independently in Python against the same inputs the PHP
+`hash_hmac()` call would receive, confirming it correctly matches a
+genuine payload and correctly rejects a tampered one. Confirmed the
+CSRF exception path matches the actual route URI exactly.
+
+### What I couldn't verify
+
+No PHP available in this sandbox to actually exercise the live HTTP
+calls to Paystack's API, or confirm Laravel's `encrypted` cast round
+-trips correctly against a real database connection. The
+implementation follows Laravel's and Paystack's own documented
+behavior closely, but a real test transaction (Paystack's test mode
+supports this without moving real money) is worth doing before
+relying on this for actual payments.
+
+### Files
+
+```
+database/migrations/2026_03_16_000001_add_paystack_settings_to_settings_table.php
+database/migrations/2026_03_16_000002_add_payment_tracking_to_shipments_table.php
+app/Models/Setting.php   (paystack_enabled/public_key/secret_key, encrypted cast)
+app/Models/Shipment.php   (payment_status/payment_reference/paid_at)
+app/Services/PaystackService.php   (new)
+app/Http/Controllers/Web/PaymentController.php   (new — pay/callback/webhook)
+app/Http/Controllers/Web/SettingsController.php   (validation, secret-key preserve-on-blank)
+bootstrap/app.php   (CSRF exception for the webhook route)
+routes/web.php   (payments.pay, payments.callback, payments.webhook)
+resources/views/settings/edit.blade.php   (Payments section)
+resources/views/shipments/show.blade.php   (Pay with Paystack button, payment status row)
+```

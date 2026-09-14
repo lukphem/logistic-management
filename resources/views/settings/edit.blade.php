@@ -288,6 +288,38 @@
             </div>
         </div>
 
+        {{-- Payments (Paystack) --}}
+        <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+            <h2 class="mb-1 text-sm font-semibold text-ink-900">Payments</h2>
+            <p class="mb-4 text-xs text-ink-500">Paystack — <a href="https://paystack.com/docs/payments/accept-payments/" target="_blank" class="text-[var(--brand-primary)] hover:underline">their setup docs</a> for reference. Test and live keys both work here — which one applies is decided by the key's own prefix (pk_test_/sk_test_ vs pk_live_/sk_live_), not a separate toggle.</p>
+
+            <label class="mb-4 flex items-center gap-2 text-sm text-ink-900">
+                <input type="checkbox" name="paystack_enabled" value="1" @checked(old('paystack_enabled', $settings->paystack_enabled)) class="rounded border-line">
+                Enable Paystack payments
+            </label>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Public key</label>
+                    <input type="text" name="paystack_public_key" value="{{ old('paystack_public_key', $settings->paystack_public_key) }}" placeholder="pk_test_… or pk_live_…"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Secret key</label>
+                    <input type="password" name="paystack_secret_key" value="" autocomplete="off" placeholder="{{ $settings->paystack_secret_key ? '•••••••••••••••••••• (saved — leave blank to keep it)' : 'sk_test_… or sk_live_…' }}"
+                           class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <p class="mt-1 text-xs text-ink-500">Never re-displayed once saved — only shown once, right when you paste it in. Leave blank to keep the current key.</p>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Webhook URL</label>
+                <input type="text" value="{{ route('payments.webhook') }}" readonly onclick="this.select()"
+                       class="w-full rounded-md border border-line bg-surface-50 px-3 py-2 text-sm font-mono text-ink-700 outline-none">
+                <p class="mt-1 text-xs text-ink-500">Paste this into your Paystack dashboard under Settings → API Keys &amp; Webhooks — <a href="https://paystack.com/docs/payments/webhooks/#go-live-checklist" target="_blank" class="text-[var(--brand-primary)] hover:underline">their webhook setup guide</a>. This confirms payment even if the person closes the tab right after paying, so it's the one that actually matters — the redirect back here is only a convenience, not the source of truth.</p>
+            </div>
+        </div>
+
         <div class="flex justify-end">
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
                 Save settings

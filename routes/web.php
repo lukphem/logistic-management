@@ -22,6 +22,7 @@ use App\Http\Controllers\Web\RouteController;
 use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
+use App\Http\Controllers\Web\PaymentController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StandardBillingController;
 use App\Http\Controllers\Web\StateController;
@@ -56,6 +57,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
     Route::get('/shipments/{shipment}/label', [ShipmentController::class, 'label'])->name('shipments.label');
     Route::get('/shipments/{shipment}/waybill', [ShipmentController::class, 'waybillDocument'])->name('shipments.waybill');
+    Route::get('/shipments/{shipment}/pay', [PaymentController::class, 'pay'])->name('payments.pay');
+    Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('payments.callback');
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
@@ -354,3 +357,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::delete('/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
     });
 });
+
+// Public — Paystack calls this directly from their own servers, no
+// staff session involved. Trust comes from signature verification
+// inside the controller, not from auth/staff middleware.
+Route::post('/payments/webhook', [PaymentController::class, 'webhook'])->name('payments.webhook');

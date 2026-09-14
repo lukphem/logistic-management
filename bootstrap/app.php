@@ -16,6 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'user_type' => \App\Http\Middleware\UserType::class,
             'staff' => \App\Http\Middleware\EnsureStaffUser::class,
         ]);
+
+        // Paystack's own webhook POST carries no CSRF token — it's not
+        // a browser form submission, it's a server-to-server call from
+        // Paystack's infrastructure. Trust for this route comes from
+        // signature verification inside the controller itself
+        // (PaystackService::verifyWebhookSignature), not from CSRF.
+        $middleware->validateCsrfTokens(except: [
+            'payments/webhook',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

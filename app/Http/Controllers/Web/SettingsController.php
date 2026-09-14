@@ -41,6 +41,9 @@ class SettingsController extends Controller
             'label_barcode_type' => 'required|in:qr,barcode',
             'waybill_terms' => 'nullable|string|max:5000',
             'waybill_design' => 'required|in:classic,modern,compact',
+            'paystack_enabled' => 'sometimes|boolean',
+            'paystack_public_key' => 'nullable|string|max:255|starts_with:pk_test_,pk_live_',
+            'paystack_secret_key' => 'nullable|string|max:255|starts_with:sk_test_,sk_live_',
             'waybill_show_qr' => 'sometimes|boolean',
             'operating_regions' => 'nullable|string',
             'invoice_header' => 'nullable|string|max:2000',
@@ -56,6 +59,14 @@ class SettingsController extends Controller
 
         $data['waybill_show_qr'] = $request->boolean('waybill_show_qr');
         $data['allow_manual_account_number'] = $request->boolean('allow_manual_account_number');
+        $data['paystack_enabled'] = $request->boolean('paystack_enabled');
+        // Left blank on the form on purpose (never re-displayed once
+        // saved, same as any secret credential) — submitting the form
+        // without retyping it should keep the existing key, not wipe
+        // it back to null.
+        if (! $request->filled('paystack_secret_key')) {
+            unset($data['paystack_secret_key']);
+        }
         $data['supported_billing_models'] = $data['supported_billing_models'] ?? [];
         $data['operating_regions'] = $request->filled('operating_regions')
             ? array_map('trim', explode(',', $request->operating_regions))
