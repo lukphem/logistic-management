@@ -17,6 +17,7 @@ class Shipment extends Model
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg', 'quantity', 'carton_size',
         'is_cod', 'cod_amount', 'cod_remitted_at', 'is_pickup_requested', 'pickup_amount',
         'payment_status', 'payment_reference', 'paid_at',
+        'collection_method', 'cash_collected_at', 'cash_settlement_id',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
         'sla_breached', 'promised_delivery_at', 'delivered_at',
@@ -29,6 +30,7 @@ class Shipment extends Model
         'is_pickup_requested' => 'boolean',
         'cod_remitted_at' => 'datetime',
         'paid_at' => 'datetime',
+        'cash_collected_at' => 'datetime',
         'promised_delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
     ];
@@ -220,6 +222,11 @@ class Shipment extends Model
     public function apiClient(): BelongsTo
     {
         return $this->belongsTo(\App\Models\ApiClient::class);
+    }
+
+    public function cashSettlement(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\CashSettlement::class);
     }
 
     public function assignedRider(): BelongsTo

@@ -142,6 +142,22 @@ class RiderController extends Controller
         return response()->json($location);
     }
 
+    /**
+     * Marks the cash a rider collected from the receiver as physically
+     * in hand — not yet "remitted" in the old sense (that concept is
+     * gone), but eligible for settlement: a hub/outlet staff member
+     * picks it up on the Reconciliation page along with whatever else
+     * is outstanding and pays the accumulated total to the company via
+     * Paystack in one batch. Same collection_method/cash_collected_at
+     * fields a walk-in's cash payment at an outlet counter uses — a
+     * receiver paying a rider cash on delivery is the same kind of
+     * event as a walk-in paying cash at a counter, so it flows through
+     * the same settlement mechanism rather than a separate one.
+     *
+     * Ownership check added here — the previous version let any
+     * authenticated rider mark any COD shipment collected, with no
+     * verification they were the one actually assigned to it.
+     */
     public function remitCod(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
@@ -158,7 +174,15 @@ class RiderController extends Controller
             return response()->json(['message' => 'Shipment is not a COD order'], 422);
         }
 
-        $shipment->update(['cod_remitted_at' => now()]);
+        if ($shipment->assigned_rider_id !== $request->user()->id) {
+            return response()->json(['message' => "This shipment isn't assigned to you"], 403);
+        }
+
+        if ($shipment->cash_collected_at) {
+            return response()->json(['message' => 'Already marked as collected'], 422);
+        }
+
+        $shipment->update(['collection_method' => 'cash', 'cash_collected_at' => now()]);
 
         return response()->json($shipment);
     }

@@ -321,6 +321,13 @@ class ShipmentController extends Controller
             'accountOptions' => \App\Models\ClientAccount::with('client:id,name')
                 ->orderBy('account_name')
                 ->get(['id', 'client_user_id', 'account_number', 'account_name']),
+            // Gates which payment-method options show at all — an
+            // outlet-scoped staff member's own outlet decides whether
+            // Cash is even offered here; hub/global staff have no
+            // single outlet to check against, so Cash is available by
+            // default for them (nothing to restrict it).
+            'bookingOutlet' => auth()->user()->outlet_id ? \App\Models\Outlet::find(auth()->user()->outlet_id) : null,
+            'paystackEnabled' => Setting::current()->paystack_enabled,
         ]);
     }
 
@@ -539,11 +546,14 @@ class ShipmentController extends Controller
             }
         }
 
+        $collectionMethod = $this->resolveCollectionMethod($data);
+
         $shipment = Shipment::create([
             ...$data,
             'shipping_type' => $quote['shipping_type'],
             'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
             ...$pricing,
+            ...$collectionMethod,
         ]);
 
         return redirect()->route('shipments.show', $shipment)->with('status', "Shipment {$shipment->tracking_number} created.");
@@ -657,6 +667,7 @@ class ShipmentController extends Controller
             'vat_amount' => $result['vat_amount'] ?? 0,
             'total_amount' => $result['total_amount'] ?? 0,
             'promised_delivery_at' => ($result['transit_days'] ?? null) ? now()->addDays($result['transit_days']) : null,
+            ...$this->resolveCollectionMethod($data),
         ]);
 
         $quote->update([
@@ -666,6 +677,29 @@ class ShipmentController extends Controller
         ]);
 
         return redirect()->route('shipments.show', $shipment)->with('status', "Shipment {$shipment->tracking_number} created from quote {$quote->quote_number}.");
+    }
+
+    /**
+     * Cash chosen at booking means cash was physically handed over
+     * right then — collection_method/cash_collected_at set
+     * immediately, making the shipment eligible for the Reconciliation
+     * page the moment it's created. Paystack chosen (or nothing
+     * chosen — e.g. an account-based shipment, where this selector
+     * doesn't apply) leaves both null; payment happens later through
+     * the existing "Pay with Paystack" button on the shipment page,
+     * same as it already did before this feature existed.
+     */
+    private function resolveCollectionMethod(array $data): array
+    {
+        if (($data['payment_method'] ?? null) === 'cash') {
+            return ['collection_method' => 'cash', 'cash_collected_at' => now()];
+        }
+
+        if (($data['payment_method'] ?? null) === 'paystack') {
+            return ['collection_method' => 'paystack'];
+        }
+
+        return [];
     }
 
     /**
@@ -731,6 +765,7 @@ class ShipmentController extends Controller
             'cod_amount' => 'nullable|numeric|min:0',
             'insured' => 'sometimes|boolean',
             'declared_value' => 'nullable|numeric|min:0',
+            'payment_method' => 'nullable|in:cash,paystack',
         ]);
 
         if ($validator->fails()) {

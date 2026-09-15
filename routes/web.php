@@ -23,6 +23,7 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
+use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StandardBillingController;
 use App\Http\Controllers\Web\StateController;
@@ -59,6 +60,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::get('/shipments/{shipment}/waybill', [ShipmentController::class, 'waybillDocument'])->name('shipments.waybill');
     Route::get('/shipments/{shipment}/pay', [PaymentController::class, 'pay'])->name('payments.pay');
     Route::get('/payments/callback', [PaymentController::class, 'callback'])->name('payments.callback');
+    Route::get('/reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
+    Route::post('/reconciliation', [ReconciliationController::class, 'store'])->name('reconciliation.store');
+    Route::get('/cash-settlements/{settlement}/pay', [PaymentController::class, 'paySettlement'])->name('payments.pay-settlement');
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');

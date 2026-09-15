@@ -8753,3 +8753,91 @@ app/Http/Controllers/Web/ClientController.php   (payment_type/credit_limit requi
 resources/views/clients/form.blade.php   (Payment section)
 resources/views/clients/show.blade.php   (Payment section on Add-account form)
 ```
+
+## Increment 149 — Cash Settlement via Paystack (Reconciliation)
+
+Full pivot from "cash tracking" to "cash *settlement*" — physically
+collected money (a walk-in paying an outlet counter, or a receiver
+paying a rider COD on delivery) is never treated as "paid" on its
+own; it becomes paid only once it's actually reached the company
+electronically, via one Paystack transaction covering everything
+selected.
+
+### The mechanism
+
+`collection_method`/`cash_collected_at` on shipments replace the old,
+COD-only `cod_remitted_at` flag — deliberately not COD-specific,
+since a walk-in's counter cash and a rider's delivery cash are the
+same situation: money physically collected, still needing to reach
+the company. A shipment becomes eligible for settlement the moment
+either happens.
+
+New **Reconciliation** page (nav entry added): lists every
+cash-collected, unsettled shipment the logged-in staff member has
+access to — same outlet/hub/global scoping the shipments list
+already uses, so cash you can't see or touch never shows up to
+settle. Select some or all, hit "Settle selected via Paystack," and
+one transaction is initialized for the combined total — not one per
+shipment. Confirmed the same way single-shipment payments already
+are (never trusted from the redirect alone, always re-verified
+against Paystack's own records, webhook is the authoritative source
+independent of whether the browser made it back), and a settlement
+being confirmed paid cascades `payment_status = 'paid'` to every
+shipment inside it in one update.
+
+### Booking gets a payment-method choice
+
+New "Payment method" section on the shipment create form — Cash or
+Paystack, shown only when at least one is actually available.
+Whether Cash shows up depends on the booking staff member's own
+outlet (`Outlet::can_collect_cash`, from last increment) — hub/global
+staff have no single outlet to check against, so Cash is available by
+default for them. Choosing Cash sets `collection_method`/
+`cash_collected_at` immediately (cash was physically handed over
+right then); choosing Paystack (or nothing, e.g. an account-based
+shipment where this doesn't apply) leaves it for the existing "Pay
+with Paystack" button to handle later, unchanged from before this
+feature.
+
+### The rider side, and a real gap closed along the way
+
+`RiderController::remitCod()` now sets the same shared fields
+instead of the old `cod_remitted_at` — a receiver's COD cash flows
+into the exact same settlement pool a walk-in's counter cash does,
+one reconciliation mechanism for both rather than two separate ones.
+While already in this method: added the ownership check that was
+missing before — the previous version let any authenticated rider
+mark *any* COD shipment collected, with no verification they were
+the one actually assigned to it.
+
+### Verified
+
+Balance-checked, duplicate-scanned, and crash-pattern-scanned after
+every file. Full repo balance check: clean across 197 files.
+Re-scanned every controller for the earlier missing-`Controller`-
+import bug specifically — clean, including confirming
+`ReconciliationController`'s fully-qualified-name approach resolves
+correctly too. Simulated the full lifecycle end-to-end against live
+MySQL: a cash-booked shipment appears eligible, gets bundled into a
+settlement, the settlement being marked paid cascades to the
+shipment, and the eligibility query correctly excludes it afterward.
+Simulated the collection-method resolution logic across all four
+input cases.
+
+### Files
+
+```
+database/migrations/2026_03_18_000001_add_cash_settlement_system.php
+app/Models/CashSettlement.php   (new)
+app/Models/Shipment.php   (collection_method/cash_collected_at/cash_settlement_id, cashSettlement())
+app/Http/Controllers/Api/RiderController.php   (remitCod() reworked, ownership check added)
+app/Http/Controllers/Web/PaymentController.php   (paySettlement(), settlement-aware callback/webhook)
+app/Http/Controllers/Web/ReconciliationController.php   (new)
+app/Http/Controllers/Web/ShipmentController.php   (payment_method validation, resolveCollectionMethod(), wired into store()/storeFromQuote())
+resources/views/reconciliation/index.blade.php   (new)
+resources/views/shipments/create.blade.php   (Payment method section)
+resources/views/shipments/show.blade.php   (collection/settlement status display)
+resources/views/components/icon.blade.php   (new wallet icon)
+resources/views/components/layouts/app.blade.php   (Reconciliation nav entry)
+routes/web.php   (reconciliation.index/store, payments.pay-settlement)
+```

@@ -425,6 +425,26 @@
                 </div>
             </div>
 
+            @if ((! $bookingOutlet || $bookingOutlet->can_collect_cash) || $paystackEnabled)
+                <div class="rounded-lg border border-dashed border-line p-4">
+                    <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Payment method <span class="normal-case text-ink-400">(for a walk-in paying now — leave unselected for an account-based shipment)</span></p>
+                    <div class="flex flex-wrap gap-6">
+                        @if (! $bookingOutlet || $bookingOutlet->can_collect_cash)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="cash" @checked(old('payment_method') === 'cash') class="border-line">
+                                Cash — collected now
+                            </label>
+                        @endif
+                        @if ($paystackEnabled)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="paystack" @checked(old('payment_method') === 'paystack') class="border-line">
+                                Paystack — pay after booking
+                            </label>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <div class="rounded-lg border border-dashed border-line p-4">
                 <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Not on a standard courier waybill — specific to this business</p>
                 <div class="flex flex-wrap gap-6">

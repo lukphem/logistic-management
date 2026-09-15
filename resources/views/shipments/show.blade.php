@@ -163,11 +163,27 @@
                     <dd class="text-ink-900">
                         @if ($shipment->is_cod)
                             {{ number_format($shipment->cod_amount, 2) }}
-                            {{ $shipment->cod_remitted_at ? '· remitted' : '· pending remittance' }}
+                            @if ($shipment->payment_status === 'paid')
+                                · settled
+                            @elseif ($shipment->cash_collected_at)
+                                · collected, pending settlement
+                            @else
+                                · pending collection
+                            @endif
                         @else
                             No
                         @endif
                     </dd>
+
+                    @if ($shipment->collection_method)
+                        <dt class="text-ink-500">Collection method</dt>
+                        <dd class="text-ink-900">
+                            {{ $shipment->collection_method === 'cash' ? 'Cash' : 'Paystack' }}
+                            @if ($shipment->collection_method === 'cash' && $shipment->cash_collected_at)
+                                <span class="text-xs text-ink-500">(collected {{ $shipment->cash_collected_at->format('d M Y') }}{{ $shipment->cashSettlement ? ', settled ' . $shipment->cashSettlement->paid_at?->format('d M Y') : '' }})</span>
+                            @endif
+                        </dd>
+                    @endif
 
                     <dt class="text-ink-500">Pickup requested</dt>
                     <dd class="text-ink-900">
