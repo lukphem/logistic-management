@@ -102,6 +102,23 @@ class RiderController extends Controller
 
         $shipment->update($shipmentUpdate);
 
+        // Milestone email — only for statuses staff have explicitly
+        // marked notify-worthy (ScanStatus::notify_customer), and only
+        // to whichever of receiver/sender email actually has one on
+        // file (most walk-in senders never give an email at all, and
+        // that's fine — this just quietly sends to whoever's
+        // reachable, never both-or-nothing). Queued via the Mailable's
+        // own ShouldQueue, so this never adds latency to the rider's
+        // own scan response even if the mail server is slow.
+        if ($scanStatus?->notify_customer) {
+            $recipients = array_filter([$shipment->receiver_email, $shipment->sender_email]);
+
+            if (! empty($recipients)) {
+                \Illuminate\Support\Facades\Mail::to($recipients)
+                    ->queue(new \App\Mail\ShipmentStatusUpdated($shipment, $scanStatus->label));
+            }
+        }
+
         return response()->json($scanEvent, 201);
     }
 

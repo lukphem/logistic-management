@@ -26,6 +26,7 @@
                     <th class="px-5 py-3 font-medium">Label</th>
                     <th class="px-5 py-3 font-medium">Ends shipment?</th>
                     <th class="px-5 py-3 font-medium">Delivery attempt?</th>
+                    <th class="px-5 py-3 font-medium">Notify customer?</th>
                     <th class="px-5 py-3"></th>
                 </tr>
             </thead>
@@ -49,6 +50,11 @@
                         <td class="px-5 py-3">
                             <input form="{{ $formId }}" type="checkbox" name="is_delivery_attempt" value="1" @checked($status->is_delivery_attempt)
                                    title="Scanning this status counts as a delivery attempt against the shipment's client's Maximum Delivery Attempt limit."
+                                   class="rounded border-line">
+                        </td>
+                        <td class="px-5 py-3">
+                            <input form="{{ $formId }}" type="checkbox" name="notify_customer" value="1" @checked($status->notify_customer)
+                                   title="Scanning this status emails the receiver (and sender, if their email is on file) that their shipment reached this milestone."
                                    class="rounded border-line">
                         </td>
                         <td class="px-5 py-3 text-right">
@@ -92,6 +98,10 @@
             <label class="flex items-center gap-2 pb-2 text-sm text-ink-900">
                 <input type="checkbox" name="is_delivery_attempt" value="1" class="rounded border-line">
                 Counts as a delivery attempt
+            </label>
+            <label class="flex items-center gap-2 pb-2 text-sm text-ink-900">
+                <input type="checkbox" name="notify_customer" value="1" class="rounded border-line">
+                Notify customer
             </label>
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:opacity-90 hover:shadow-md">
                 Add status

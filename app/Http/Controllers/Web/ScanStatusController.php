@@ -25,6 +25,7 @@ class ScanStatusController extends Controller
             'label' => 'required|string|max:100',
             'is_terminal' => 'sometimes|boolean',
             'is_delivery_attempt' => 'sometimes|boolean',
+            'notify_customer' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
@@ -32,6 +33,7 @@ class ScanStatusController extends Controller
         $data = $validator->validated();
         $data['is_terminal'] = $request->boolean('is_terminal');
         $data['is_delivery_attempt'] = $request->boolean('is_delivery_attempt');
+        $data['notify_customer'] = $request->boolean('notify_customer');
         $data['sort_order'] = (ScanStatus::withoutGlobalScopes()->max('sort_order') ?? 0) + 1;
 
         ScanStatus::create($data);
@@ -46,6 +48,7 @@ class ScanStatusController extends Controller
             'sort_order' => 'required|integer|min:0',
             'is_terminal' => 'sometimes|boolean',
             'is_delivery_attempt' => 'sometimes|boolean',
+            'notify_customer' => 'sometimes|boolean',
         ]);
 
         $validator->validate();
@@ -53,6 +56,7 @@ class ScanStatusController extends Controller
         $data = $validator->validated();
         $data['is_terminal'] = $request->boolean('is_terminal');
         $data['is_delivery_attempt'] = $request->boolean('is_delivery_attempt');
+        $data['notify_customer'] = $request->boolean('notify_customer');
 
         // key is intentionally not editable — it's what's stored on
         // historical shipments/scan_events, so renaming it would silently

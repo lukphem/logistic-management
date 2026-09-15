@@ -8952,3 +8952,87 @@ resources/views/shipments/show.blade.php   (Check status button)
 resources/views/components/layouts/app.blade.php   (Payments submenu group)
 routes/web.php   (payments.check-status, payment-reports.index)
 ```
+
+## Increment 151 — Public Tracking Page + Status-Change Email Notifications
+
+The first two items from the operational status/tracking process
+review — the two highest-priority gaps identified against standard
+courier practice (DHL/FedEx/UPS): a public tracking page (previously
+missing entirely — tracking only existed behind API auth) and
+proactive status-change notifications (previously nonexistent —
+`scan()` updated status but never told anyone).
+
+### Public tracking — no login required
+
+New `/track` page: enter a tracking number, see status and a visual
+timeline. Deliberately exposes far less than the existing
+authenticated API's own `track()` endpoint — no GPS coordinates, no
+photos/signatures, no handler names, no full addresses or phone
+numbers, no pricing. Just status, city-level route, and a scan
+history stripped to label + location + time, matching what a real
+courier's own public tracking page actually shows versus what stays
+internal. Two standalone branded pages (mirroring the login page's
+existing pattern, not the staff app's sidebar layout, since this
+isn't staff-facing).
+
+### Status-change email notifications
+
+New `ScanStatus::notify_customer` flag — staff-configurable per
+status, same established pattern as the existing
+`is_delivery_attempt` flag, rather than hardcoding which statuses
+matter. Seeded sensibly for a fresh install: Booked, Out for
+Delivery, Delivered, Exception, Returned, and Cancelled notify by
+default; Picked Up, In Transit, and Arrived at Hub don't — matching
+real courier practice of emailing on genuine milestones, not every
+single scan. Admin UI (Scan Statuses page) updated with the new
+checkbox in both the edit rows and the add-new form.
+
+`RiderController::scan()` now checks this flag after every status
+update and, if set, emails whichever of receiver/sender actually has
+an email on file (quietly skips if neither does — most walk-in
+senders never give one, and that's fine, not an error). The
+`ShipmentStatusUpdated` Mailable is queued via its own `ShouldQueue`,
+so a slow or failing mail send never adds latency to a rider's own
+scan API response, and it links straight back to the new public
+tracking page.
+
+### Verified
+
+Balance-checked, duplicate-scanned, and crash-pattern-scanned after
+every file. Full repo balance check: clean across 209 files.
+Re-scanned every controller for the missing-`Controller`-import bug
+from three increments back, confirming `TrackingController`'s
+fully-qualified-name approach resolves correctly too. Verified
+against live MySQL: the status-label resolution join works correctly
+for a real shipment, the `notify_customer` flag is readable and
+correctly set, a genuinely nonexistent tracking number returns zero
+rows (confirming the "not found" branch triggers correctly), and the
+label fallback for an unrecognized status key degrades gracefully
+rather than showing raw `snake_case`. Simulated the recipient-
+resolution logic (receiver only, sender only, both, neither) across
+all four cases.
+
+### What's still open from the original suggestion
+
+Two lower-priority items from that same review weren't touched this
+round: a distinct "delivery attempt failed" status separate from the
+generic "Exception" catch-all, and reason codes attached to
+exceptions (address issue, weather, customs hold, etc.). Both are
+natural follow-ups whenever there's appetite for them.
+
+### Files
+
+```
+database/migrations/2026_03_20_000001_add_notify_customer_to_scan_statuses_table.php
+app/Models/ScanStatus.php   (notify_customer)
+database/seeders/ScanStatusSeeder.php   (notify_customer defaults)
+app/Http/Controllers/Web/ScanStatusController.php   (notify_customer in store()/update())
+resources/views/scan-statuses/index.blade.php   (notify_customer checkbox)
+app/Http/Controllers/Web/TrackingController.php   (new)
+resources/views/tracking/search.blade.php   (new)
+resources/views/tracking/show.blade.php   (new)
+app/Mail/ShipmentStatusUpdated.php   (new)
+resources/views/emails/shipment-status-updated.blade.php   (new)
+app/Http/Controllers/Api/RiderController.php   (notification trigger in scan())
+routes/web.php   (tracking.search, tracking.submit, tracking.show)
+```

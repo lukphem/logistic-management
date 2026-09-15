@@ -32,11 +32,20 @@ use App\Http\Controllers\Web\TerritoryController;
 use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\VehicleTypeController;
+use App\Http\Controllers\Web\TrackingController;
 use App\Http\Controllers\Web\ZoneController;
 use App\Http\Controllers\Web\ZoneMappingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
+
+// Public — no login, same "type a tracking number" page every
+// courier's own website has. Deliberately placed outside every
+// auth/staff/guest middleware group below, since it isn't gated on
+// having an account at all, staff or otherwise.
+Route::get('/track', [TrackingController::class, 'search'])->name('tracking.search');
+Route::post('/track', [TrackingController::class, 'submit'])->name('tracking.submit');
+Route::get('/track/{trackingNumber}', [TrackingController::class, 'show'])->name('tracking.show');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'show'])->name('login');
