@@ -119,4 +119,84 @@ class PaystackService
 
         return hash_equals($expected, $signatureHeader);
     }
+
+    /**
+     * Every path that can mark a shipment paid — the browser callback,
+     * the webhook, and the scheduled requery command
+     * (app/Console/Commands/RequeryPendingPayments.php) — all funnel
+     * through this one method rather than each doing their own
+     * read-then-update. Locked inside a transaction so that if two of
+     * those paths fire within milliseconds of each other for the same
+     * reference (a real possibility — Paystack sends the webhook
+     * almost immediately, often before the browser has even finished
+     * redirecting back to the callback_url), the second one to reach
+     * this method waits for the first's lock to release, then sees the
+     * row already marked paid and does nothing — never a double
+     * update, never two "payment confirmed" notifications for the same
+     * payment.
+     *
+     * Returns whether this call is the one that actually applied the
+     * update (false if it was already paid, or the amount didn't
+     * match) — callers use this to word their message correctly rather
+     * than always claiming credit for confirming the payment.
+     */
+    public function markShipmentPaidIfDue(string $reference, int $paidKobo, bool $logMismatch = false): bool
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($reference, $paidKobo, $logMismatch) {
+            $shipment = \App\Models\Shipment::where('payment_reference', $reference)->lockForUpdate()->first();
+
+            if (! $shipment || $shipment->payment_status === 'paid') {
+                return false;
+            }
+
+            $expectedKobo = (int) round(((float) $shipment->total_amount) * 100);
+
+            if ($paidKobo < $expectedKobo) {
+                if ($logMismatch) {
+                    \Illuminate\Support\Facades\Log::warning("Paystack: amount mismatch for {$reference} — paid {$paidKobo} kobo, expected {$expectedKobo} kobo.");
+                }
+
+                return false;
+            }
+
+            $shipment->update(['payment_status' => 'paid', 'paid_at' => now()]);
+
+            return true;
+        });
+    }
+
+    /**
+     * The settlement equivalent of markShipmentPaidIfDue() above — same
+     * locking reasoning, same funnel-every-path-through-one-place
+     * approach. The cascade from "settlement paid" to "every shipment
+     * in it paid" happens inside the same locked transaction, so a
+     * concurrent read of any of those shipments' payment_status either
+     * sees the pre-settlement state or the fully-cascaded post-
+     * settlement state — never a half-applied cascade.
+     */
+    public function markSettlementPaidIfDue(string $reference, int $paidKobo, bool $logMismatch = false): bool
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($reference, $paidKobo, $logMismatch) {
+            $settlement = \App\Models\CashSettlement::where('payment_reference', $reference)->lockForUpdate()->first();
+
+            if (! $settlement || $settlement->status === 'paid') {
+                return false;
+            }
+
+            $expectedKobo = (int) round(((float) $settlement->total_amount) * 100);
+
+            if ($paidKobo < $expectedKobo) {
+                if ($logMismatch) {
+                    \Illuminate\Support\Facades\Log::warning("Paystack: settlement amount mismatch for {$reference} — paid {$paidKobo} kobo, expected {$expectedKobo} kobo.");
+                }
+
+                return false;
+            }
+
+            $settlement->update(['status' => 'paid', 'paid_at' => now()]);
+            $settlement->shipments()->update(['payment_status' => 'paid', 'paid_at' => now()]);
+
+            return true;
+        });
+    }
 }

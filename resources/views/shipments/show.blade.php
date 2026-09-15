@@ -42,6 +42,13 @@
                     <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-3 py-1 text-sm font-medium text-status-delivered">Paid</span>
                 @else
                     <a href="{{ route('payments.pay', $shipment) }}" class="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90">Pay with Paystack</a>
+                    @if ($shipment->payment_reference)
+                        <form method="POST" action="{{ route('payments.check-status') }}" class="inline">
+                            @csrf
+                            <input type="hidden" name="reference" value="{{ $shipment->payment_reference }}">
+                            <button type="submit" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Check status</button>
+                        </form>
+                    @endif
                 @endif
             @endif
             @can('shipments:update')

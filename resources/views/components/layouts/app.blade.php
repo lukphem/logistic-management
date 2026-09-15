@@ -48,8 +48,17 @@
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard', 'permission' => null],
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
-                        ['label' => 'Reconciliation', 'route' => 'reconciliation.index', 'icon' => 'wallet', 'permission' => null],
                         ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
+                    ];
+
+                    // Payments — Reconciliation (what's outstanding right
+                    // now, actionable) and Payment Reports (the full
+                    // paid/unpaid history) are different views of the
+                    // same underlying money, so they sit together as one
+                    // group rather than as two unrelated flat items.
+                    $paymentItems = [
+                        ['label' => 'Reconciliation', 'route' => 'reconciliation.index', 'icon' => 'wallet', 'permission' => null],
+                        ['label' => 'Payment Reports', 'route' => 'payment-reports.index', 'icon' => 'list-check', 'permission' => 'payments:read'],
                     ];
 
                     // Billing setup — nested inside Setups alongside
@@ -129,6 +138,11 @@
                     );
                     $topSetupItemVisible = ! $topSetupItem['permission'] || auth()->user()->can($topSetupItem['permission']);
 
+                    $visiblePaymentItems = collect($paymentItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $paymentsActive = collect($paymentItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
+
                     // Every Standard Billing sub-item shares the same
                     // route (standard-billing.index) — they're tabs on
                     // one page, not separate pages — so telling them
@@ -163,6 +177,28 @@
                         {{ $item['label'] }}
                     </a>
                 @endforeach
+
+                @if ($visiblePaymentItems->isNotEmpty())
+                    <details class="group/payments" @if($paymentsActive) open @endif>
+                        <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
+                            <x-icon name="wallet" class="h-[18px] w-[18px] shrink-0" />
+                            <span class="flex-1">Payments</span>
+                            <x-icon name="chevron" class="h-4 w-4 shrink-0 transition-transform group-open/payments:rotate-180" />
+                        </summary>
+
+                        <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                            @foreach ($visiblePaymentItems as $item)
+                                @php $active = request()->routeIs($item['route'] . '*'); @endphp
+                                <a href="{{ route($item['route']) }}"
+                                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                                          {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />
+                                    {{ $item['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
 
                 @if ($topSetupItemVisible || $visibleBillingItems->isNotEmpty() || $visibleLocationItems->isNotEmpty() || $visibleRestSetupItems->isNotEmpty())
                     <details class="group/setups" @if($setupsActive) open @endif>

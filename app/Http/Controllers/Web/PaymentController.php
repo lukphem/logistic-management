@@ -58,9 +58,9 @@ class PaymentController extends Controller
         }
 
         // Reference stored immediately, before the redirect — the
-        // callback/webhook only ever have the reference to work with,
-        // so this is what lets either of them find their way back to
-        // the right shipment.
+        // callback/webhook/requery only ever have the reference to
+        // work with, so this is what lets any of them find their way
+        // back to the right shipment.
         $shipment->update(['payment_reference' => $result['reference']]);
 
         return redirect()->away($result['authorization_url']);
@@ -71,9 +71,9 @@ class PaymentController extends Controller
      * shipments at once — one Paystack transaction for the settlement's
      * total_amount, not one per shipment. The shipments themselves
      * aren't touched here; they only become "paid" once this batch's
-     * own payment is confirmed (see markSettlementPaid()), so a
-     * settlement that's initialized but never completed leaves every
-     * shipment in it exactly as outstanding as before.
+     * own payment is confirmed (see PaystackService::markSettlementPaidIfDue()),
+     * so a settlement that's initialized but never completed leaves
+     * every shipment in it exactly as outstanding as before.
      */
     public function paySettlement(CashSettlement $settlement): RedirectResponse
     {
@@ -110,10 +110,19 @@ class PaymentController extends Controller
      * Where Paystack sends the browser back after checkout — never
      * trusted as proof of payment on its own (the person could close
      * the tab, lose connection, or the browser could simply be
-     * redirected here without a real charge succeeding). Always
+     * redirected here without a real charge succeeding — an
+     * "incomplete callback" in exactly this sense). Always
      * re-verified against Paystack's own records before anything is
      * ever marked paid here. Reference prefix decides which of the two
      * payment types (single shipment vs settlement batch) this is.
+     *
+     * If the person never makes it back here at all — closed tab, lost
+     * connection, browser crash — nothing in this method ever runs,
+     * and that's fine: the webhook (independent of this endpoint
+     * entirely) and the scheduled requery command
+     * (app/Console/Commands/RequeryPendingPayments.php) are what
+     * actually guarantee the payment still gets confirmed even when
+     * this callback never fires at all.
      */
     public function callback(Request $request): RedirectResponse
     {
@@ -133,25 +142,27 @@ class PaymentController extends Controller
             return redirect()->route('shipments.index')->withErrors(['payment' => 'Could not match this payment to a shipment.']);
         }
 
+        if ($shipment->payment_status === 'paid') {
+            return redirect()->route('shipments.show', $shipment)->with('status', 'Payment already confirmed for ' . $shipment->tracking_number . '.');
+        }
+
         $result = $this->paystack->verifyTransaction($reference);
 
         if (! $result['success']) {
             return redirect()->route('shipments.show', $shipment)->withErrors(['payment' => $result['message']]);
         }
 
-        if ($result['paid'] && $shipment->payment_status !== 'paid') {
-            $shipment->update(['payment_status' => 'paid', 'paid_at' => now()]);
+        if ($result['paid']) {
+            $applied = $this->paystack->markShipmentPaidIfDue($reference, (int) round(((float) $shipment->total_amount) * 100));
 
-            return redirect()->route('shipments.show', $shipment)->with('status', 'Payment confirmed for ' . $shipment->tracking_number . '.');
+            return redirect()->route('shipments.show', $shipment)->with('status', $applied
+                ? 'Payment confirmed for ' . $shipment->tracking_number . '.'
+                : 'Payment already confirmed for ' . $shipment->tracking_number . '.');
         }
 
-        if (! $result['paid']) {
-            $shipment->update(['payment_status' => 'failed']);
+        $shipment->update(['payment_status' => 'failed']);
 
-            return redirect()->route('shipments.show', $shipment)->withErrors(['payment' => 'Payment was not successful.']);
-        }
-
-        return redirect()->route('shipments.show', $shipment)->with('status', 'Payment already confirmed for ' . $shipment->tracking_number . '.');
+        return redirect()->route('shipments.show', $shipment)->withErrors(['payment' => 'Payment was not successful.']);
     }
 
     private function handleSettlementCallback(string $reference): RedirectResponse
@@ -162,25 +173,27 @@ class PaymentController extends Controller
             return redirect()->route('reconciliation.index')->withErrors(['payment' => 'Could not match this payment to a settlement.']);
         }
 
+        if ($settlement->status === 'paid') {
+            return redirect()->route('reconciliation.index')->with('status', 'This settlement was already confirmed.');
+        }
+
         $result = $this->paystack->verifyTransaction($reference);
 
         if (! $result['success']) {
             return redirect()->route('reconciliation.index')->withErrors(['payment' => $result['message']]);
         }
 
-        if ($result['paid'] && $settlement->status !== 'paid') {
-            $this->markSettlementPaid($settlement);
+        if ($result['paid']) {
+            $applied = $this->paystack->markSettlementPaidIfDue($reference, (int) round(((float) $settlement->total_amount) * 100));
 
-            return redirect()->route('reconciliation.index')->with('status', 'Settlement of ' . number_format($settlement->total_amount, 2) . ' confirmed — ' . $settlement->shipments()->count() . ' shipment(s) marked paid.');
+            return redirect()->route('reconciliation.index')->with('status', $applied
+                ? 'Settlement of ' . number_format($settlement->total_amount, 2) . ' confirmed — ' . $settlement->shipments()->count() . ' shipment(s) marked paid.'
+                : 'This settlement was already confirmed.');
         }
 
-        if (! $result['paid']) {
-            $settlement->update(['status' => 'failed']);
+        $settlement->update(['status' => 'failed']);
 
-            return redirect()->route('reconciliation.index')->withErrors(['payment' => 'Settlement payment was not successful.']);
-        }
-
-        return redirect()->route('reconciliation.index')->with('status', 'This settlement was already confirmed.');
+        return redirect()->route('reconciliation.index')->withErrors(['payment' => 'Settlement payment was not successful.']);
     }
 
     /**
@@ -212,65 +225,65 @@ class PaymentController extends Controller
             $paidKobo = (int) ($payload['data']['amount'] ?? 0);
 
             if ($reference && str_starts_with($reference, 'SETTLE-')) {
-                $this->webhookSettlement($reference, $paidKobo);
+                $this->paystack->markSettlementPaidIfDue($reference, $paidKobo, logMismatch: true);
             } elseif ($reference) {
-                $this->webhookShipment($reference, $paidKobo);
+                $this->paystack->markShipmentPaidIfDue($reference, $paidKobo, logMismatch: true);
             }
         }
 
         return response('OK', 200);
     }
 
-    private function webhookShipment(string $reference, int $paidKobo): void
+    /**
+     * A manual, on-demand version of the same requery the scheduled
+     * command runs automatically — for when someone doesn't want to
+     * wait for the next scheduled pass (RequeryPendingPayments runs
+     * every 10 minutes) and just wants to know right now whether a
+     * payment that never confirmed actually went through.
+     */
+    public function checkStatus(Request $request): RedirectResponse
     {
+        $reference = $request->input('reference');
+        $redirectRoute = str_starts_with((string) $reference, 'SETTLE-') ? 'reconciliation.index' : 'shipments.index';
+
+        if (! $reference) {
+            return redirect()->route($redirectRoute)->withErrors(['payment' => 'No reference to check.']);
+        }
+
+        $result = $this->paystack->verifyTransaction($reference);
+
+        if (! $result['success']) {
+            return redirect()->route($redirectRoute)->withErrors(['payment' => $result['message']]);
+        }
+
+        if (str_starts_with($reference, 'SETTLE-')) {
+            $settlement = CashSettlement::where('payment_reference', $reference)->first();
+
+            if (! $settlement) {
+                return redirect()->route('reconciliation.index')->withErrors(['payment' => 'Could not find this settlement.']);
+            }
+
+            if ($result['paid']) {
+                $this->paystack->markSettlementPaidIfDue($reference, (int) round(((float) $settlement->total_amount) * 100));
+
+                return redirect()->route('reconciliation.index')->with('status', 'Confirmed — settlement is paid.');
+            }
+
+            return redirect()->route('reconciliation.index')->with('status', 'Checked — this settlement has not been paid yet.');
+        }
+
         $shipment = Shipment::where('payment_reference', $reference)->first();
 
-        if (! $shipment || $shipment->payment_status === 'paid') {
-            return;
+        if (! $shipment) {
+            return redirect()->route('shipments.index')->withErrors(['payment' => 'Could not find this shipment.']);
         }
 
-        // Same amount check the docs call out explicitly — never mark
-        // paid on reference match alone without confirming the amount
-        // actually matches what was owed.
-        $expectedKobo = (int) round(((float) $shipment->total_amount) * 100);
+        if ($result['paid']) {
+            $this->paystack->markShipmentPaidIfDue($reference, (int) round(((float) $shipment->total_amount) * 100));
 
-        if ($paidKobo >= $expectedKobo) {
-            $shipment->update(['payment_status' => 'paid', 'paid_at' => now()]);
-        } else {
-            Log::warning("Paystack webhook: amount mismatch for {$reference} — paid {$paidKobo} kobo, expected {$expectedKobo} kobo.");
-        }
-    }
-
-    private function webhookSettlement(string $reference, int $paidKobo): void
-    {
-        $settlement = CashSettlement::where('payment_reference', $reference)->first();
-
-        if (! $settlement || $settlement->status === 'paid') {
-            return;
+            return redirect()->route('shipments.show', $shipment)->with('status', 'Confirmed — payment is paid.');
         }
 
-        $expectedKobo = (int) round(((float) $settlement->total_amount) * 100);
-
-        if ($paidKobo >= $expectedKobo) {
-            $this->markSettlementPaid($settlement);
-        } else {
-            Log::warning("Paystack webhook: settlement amount mismatch for {$reference} — paid {$paidKobo} kobo, expected {$expectedKobo} kobo.");
-        }
-    }
-
-    /**
-     * The cascade from "settlement batch paid" to "every shipment in
-     * it paid" — the single place this happens, called from both the
-     * callback (person's own browser) and the webhook (authoritative,
-     * independent of whether they ever got back to the callback).
-     * Guarded by the settlement's own status !== 'paid' check at both
-     * call sites, so this never double-runs even if both paths fire
-     * for the same settlement.
-     */
-    private function markSettlementPaid(CashSettlement $settlement): void
-    {
-        $settlement->update(['status' => 'paid', 'paid_at' => now()]);
-
-        $settlement->shipments()->update(['payment_status' => 'paid', 'paid_at' => now()]);
+        return redirect()->route('shipments.show', $shipment)->with('status', 'Checked — payment has not gone through yet.');
     }
 }

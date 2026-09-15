@@ -8841,3 +8841,114 @@ resources/views/components/icon.blade.php   (new wallet icon)
 resources/views/components/layouts/app.blade.php   (Reconciliation nav entry)
 routes/web.php   (reconciliation.index/store, payments.pay-settlement)
 ```
+
+## Increment 150 — Payment Integrity, Requeries, and Payment Reports
+
+### Preventing double payment — three layers
+
+1. **Database-level uniqueness** on `payment_reference` for both
+   shipments and settlements — verified directly: attempting to reuse
+   a reference across two rows now fails with a real duplicate-key
+   error at the database, not just discouraged by application logic.
+   Multiple `NULL` references (a shipment/settlement with no payment
+   attempted yet) still coexist freely, as standard SQL allows.
+2. **Race condition fixed in settlement creation** — two staff
+   members submitting overlapping shipment selections at nearly the
+   same moment could previously both read the same shipment as "still
+   eligible" before either update landed, letting it get claimed into
+   two different settlements. Now wrapped in a transaction with
+   `lockForUpdate()`, so the second request waits for the first to
+   finish and correctly sees the shipment as already claimed.
+3. **Every path that can mark something paid — the browser callback,
+   the webhook, and the new requery command below — now funnels
+   through one shared, lock-protected method** in `PaystackService`
+   (`markShipmentPaidIfDue`/`markSettlementPaidIfDue`) instead of each
+   duplicating its own read-then-update. Paystack's webhook often
+   arrives before the browser even finishes redirecting to the
+   callback — previously both could theoretically race to update the
+   same row; now the second to arrive sees the lock, waits, and
+   correctly finds it already paid.
+
+### What happens if the callback URL never completes
+
+This was already partially handled (the callback was never the only
+source of truth — the webhook always was), but there was no real
+answer for "what if the webhook missed it too." New scheduled command,
+`payments:requery-pending`, directly asks Paystack's own API about any
+payment reference still unconfirmed after 10 minutes — genuinely
+independent of both the callback and the webhook, so a payment that
+both of those missed (closed tab, lost connection, misconfigured
+webhook URL, a delivery hiccup on Paystack's end) still gets caught
+and confirmed automatically. Scheduled every 10 minutes in
+`routes/console.php`.
+
+A manual "Check status" button was also added to both the shipment
+page and the reconciliation page — the same requery, on demand,
+rather than waiting for the next scheduled pass.
+
+### Payment Reports — full history, paid and unpaid, per outlet
+
+New page (`payments:read` permission, new module added to the role
+seeder) showing every cash-collected shipment ever, not just what's
+currently outstanding — filterable by outlet, status, and date range,
+with paid/unpaid summary totals. Outlet-scoped staff automatically
+see only their own outlet's history through the same access-scoping
+already built into every staff account — "the outlet can access their
+own history" didn't need a separate outlet-facing page, just the
+existing scoping applied to this one too.
+
+### Navigation regrouped
+
+Reconciliation and Payment Reports — different views of the same
+underlying money (what's outstanding right now vs. the full history)
+— are now grouped under a collapsible "Payments" section rather than
+sitting as unrelated flat items, using the same collapsible-group
+pattern the existing "Setups" menu already established.
+
+### Verified
+
+Balance-checked, duplicate-scanned, and crash-pattern-scanned after
+every file. Full repo balance check: clean across 206 files.
+Re-scanned every controller for the missing-`Controller`-import bug
+from two increments back, including confirming both new controllers'
+fully-qualified-name approach resolves correctly. Directly confirmed
+against live MySQL that the unique constraint actually rejects a
+duplicate reference (real duplicate-key error, not just a theoretical
+protection) and that multiple `NULL` references still coexist fine.
+Verified the payment report's summary calculation against real
+inserted data (1 paid, 1 unpaid, correct totals). Simulated the
+10-minute requery cutoff across four boundary cases including the
+exact 10-minute mark.
+
+### Deployment note
+
+Laravel's scheduler (`Schedule::command(...)` in `routes/console.php`)
+only actually runs if something calls `php artisan schedule:run` every
+minute — on Linux this is normally a single cron entry
+(`* * * * * php artisan schedule:run`); on Windows/XAMPP this needs a
+Task Scheduler entry doing the same thing, since there's no cron.
+Without that one entry, the requery command exists but never
+actually fires on its own — the manual "Check status" button still
+works regardless, since it doesn't depend on the scheduler at all.
+
+Also: run `php artisan db:seed --class=RolePermissionSeeder` (safe to
+re-run — it's idempotent) to pick up the new `payments` permission
+module and its role assignments.
+
+### Files
+
+```
+database/migrations/2026_03_19_000001_add_unique_payment_reference_constraints.php
+app/Services/PaystackService.php   (markShipmentPaidIfDue(), markSettlementPaidIfDue())
+app/Http/Controllers/Web/PaymentController.php   (simplified to use shared service methods, new checkStatus())
+app/Http/Controllers/Web/ReconciliationController.php   (transaction + lockForUpdate() in store())
+app/Console/Commands/RequeryPendingPayments.php   (new)
+routes/console.php   (schedule entry)
+database/seeders/RolePermissionSeeder.php   (new payments module, role assignments)
+app/Http/Controllers/Web/PaymentReportController.php   (new)
+resources/views/payment-reports/index.blade.php   (new)
+resources/views/reconciliation/index.blade.php   (Check status button)
+resources/views/shipments/show.blade.php   (Check status button)
+resources/views/components/layouts/app.blade.php   (Payments submenu group)
+routes/web.php   (payments.check-status, payment-reports.index)
+```

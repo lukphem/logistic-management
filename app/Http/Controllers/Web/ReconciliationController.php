@@ -44,6 +44,22 @@ class ReconciliationController extends \App\Http\Controllers\Controller
      * outstanding as it was until the settlement's own Paystack
      * transaction is confirmed.
      */
+    /**
+     * Bundles whichever shipments were selected into one CashSettlement
+     * and hands off to PaymentController::paySettlement() to actually
+     * take payment — this action only ever builds the batch, it never
+     * touches payment_status itself. A shipment stays exactly as
+     * outstanding as it was until the settlement's own Paystack
+     * transaction is confirmed.
+     *
+     * Wrapped in a transaction with lockForUpdate() — without it, two
+     * staff members submitting overlapping selections at nearly the
+     * same moment could both read the same shipment as "still
+     * eligible" before either one's update lands, and both end up
+     * claiming it into two different settlements. The lock forces the
+     * second request to wait for the first to finish (and re-read the
+     * now-claimed row as ineligible) rather than racing it.
+     */
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
@@ -51,27 +67,36 @@ class ReconciliationController extends \App\Http\Controllers\Controller
             'shipment_ids.*' => 'exists:shipments,id',
         ]);
 
-        // Re-fetched from the same eligible/scoped query rather than
-        // trusting the submitted IDs outright — a staff member can only
-        // ever settle shipments they could actually see on this page in
-        // the first place, and re-checking "still eligible" here closes
-        // the gap where two people try to settle the same shipment in
-        // two different batches at once.
-        $shipments = $this->eligibleShipments()
-            ->whereIn('id', $request->input('shipment_ids'))
-            ->get();
+        $settlement = \Illuminate\Support\Facades\DB::transaction(function () use ($request) {
+            // Re-fetched from the same eligible/scoped query rather than
+            // trusting the submitted IDs outright — a staff member can only
+            // ever settle shipments they could actually see on this page in
+            // the first place, and re-checking "still eligible" here closes
+            // the gap where two people try to settle the same shipment in
+            // two different batches at once.
+            $shipments = $this->eligibleShipments()
+                ->whereIn('id', $request->input('shipment_ids'))
+                ->lockForUpdate()
+                ->get();
 
-        if ($shipments->isEmpty()) {
+            if ($shipments->isEmpty()) {
+                return null;
+            }
+
+            $settlement = CashSettlement::create([
+                'initiated_by_user_id' => auth()->id(),
+                'total_amount' => $shipments->sum('total_amount'),
+                'status' => 'pending',
+            ]);
+
+            Shipment::whereIn('id', $shipments->pluck('id'))->update(['cash_settlement_id' => $settlement->id]);
+
+            return $settlement;
+        });
+
+        if (! $settlement) {
             return redirect()->route('reconciliation.index')->withErrors(['reconciliation' => 'None of the selected shipments are still eligible for settlement — someone may have already settled them.']);
         }
-
-        $settlement = CashSettlement::create([
-            'initiated_by_user_id' => auth()->id(),
-            'total_amount' => $shipments->sum('total_amount'),
-            'status' => 'pending',
-        ]);
-
-        Shipment::whereIn('id', $shipments->pluck('id'))->update(['cash_settlement_id' => $settlement->id]);
 
         return redirect()->route('payments.pay-settlement', $settlement);
     }

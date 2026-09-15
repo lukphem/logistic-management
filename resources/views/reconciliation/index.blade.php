@@ -103,6 +103,13 @@
                                 <td class="p-3 text-right">
                                     @if ($settlement->status !== 'paid')
                                         <a href="{{ route('payments.pay-settlement', $settlement) }}" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Retry payment</a>
+                                        @if ($settlement->payment_reference)
+                                            <form method="POST" action="{{ route('payments.check-status') }}" class="inline">
+                                                @csrf
+                                                <input type="hidden" name="reference" value="{{ $settlement->payment_reference }}">
+                                                <button type="submit" class="ml-2 text-xs font-medium text-ink-500 hover:underline">Check status</button>
+                                            </form>
+                                        @endif
                                     @endif
                                 </td>
                             </tr>

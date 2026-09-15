@@ -23,6 +23,7 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
+use App\Http\Controllers\Web\PaymentReportController;
 use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StandardBillingController;
@@ -63,6 +64,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::get('/reconciliation', [ReconciliationController::class, 'index'])->name('reconciliation.index');
     Route::post('/reconciliation', [ReconciliationController::class, 'store'])->name('reconciliation.store');
     Route::get('/cash-settlements/{settlement}/pay', [PaymentController::class, 'paySettlement'])->name('payments.pay-settlement');
+    Route::post('/payments/check-status', [PaymentController::class, 'checkStatus'])->name('payments.check-status');
+    Route::middleware('can:payments:read')->group(function () {
+        Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
+    });
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
