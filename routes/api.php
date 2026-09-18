@@ -35,6 +35,18 @@ Route::prefix('v1')->name('api.')->group(function () {
         Route::apiResource('permissions', \App\Http\Controllers\Api\PermissionController::class)->only(['index']);
         Route::apiResource('shipments', \App\Http\Controllers\Api\ShipmentController::class);
         Route::get('/reports/exceptions', [\App\Http\Controllers\Api\ReportController::class, 'exceptions']);
+
+        // ── Manifests — same ManifestService the staff web app uses,
+        // so a trip/manifest created or dispatched from a mobile
+        // device behaves identically to one done from a desktop. ──
+        Route::get('/manifest-trips', [\App\Http\Controllers\Api\ManifestController::class, 'index'])->name('manifest-trips.index');
+        Route::post('/manifest-trips', [\App\Http\Controllers\Api\ManifestController::class, 'store'])->name('manifest-trips.store');
+        Route::get('/manifest-trips/{trip}', [\App\Http\Controllers\Api\ManifestController::class, 'show'])->name('manifest-trips.show');
+        Route::post('/manifest-trips/{trip}/manifests', [\App\Http\Controllers\Api\ManifestController::class, 'storeManifest'])->name('manifest-trips.manifests.store');
+        Route::post('/manifest-trips/{trip}/dispatch', [\App\Http\Controllers\Api\ManifestController::class, 'dispatch'])->name('manifest-trips.dispatch');
+        Route::post('/manifests/{manifest}/receive', [\App\Http\Controllers\Api\ManifestController::class, 'receive'])->name('manifests.receive');
+        Route::get('/manifest-shipments/eligible', [\App\Http\Controllers\Api\ManifestController::class, 'eligibleShipments'])->name('manifest-shipments.eligible');
+        Route::post('/manifest-shipments/lookup', [\App\Http\Controllers\Api\ManifestController::class, 'lookupByTrackingNumber'])->name('manifest-shipments.lookup');
     });
 
     // ── Riders/Drivers ──

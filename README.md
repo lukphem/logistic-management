@@ -9152,3 +9152,66 @@ resources/views/manifests/manifests/receive.blade.php   (new)
 resources/views/components/layouts/app.blade.php   (Manifest Trips nav entry)
 routes/web.php   (manifest-trips.*, manifests.*)
 ```
+
+## Increment 153 — Manifest System: Mobile API + Shared Service Refactor
+
+"All this should be in service for easy use via API and web" — taken
+literally: extracted every piece of manifest business logic out of
+the web controllers into `ManifestService`, then built the mobile API
+controller on top of that same service rather than writing a second,
+separate copy of the create/dispatch/receive/eligibility logic. Web
+and API now behave identically because they're calling the exact
+same code, not two implementations kept in sync by hand.
+
+### `ManifestService`
+
+Every operation that used to live inline in `ManifestTripController`/
+`ManifestController` — access checks, eligibility grouping, tracking-
+number lookup, trip+manifest creation, dispatch, receive — moved here
+unchanged in behavior, just relocated. Both web controllers were
+rewritten to be thin wrappers: validate the request, call the
+service, translate the result into a redirect or a view. Verified
+this refactor didn't change behavior by re-running the same live-
+MySQL lifecycle test from the previous increment against the new
+code path.
+
+### Mobile API (`Api\ManifestController`)
+
+Full parity with the web side, under the existing staff API group
+(Sanctum + `user_type:staff`, same auth every other staff endpoint
+already uses):
+
+```
+GET  /api/v1/staff/manifest-trips                          list
+POST /api/v1/staff/manifest-trips                           create trip + first manifest
+GET  /api/v1/staff/manifest-trips/{trip}                    detail
+POST /api/v1/staff/manifest-trips/{trip}/manifests          add another manifest
+POST /api/v1/staff/manifest-trips/{trip}/dispatch            dispatch
+POST /api/v1/staff/manifests/{manifest}/receive              receive with per-shipment conditions
+GET  /api/v1/staff/manifest-shipments/eligible                bulk-by-destination-code list
+POST /api/v1/staff/manifest-shipments/lookup                  barcode/QR scan-to-add lookup
+```
+
+Same access-control checks (403 with a clear message rather than a
+web redirect+flash, appropriate for a JSON API), same audit trail,
+same notify_customer emails on status-changing scans — a mobile app
+built against this gets the identical business behavior the web app
+already has, just JSON in and out instead of HTML forms.
+
+### Verified
+
+Balance-checked, duplicate-scanned, missing-import-scanned across
+every file touched. Full repo balance check: clean across 217 files.
+Re-verified the eligibility query and trip/manifest creation against
+live MySQL after the rewrite, confirming identical results to the
+pre-refactor version — the extraction preserved behavior exactly.
+
+### Files
+
+```
+app/Services/ManifestService.php   (new — all manifest business logic)
+app/Http/Controllers/Web/ManifestTripController.php   (rewritten as a thin wrapper over the service)
+app/Http/Controllers/Web/ManifestController.php   (rewritten as a thin wrapper over the service)
+app/Http/Controllers/Api/ManifestController.php   (new — mobile API, same service)
+routes/api.php   (manifest-trips.*, manifests.*, manifest-shipments.* under staff group)
+```
