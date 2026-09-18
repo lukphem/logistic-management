@@ -23,6 +23,8 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
+use App\Http\Controllers\Web\ManifestController;
+use App\Http\Controllers\Web\ManifestTripController;
 use App\Http\Controllers\Web\PaymentReportController;
 use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
@@ -76,6 +78,23 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::post('/payments/check-status', [PaymentController::class, 'checkStatus'])->name('payments.check-status');
     Route::middleware('can:payments:read')->group(function () {
         Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
+    });
+    Route::middleware('can:manifests:read')->group(function () {
+        Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');
+        Route::get('/manifest-trips/{trip}', [ManifestTripController::class, 'show'])->name('manifest-trips.show');
+        Route::get('/manifest-shipments/eligible', [ManifestTripController::class, 'eligibleShipments'])->name('manifests.eligible-shipments');
+        Route::post('/manifest-shipments/lookup', [ManifestTripController::class, 'lookupByTrackingNumber'])->name('manifests.lookup-tracking-number');
+    });
+    Route::middleware('can:manifests:create')->group(function () {
+        Route::get('/manifest-trips/create', [ManifestTripController::class, 'create'])->name('manifest-trips.create');
+        Route::post('/manifest-trips', [ManifestTripController::class, 'store'])->name('manifest-trips.store');
+        Route::get('/manifest-trips/{trip}/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
+        Route::post('/manifest-trips/{trip}/manifests', [ManifestController::class, 'store'])->name('manifests.store');
+    });
+    Route::middleware('can:manifests:update')->group(function () {
+        Route::post('/manifest-trips/{trip}/dispatch', [ManifestTripController::class, 'dispatch'])->name('manifest-trips.dispatch');
+        Route::get('/manifests/{manifest}/receive', [ManifestController::class, 'receive'])->name('manifests.receive');
+        Route::post('/manifests/{manifest}/receive', [ManifestController::class, 'storeReceive'])->name('manifests.store-receive');
     });
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');

@@ -9036,3 +9036,119 @@ resources/views/emails/shipment-status-updated.blade.php   (new)
 app/Http/Controllers/Api/RiderController.php   (notification trigger in scan())
 routes/web.php   (tracking.search, tracking.submit, tracking.show)
 ```
+
+## Increment 152 — Manifest System (Web): Multi-Hop Movement, Batch Dispatch, Condition Tracking, Barcode/QR Scanning
+
+The full manifest design worked through in conversation — a
+three-level structure matching how real linehaul networks actually
+move freight, built from scratch (no prior manifest concept
+existed).
+
+### The data model
+
+- **`ManifestTrip`** — one physical vehicle journey: transport mode
+  (road/air/sea), carrier (company or named 3PL), vehicle type/
+  identifier, driver name/phone, who dispatched it and when, notes.
+  The full audit-trail fields asked for.
+- **`Manifest`** — one destination batch *within* a trip. This is
+  what actually gets dispatched-from and arrival-scanned-at a hub —
+  a hub can be "just a stop" for the trip as a whole while being the
+  exact destination for one manifest riding inside it. A manifest's
+  destination is never required to match a shipment's own eventual
+  destination — it can be dropped at any intermediate hub for a
+  further manifest onward, the same way a real network relays
+  freight hop by hop.
+- **`ManifestShipment`** — the per-shipment condition record for one
+  leg (pending/received/damaged/missing/over). A shipment gets a
+  fresh row on every different manifest it ever rides, so its full
+  multi-hop journey stays reconstructable — never a direct FK on the
+  shipment itself, since one shipment legitimately passes through
+  many manifests over its life.
+
+### Bulk dispatch by destination code
+
+The `eligibleShipments()` endpoint returns everything currently at a
+given origin, grouped by `destination_hub_id` using each hub's own
+`code` — exactly the "common destination code" bulk-select discussed:
+pick a group, "Add all," done. No need to hand-pick shipments one by
+one for high-volume daily dispatch.
+
+### Condition tracking on receipt
+
+Every manifest shipment defaults to Received; staff flag exceptions
+individually (Damaged/Missing) with an optional note. Each condition
+creates its own scan event with its own status (`arrived_at_hub`,
+`arrived_damaged`, or `missing` — all newly seeded, standard-courier-
+style), so a shipment's condition history is visible on its regular
+tracking timeline, not buried in manifest-only records. A manifest
+with any non-clean condition gets flagged at a glance without digging
+into per-shipment detail. Also added `transloaded` to the seeded scan
+statuses for the light-touch vehicle-to-vehicle handoff case that
+doesn't need a full manifest pair.
+
+### Barcode/QR scanning, two paths
+
+- **Keyboard-wedge handheld scanners** (the primary mechanism for hub/
+  warehouse counters) — every scan input is a focused text field that
+  listens for Enter, exactly how a scanner gun behaves; no special
+  library needed for this path at all
+- **Camera-based scanning** (secondary, for a tablet/phone with no
+  scanner attached) — `html5-qrcode` via CDN, started only on click
+  and stopped again once a code reads, so the camera's never left
+  running in the background
+
+Both paths feed the same lookup-by-tracking-number endpoint, which
+enforces the same eligibility rule as the bulk list (not already on
+an active manifest, not already terminal) — a scanned shipment can't
+be double-added any more than a manually ticked one could.
+
+### Access control
+
+Staff can only add shipments to, or dispatch, a trip whose origin
+they actually have access to, and only receive a manifest whose
+destination they have access to — reusing the existing
+`accessibleHubIds()`/`hasOutletAccess()` scoping rather than
+inventing a new permission model. New `manifests` permission module
+(read/create/update gated separately), granted to Hub Staff and Ops
+Manager by default.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned, and nested-form-checked after
+every file — caught and fixed one real instance of the `@if`-against-
+`}}` crash pattern in the trips index view before it shipped, same as
+two prior increments. Full repo balance check: clean across 215
+files. Verified the full lifecycle end-to-end against live MySQL:
+eligibility query correctly identifies an eligible shipment, trip and
+manifest creation, shipment attachment, dispatch (scan event +
+status change), and receipt (condition update, second scan event,
+manifest closure) — with the shipment's resulting scan history
+showing both events in correct order, confirming the tracking-page
+integration works too.
+
+### Not built yet
+
+Mobile API endpoints for manifest operations — the web side is fully
+functional and complete on its own, so delivering this now rather
+than holding it for the API to catch up.
+
+### Files
+
+```
+database/migrations/2026_03_21_000001_create_manifest_system_tables.php
+app/Models/ManifestTrip.php   (new)
+app/Models/Manifest.php   (new)
+app/Models/ManifestShipment.php   (new)
+app/Models/Shipment.php   (manifests()/manifestShipments() relations)
+database/seeders/ScanStatusSeeder.php   (transloaded, arrived_damaged, missing)
+database/seeders/RolePermissionSeeder.php   (manifests module + role assignments)
+app/Http/Controllers/Web/ManifestTripController.php   (new)
+app/Http/Controllers/Web/ManifestController.php   (new)
+resources/views/manifests/trips/create.blade.php   (new)
+resources/views/manifests/trips/show.blade.php   (new)
+resources/views/manifests/trips/index.blade.php   (new)
+resources/views/manifests/manifests/create.blade.php   (new)
+resources/views/manifests/manifests/receive.blade.php   (new)
+resources/views/components/layouts/app.blade.php   (Manifest Trips nav entry)
+routes/web.php   (manifest-trips.*, manifests.*)
+```

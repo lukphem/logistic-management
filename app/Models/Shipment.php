@@ -229,6 +229,25 @@ class Shipment extends Model
         return $this->belongsTo(\App\Models\CashSettlement::class);
     }
 
+    public function manifestShipments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ManifestShipment::class);
+    }
+
+    /**
+     * Every leg this shipment has ever ridden on, oldest first —
+     * a shipment can appear on any number of manifests over its life,
+     * one per hop, so this is the full multi-leg journey record, not
+     * just "the" manifest.
+     */
+    public function manifests(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Manifest::class, 'manifest_shipments')
+            ->withPivot(['condition', 'condition_notes', 'scanned_at'])
+            ->withTimestamps()
+            ->orderBy('manifest_shipments.created_at');
+    }
+
     public function assignedRider(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'assigned_rider_id');
