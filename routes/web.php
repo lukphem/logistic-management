@@ -79,17 +79,17 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:payments:read')->group(function () {
         Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
     });
-    Route::middleware('can:manifests:read')->group(function () {
-        Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');
-        Route::get('/manifest-trips/{trip}', [ManifestTripController::class, 'show'])->name('manifest-trips.show');
-        Route::get('/manifest-shipments/eligible', [ManifestTripController::class, 'eligibleShipments'])->name('manifests.eligible-shipments');
-        Route::post('/manifest-shipments/lookup', [ManifestTripController::class, 'lookupByTrackingNumber'])->name('manifests.lookup-tracking-number');
-    });
     Route::middleware('can:manifests:create')->group(function () {
         Route::get('/manifest-trips/create', [ManifestTripController::class, 'create'])->name('manifest-trips.create');
         Route::post('/manifest-trips', [ManifestTripController::class, 'store'])->name('manifest-trips.store');
         Route::get('/manifest-trips/{trip}/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
         Route::post('/manifest-trips/{trip}/manifests', [ManifestController::class, 'store'])->name('manifests.store');
+    });
+    Route::middleware('can:manifests:read')->group(function () {
+        Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');
+        Route::get('/manifest-trips/{trip}', [ManifestTripController::class, 'show'])->name('manifest-trips.show');
+        Route::get('/manifest-shipments/eligible', [ManifestTripController::class, 'eligibleShipments'])->name('manifests.eligible-shipments');
+        Route::post('/manifest-shipments/lookup', [ManifestTripController::class, 'lookupByTrackingNumber'])->name('manifests.lookup-tracking-number');
     });
     Route::middleware('can:manifests:update')->group(function () {
         Route::post('/manifest-trips/{trip}/dispatch', [ManifestTripController::class, 'dispatch'])->name('manifest-trips.dispatch');

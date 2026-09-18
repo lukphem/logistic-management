@@ -9215,3 +9215,41 @@ app/Http/Controllers/Web/ManifestController.php   (rewritten as a thin wrapper o
 app/Http/Controllers/Api/ManifestController.php   (new — mobile API, same service)
 routes/api.php   (manifest-trips.*, manifests.*, manifest-shipments.* under staff group)
 ```
+
+## Increment 154 — Hotfix: `/manifest-trips/create` Route Shadowed by `{trip}` Wildcard
+
+`GET /manifest-trips/{trip}` (the show route) was registered before
+`GET /manifest-trips/create` (the create-form route) — Laravel
+matches routes in registration order, so a request to `/manifest-
+trips/create` was captured by the wildcard first, with "create"
+treated as a trip ID. Every visit to "New trip" 500'd trying to query
+a shipment with ID "create".
+
+Fixed by reordering: the `manifests:create` permission group (which
+holds the literal `/manifest-trips/create` path) now registers before
+the `manifests:read` group (which holds the `{trip}` wildcard) —
+each route keeps its own permission gate, only the registration order
+changed.
+
+Scanned the rest of `routes/web.php` for the same shadowing pattern
+systematically. Found one other same-segment-count pair
+(`/clients/{user}/edit` registered before `/clients/tariff-template/
+{type}`), but confirmed it's not a practical risk — it would only
+collide on the specific contrived URL `/clients/tariff-template/
+edit`, not on any URL a user would actually navigate to the way
+`/manifest-trips/create` was hit by literally every visit to that
+page. Left alone.
+
+### Verified
+
+Balance-checked, full repo balance check clean across 119 PHP files
+(controllers + routes). Simulated Laravel's own route-matching logic
+against the three `/manifest-trips/*` URLs in the new registration
+order — `/manifest-trips/create` now correctly resolves to the create
+route, `/manifest-trips/5` still correctly resolves to the show route.
+
+### Files
+
+```
+routes/web.php   (manifest-trips.create/store reordered before manifest-trips.show)
+```
