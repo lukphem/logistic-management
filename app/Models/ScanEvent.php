@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ScanEvent extends Model
 {
     protected $fillable = [
-        'shipment_id', 'status', 'handled_by', 'hub_id', 'outlet_id',
-        'latitude', 'longitude', 'photo_path', 'signature_path', 'scanned_at',
+        'shipment_id', 'status', 'handled_by', 'hub_id', 'outlet_id', 'destination_hub_id',
+        'latitude', 'longitude', 'photo_path', 'signature_path', 'receiver_name', 'scanned_at',
     ];
 
     protected $casts = ['scanned_at' => 'datetime'];
@@ -32,5 +32,10 @@ class ScanEvent extends Model
     public function outlet(): BelongsTo
     {
         return $this->belongsTo(Outlet::class);
+    }
+
+    public function destinationHub(): BelongsTo
+    {
+        return $this->belongsTo(Hub::class, 'destination_hub_id');
     }
 }

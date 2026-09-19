@@ -46,17 +46,23 @@ class RiderController extends Controller
             'status' => 'required|string',
             'hub_id' => 'nullable|exists:hubs,id',
             'outlet_id' => 'nullable|exists:outlets,id',
+            'destination_hub_id' => 'nullable|exists:hubs,id',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'photo_path' => 'nullable|string',
             'signature_path' => 'nullable|string',
+            'receiver_name' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $scanEvent = $this->scans->recordScan($validator->validated(), $request->user()->id);
+        try {
+            $scanEvent = $this->scans->recordScan($validator->validated(), $request->user()->id);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json($scanEvent, 201);
     }

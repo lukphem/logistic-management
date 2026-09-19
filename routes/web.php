@@ -100,6 +100,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
         Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
+        Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
     });

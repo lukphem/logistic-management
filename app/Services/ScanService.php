@@ -13,18 +13,48 @@ use Illuminate\Support\Facades\Mail;
  * The single place a shipment scan actually gets recorded — extracted
  * from what used to be inline in RiderController::scan() so the same
  * logic (attempt-limit counting, notify_customer emails, delivered_at
- * handling) applies identically whether the scan came from a rider's
- * mobile app or a hub/counter staff member using the web Operational
- * Scans module. One behavior, two front doors.
+ * handling, and the two safety rules below) applies identically
+ * whether the scan came from a rider's mobile app or a hub/counter
+ * staff member using the web Operational Scans module. One behavior,
+ * two front doors.
+ *
+ * Two hard rules enforced here, not just suggested by the UI:
+ * 1. A shipment already at a terminal status (ScanStatus::is_terminal
+ *    — delivered/returned/cancelled by default) can never be scanned
+ *    again for anything. Once it's out of the company's hands, it's
+ *    out — no further movement makes sense to record.
+ * 2. A shipment still sitting at "booked" (nothing has physically
+ *    touched it yet) can only move via a status staff have marked
+ *    is_first_touch (Picked Up or Dropped Off by default) — it has
+ *    to genuinely be in hand before an arrival/departure/delivery/
+ *    exception scan means anything.
  */
 class ScanService
 {
     /**
-     * @param array{shipment_id: int, status: string, hub_id?: ?int, outlet_id?: ?int, latitude?: ?float, longitude?: ?float, photo_path?: ?string, signature_path?: ?string} $data
+     * @param array{shipment_id: int, status: string, hub_id?: ?int, outlet_id?: ?int, destination_hub_id?: ?int, latitude?: ?float, longitude?: ?float, photo_path?: ?string, signature_path?: ?string, receiver_name?: ?string} $data
+     *
+     * @throws \RuntimeException if the shipment is terminal, or still
+     *         booked and the target status isn't a first-touch one
      */
     public function recordScan(array $data, int $handledByUserId): ScanEvent
     {
         $shipment = Shipment::findOrFail($data['shipment_id']);
+
+        $currentStatus = ScanStatus::where('key', $shipment->current_status)->first();
+        if ($currentStatus?->is_terminal) {
+            throw new \RuntimeException("{$shipment->tracking_number} is already {$currentStatus->label} and is considered out of the company's hands — it can't be scanned again.");
+        }
+
+        $newStatus = ScanStatus::where('key', $data['status'])->first();
+
+        // "Never scanned before" is read off current_status still
+        // being exactly 'booked' — the value ShipmentController::store()
+        // sets at creation and nothing else ever sets again, so this
+        // reliably means "nothing has touched this shipment yet."
+        if ($shipment->current_status === 'booked' && ! $newStatus?->is_first_touch) {
+            throw new \RuntimeException("{$shipment->tracking_number} hasn't been picked up or dropped off yet — it needs a Pickup or Drop-off scan before anything else.");
+        }
 
         $hubId = $data['hub_id'] ?? null;
         $outletId = $data['outlet_id'] ?? null;
@@ -39,10 +69,12 @@ class ScanService
             'status' => $data['status'],
             'hub_id' => $hubId,
             'outlet_id' => $outletId,
+            'destination_hub_id' => $data['destination_hub_id'] ?? null,
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'photo_path' => $data['photo_path'] ?? null,
             'signature_path' => $data['signature_path'] ?? null,
+            'receiver_name' => $data['receiver_name'] ?? null,
             'handled_by' => $handledByUserId,
             'scanned_at' => now(),
         ]);
@@ -63,9 +95,7 @@ class ScanService
         // attempt (ScanStatus::is_delivery_attempt), since statuses
         // are fully staff-configurable and there's no reliable way to
         // infer this from a label alone.
-        $scanStatus = ScanStatus::where('key', $data['status'])->first();
-
-        if ($scanStatus?->is_delivery_attempt) {
+        if ($newStatus?->is_delivery_attempt) {
             $shipmentUpdate['delivery_attempts_count'] = $shipment->delivery_attempts_count + 1;
 
             $maxAttempts = $shipment->client_account_id
@@ -79,7 +109,7 @@ class ScanService
 
         $shipment->update($shipmentUpdate);
 
-        $this->notifyIfConfigured($shipment, $scanStatus);
+        $this->notifyIfConfigured($shipment, $newStatus);
 
         return $scanEvent;
     }

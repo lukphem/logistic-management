@@ -9320,3 +9320,91 @@ resources/views/operational-scans/index.blade.php   (new)
 resources/views/components/layouts/app.blade.php   (Operational Scans sidebar group)
 routes/web.php   (operational-scans.index/store, /manifest-trips/{type})
 ```
+
+## Increment 156 — Scan Safety Rules: Terminal Blocking, First-Touch Gating, Location Locking, Departure Destination, Delivery Evidence
+
+The first batch of a large set of process fixes — the correctness/
+safety pieces, applied at `ScanService` so they're enforced
+identically for both rider mobile scans and the web Operational
+Scans module.
+
+### Two hard rules, enforced at the one shared choke point
+
+1. **Terminal shipments can never be scanned again.** A shipment
+   already at a status staff have marked `is_terminal` (delivered/
+   returned/cancelled by default) is "out of the company's hands" —
+   any further scan attempt is rejected with a clear message, rather
+   than silently accepted and recorded as if it meant something.
+2. **A freshly booked shipment needs a first-touch scan before
+   anything else.** New `ScanStatus::is_first_touch` flag (seeded
+   true for Picked Up and the new Dropped Off status) — a shipment
+   still sitting at `booked` can only move via one of these; an
+   arrival/departure/delivery/exception scan attempted before that is
+   rejected. New **Drop-off Scan** added as a sixth Operational Scans
+   link, for a walk-in customer handing their own package over at a
+   counter (as opposed to Pickup, which is a rider collecting from
+   the sender).
+
+### Location access, properly tiered
+
+Previously every Operational Scan let anyone pick from a full hub/
+outlet dropdown. Now resolved server-side by the user's own access
+level, never trusted from the request:
+- **Global** staff pick freely from every hub/outlet
+- **Regional** staff pick freely, but only within their own region —
+  picking outside it is rejected
+- **Hub/outlet-scoped** staff aren't offered a choice at all — the
+  page shows their own assigned location as fixed text, and the
+  server always uses that location regardless of what (if anything)
+  was submitted
+
+### Departure Scan now asks where it's heading
+
+New "Heading to" required field, backed by a new `destination_hub_id`
+column on `scan_events` — a single shipment departing outside any
+formal manifest now records its intended destination the same way a
+manifest already does, closing the gap between the two.
+
+### Delivery Scan captures real evidence
+
+New fields: who actually received it (often not the shipment's own
+registered receiver — a neighbour, a gatekeeper, front-desk staff),
+a signature captured via an on-page canvas (mouse and touch both
+supported, no library needed), and an optional photo (camera capture
+on mobile via `capture="environment"`, regular file picker on
+desktop). Both upload through a dedicated endpoint that decodes and
+stores the image server-side rather than trusting a client-supplied
+path.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace
+balance on the substantially larger script), duplicate-checked,
+missing-import-scanned. Full repo balance check: clean across 220
+files. Simulated the terminal-block and first-touch-gating logic
+against five cases exactly matching `ScanService`'s own conditions —
+all pass. Confirmed `User::hasHubAccess()` and `Outlet::hub()` (both
+depended on by the new location-resolution logic) exist and resolve
+correctly.
+
+### Still to come from this same round of feedback
+
+Renaming/consolidating Manifest Trips under the "Operations" sidebar
+group, the manifest creation UX improvements (auto-load-by-
+destination, confirmation step before submitting), and the tracking
+portal enhancements (booked milestone, manifest/trip number lookup,
+staff sidebar link) — next.
+
+### Files
+
+```
+database/migrations/2026_03_22_000001_add_first_touch_and_delivery_evidence_fields.php
+app/Models/ScanStatus.php   (is_first_touch)
+app/Models/ScanEvent.php   (destination_hub_id, receiver_name)
+database/seeders/ScanStatusSeeder.php   (Dropped Off status, is_first_touch flags)
+app/Services/ScanService.php   (terminal blocking, first-touch gating)
+app/Http/Controllers/Api/RiderController.php   (catches the new exception, accepts new fields)
+app/Http/Controllers/Web/OperationalScanController.php   (Drop-off type, location tiering, destination/evidence support, uploadEvidence())
+resources/views/operational-scans/index.blade.php   (locked-location display, destination field, signature/photo capture)
+routes/web.php   (operational-scans.upload-evidence)
+```
