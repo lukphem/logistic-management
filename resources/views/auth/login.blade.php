@@ -71,6 +71,10 @@
                         Sign in
                     </button>
                 </form>
+
+                <p class="mt-6 text-center text-sm text-ink-500">
+                    Looking to track a shipment? <a href="{{ route('tracking.search') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Track here</a>
+                </p>
             </div>
         </div>
     </div>

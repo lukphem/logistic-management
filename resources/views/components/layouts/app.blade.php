@@ -48,7 +48,7 @@
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard', 'permission' => null],
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
-                        ['label' => 'Tracking', 'route' => 'tracking.search', 'icon' => 'search', 'permission' => null],
+                        ['label' => 'Tracking', 'route' => 'staff-tracking.search', 'icon' => 'search', 'permission' => null],
                         ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
                     ];
 

@@ -35,6 +35,7 @@ use App\Http\Controllers\Web\TerritoryController;
 use App\Http\Controllers\Web\UnitController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\VehicleTypeController;
+use App\Http\Controllers\Web\StaffTrackingController;
 use App\Http\Controllers\Web\TrackingController;
 use App\Http\Controllers\Web\ZoneController;
 use App\Http\Controllers\Web\ZoneMappingController;
@@ -60,6 +61,11 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout')->midd
 
 Route::middleware(['auth', 'staff'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/staff-tracking', [StaffTrackingController::class, 'search'])->name('staff-tracking.search');
+    Route::post('/staff-tracking', [StaffTrackingController::class, 'submit'])->name('staff-tracking.submit');
+    Route::get('/staff-tracking/multi', [StaffTrackingController::class, 'multi'])->name('staff-tracking.multi');
+    Route::get('/staff-tracking/{trackingNumber}', [StaffTrackingController::class, 'show'])->name('staff-tracking.show');
 
     Route::get('/shipments', [ShipmentController::class, 'index'])->name('shipments.index');
     Route::middleware('can:shipments:create')->group(function () {
@@ -105,6 +111,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
         Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
         Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');
+        Route::get('/operational-scans-nearby-destinations', [OperationalScanController::class, 'nearbyDestinations'])->name('operational-scans.nearby-destinations');
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
     });

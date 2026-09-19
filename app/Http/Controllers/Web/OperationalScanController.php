@@ -28,7 +28,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         'pickup' => ['label' => 'Pickup Scan', 'keys' => ['picked_up']],
         'dropoff' => ['label' => 'Drop-off Scan', 'keys' => ['dropped_off']],
         'arrival' => ['label' => 'Arrival Scan', 'keys' => ['arrived_at_hub']],
-        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit'], 'needs_destination' => true, 'needs_handoff' => true],
+        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit', 'out_for_delivery'], 'needs_destination' => true, 'needs_handoff' => true, 'destination_same_city' => true],
         'delivery' => ['label' => 'Delivery Scan', 'keys' => ['delivered'], 'needs_evidence' => true],
         'exception' => ['label' => 'Exception Scan', 'keys' => ['arrived_damaged', 'missing', 'exception', 'returned', 'cancelled']],
     ];
@@ -55,11 +55,14 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'needsDestination' => $config['needs_destination'] ?? false,
             'needsEvidence' => $config['needs_evidence'] ?? false,
             'needsHandoff' => $config['needs_handoff'] ?? false,
+            'destinationSameCity' => $config['destination_same_city'] ?? false,
             'hubs' => $hubs,
             'outlets' => $outlets,
-            'destinationHubs' => $config['needs_destination'] ?? false ? Hub::orderBy('name')->get() : collect(),
+            'destinationHubs' => ($config['needs_destination'] ?? false) && ! ($config['destination_same_city'] ?? false) ? Hub::orderBy('name')->get() : collect(),
             'riders' => $config['needs_handoff'] ?? false ? \App\Models\User::where('user_type', 'rider')->orderBy('name')->get() : collect(),
             'lockedLocationLabel' => $locked,
+            'lockedHubId' => $locked ? $user->hub_id : null,
+            'lockedOutletId' => $locked ? $user->outlet_id : null,
         ]);
     }
 
@@ -74,7 +77,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'status' => 'required|string|in:' . implode(',', $config['keys']),
             'hub_id' => 'nullable|exists:hubs,id',
             'outlet_id' => 'nullable|exists:outlets,id',
-            'destination_hub_id' => ($config['needs_destination'] ?? false) ? 'required|exists:hubs,id' : 'nullable|exists:hubs,id',
+            'destination_hub_id' => ($config['needs_destination'] ?? false) ? 'required_unless:status,out_for_delivery|nullable|exists:hubs,id' : 'nullable|exists:hubs,id',
             'receiver_name' => ($config['needs_evidence'] ?? false) ? 'required|string|max:255' : 'nullable|string|max:255',
             'photo_path' => 'nullable|string',
             'signature_path' => 'nullable|string',
@@ -133,6 +136,38 @@ class OperationalScanController extends \App\Http\Controllers\Controller
      *
      * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: ?string} [hubs, outlets, lockedLocationLabel]
      */
+    /**
+     * Departure Scan's destination is deliberately scoped to local
+     * movement — same city, outlet-to-outlet or unit-to-unit — not
+     * the cross-city/regional linehaul a Manifest handles. Resolves
+     * the origin's city from whichever hub/outlet was selected (an
+     * outlet's own city comes from its parent hub), then returns
+     * every other hub/outlet sharing that city. Genuinely remote
+     * destinations simply never show up in this list — staff are
+     * naturally routed to Manifests for those instead of being told
+     * "no" here.
+     */
+    public function nearbyDestinations(Request $request): JsonResponse
+    {
+        $request->validate([
+            'hub_id' => 'nullable|exists:hubs,id',
+            'outlet_id' => 'nullable|exists:outlets,id',
+        ]);
+
+        $originHub = $request->input('outlet_id')
+            ? Outlet::find($request->input('outlet_id'))?->hub
+            : Hub::find($request->input('hub_id'));
+
+        if (! $originHub || ! $originHub->city_id) {
+            return response()->json(['hubs' => [], 'outlets' => []]);
+        }
+
+        $cityHubs = Hub::where('city_id', $originHub->city_id)->orderBy('name')->get(['id', 'name', 'code']);
+        $cityOutlets = Outlet::whereIn('hub_id', $cityHubs->pluck('id'))->orderBy('name')->get(['id', 'name', 'hub_id']);
+
+        return response()->json(['hubs' => $cityHubs, 'outlets' => $cityOutlets]);
+    }
+
     public function uploadEvidence(Request $request): JsonResponse
     {
         $request->validate([

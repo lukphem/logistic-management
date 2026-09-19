@@ -24,7 +24,11 @@
                 </span>
             @endif
             <span class="text-sm font-semibold text-ink-900">{{ config('branding.company_name') }}</span>
-            <a href="{{ route('tracking.search') }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">Track another number</a>
+            @if ($back)
+                <a href="{{ route('tracking.multi', ['numbers' => $back]) }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">← Back to results</a>
+            @else
+                <a href="{{ route('tracking.search') }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">Track another number</a>
+            @endif
         </div>
 
         @if (! $batch)

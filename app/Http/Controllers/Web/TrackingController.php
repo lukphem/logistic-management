@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Models\Manifest;
-use App\Models\ManifestTrip;
 use App\Models\ScanStatus;
-use App\Models\Shipment;
+use App\Services\TrackingService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -22,13 +20,18 @@ use Illuminate\View\View;
  * public tracking page actually shows: status, city-level route, and
  * a scan history stripped down to label + location + time.
  *
- * Also usable internally by staff (same page, linked from the
- * sidebar) — the distinction that matters here isn't staff vs.
- * public, it's what's safe to show anyone who has the number at all,
- * since a tracking number itself isn't treated as a secret.
+ * Staff tracking is a genuinely separate page now
+ * (Web\StaffTrackingController, under the app's own sidebar layout)
+ * rather than this same page showing more when someone happens to be
+ * logged in — this page stays exactly this stripped-down regardless
+ * of login state.
  */
 class TrackingController extends \App\Http\Controllers\Controller
 {
+    public function __construct(private TrackingService $tracking)
+    {
+    }
+
     public function search(): View
     {
         return view('tracking.search');
@@ -73,24 +76,26 @@ class TrackingController extends \App\Http\Controllers\Controller
             ->values();
 
         $results = $numbers->map(function ($number) {
-            if (str_starts_with($number, 'MAN-')) {
-                $manifest = Manifest::where('manifest_number', $number)->with('manifestShipments')->first();
+            $kind = $this->tracking->resolveKind($number);
+
+            if ($kind === 'manifest') {
+                $manifest = $this->tracking->findManifest($number);
 
                 return ['number' => $number, 'kind' => 'manifest', 'found' => (bool) $manifest, 'count' => $manifest?->manifestShipments->count(), 'status' => $manifest?->status];
             }
 
-            if (str_starts_with($number, 'TRIP-')) {
-                $trip = ManifestTrip::where('trip_number', $number)->first();
+            if ($kind === 'trip') {
+                $trip = $this->tracking->findTrip($number);
 
                 return ['number' => $number, 'kind' => 'trip', 'found' => (bool) $trip, 'status' => $trip?->isDispatched() ? 'dispatched' : 'draft'];
             }
 
-            $shipment = Shipment::where('tracking_number', $number)->first();
+            $shipment = $this->tracking->findShipment($number);
 
             return ['number' => $number, 'kind' => 'shipment', 'found' => (bool) $shipment, 'status' => $shipment?->current_status, 'receiver_name' => $shipment?->receiver_name];
         });
 
-        return view('tracking.multi', compact('results'));
+        return view('tracking.multi', ['results' => $results, 'numbersParam' => $numbers->implode(',')]);
     }
 
     /**
@@ -102,48 +107,32 @@ class TrackingController extends \App\Http\Controllers\Controller
      * remember. Manifest/trip numbers are tried first since their
      * MAN-/TRIP- prefixes make them unambiguous; anything else is
      * treated as a shipment's own number.
+     *
+     * $back carries the previous multi-track result set forward (the
+     * comma-joined numbers), so the page can offer a way back to it
+     * rather than only "track another number" and losing the list.
      */
-    public function show(string $trackingNumber): View
+    public function show(Request $request, string $trackingNumber): View
     {
         $number = trim($trackingNumber);
+        $kind = $this->tracking->resolveKind($number);
+        $back = $request->query('back');
 
-        if (str_starts_with($number, 'MAN-')) {
-            return $this->showManifest($number);
+        if ($kind === 'manifest') {
+            return $this->showManifest($number, $back);
         }
 
-        if (str_starts_with($number, 'TRIP-')) {
-            return $this->showTrip($number);
+        if ($kind === 'trip') {
+            return $this->showTrip($number, $back);
         }
 
-        return $this->showShipment($number);
+        return $this->showShipment($number, $back);
     }
 
-    /**
-     * Staff who are logged in and viewing this same page see a
-     * richer version — who handled each scan, who it was handed to,
-     * GPS/photo/signature evidence — all deliberately excluded from
-     * the public view. This is the one place that distinction is
-     * actually decided: not a separate page, just more relations
-     * eager-loaded and an isStaff flag the view checks before
-     * showing the extra detail.
-     */
-    private function showShipment(string $trackingNumber): View
+    private function showShipment(string $trackingNumber, ?string $back): View
     {
-        $isStaff = auth()->check();
-
-        $shipment = Shipment::where('tracking_number', $trackingNumber)
-            ->with(array_filter([
-                'scanEvents' => fn ($q) => $q->orderBy('scanned_at'),
-                'scanEvents.hub',
-                'scanEvents.outlet',
-                'scanEvents.destinationHub',
-                $isStaff ? 'scanEvents.handler' : null,
-                $isStaff ? 'scanEvents.handedTo' : null,
-                'originCity',
-                'destinationCity',
-                'serviceType',
-            ]))
-            ->first();
+        $shipment = $this->tracking->findShipment($trackingNumber);
+        $lastScan = $shipment ? $this->tracking->lastScanSummary($shipment) : null;
 
         // Keyed by ScanStatus.key so the timeline can resolve a scan
         // event's raw status string (e.g. "out_for_delivery") to its
@@ -153,38 +142,32 @@ class TrackingController extends \App\Http\Controllers\Controller
         // staff actually configured.
         $statusLabels = ScanStatus::all()->pluck('label', 'key');
 
-        return view('tracking.show', compact('shipment', 'trackingNumber', 'statusLabels', 'isStaff'));
+        return view('tracking.show', compact('shipment', 'trackingNumber', 'statusLabels', 'lastScan', 'back'));
     }
 
-    private function showManifest(string $manifestNumber): View
+    private function showManifest(string $manifestNumber, ?string $back): View
     {
-        $manifest = Manifest::where('manifest_number', $manifestNumber)
-            ->with(['trip', 'destinationHub', 'destinationOutlet', 'manifestShipments.shipment'])
-            ->first();
+        $manifest = $this->tracking->findManifest($manifestNumber);
 
         return view('tracking.batch', [
             'trackingNumber' => $manifestNumber,
             'batchLabel' => 'Manifest ' . $manifestNumber,
             'batch' => $manifest,
             'shipments' => $manifest?->manifestShipments->pluck('shipment')->filter() ?? collect(),
+            'back' => $back,
         ]);
     }
 
-    private function showTrip(string $tripNumber): View
+    private function showTrip(string $tripNumber, ?string $back): View
     {
-        $trip = ManifestTrip::where('trip_number', $tripNumber)
-            ->with(['originHub', 'originOutlet', 'manifests.destinationHub', 'manifests.manifestShipments.shipment'])
-            ->first();
-
-        $shipments = $trip
-            ? $trip->manifests->flatMap(fn ($m) => $m->manifestShipments->pluck('shipment'))->filter()->unique('id')
-            : collect();
+        $trip = $this->tracking->findTrip($tripNumber);
 
         return view('tracking.batch', [
             'trackingNumber' => $tripNumber,
             'batchLabel' => 'Trip ' . $tripNumber,
             'batch' => $trip,
-            'shipments' => $shipments,
+            'shipments' => $trip ? $this->tracking->shipmentsOnTrip($trip) : collect(),
+            'back' => $back,
         ]);
     }
 }

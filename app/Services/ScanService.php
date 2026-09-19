@@ -56,6 +56,17 @@ class ScanService
             throw new \RuntimeException("{$shipment->tracking_number} hasn't been picked up or dropped off yet — it needs a Pickup or Drop-off scan before anything else.");
         }
 
+        // Pickup and Drop-off both mean exactly the same underlying
+        // fact — the shipment is now in the company's custody — so
+        // once either has happened, doing the other means nothing new
+        // and is rejected rather than silently re-recorded. This is
+        // the reverse of the check above: that one guards against
+        // skipping first-touch entirely, this one guards against
+        // repeating it.
+        if ($newStatus?->is_first_touch && $shipment->current_status !== 'booked') {
+            throw new \RuntimeException("{$shipment->tracking_number} is already in the company's custody — it's already been picked up or dropped off, so this can't be done again.");
+        }
+
         $hubId = $data['hub_id'] ?? null;
         $outletId = $data['outlet_id'] ?? null;
 

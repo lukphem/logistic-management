@@ -50,14 +50,17 @@
             @endif
 
             @if ($needsDestination)
-                <div>
+                <div id="destination-field">
                     <label class="mb-1 block text-sm font-medium text-ink-900">Heading to <x-required /></label>
                     <select id="scan-destination" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                        <option value="">— Select —</option>
+                        <option value="">{{ $destinationSameCity ? '— Select an origin first —' : '— Select —' }}</option>
                         @foreach ($destinationHubs as $hub)
                             <option value="{{ $hub->id }}">{{ $hub->name }} ({{ $hub->code }})</option>
                         @endforeach
                     </select>
+                    @if ($destinationSameCity)
+                        <p class="mt-1 text-xs text-ink-500">Only nearby locations in the same city — for a different city, use a Manifest instead.</p>
+                    @endif
                 </div>
             @endif
             @if ($needsHandoff)
@@ -125,10 +128,14 @@
             const isMultiChoice = @json($isMultiChoice);
             const needsDestination = @json($needsDestination);
             const needsEvidence = @json($needsEvidence);
+            const destinationSameCity = @json($destinationSameCity);
+            const lockedHubId = @json($lockedHubId);
+            const lockedOutletId = @json($lockedOutletId);
             const statusEl = document.getElementById('scan-status');
             const hubSelect = document.getElementById('scan-hub');
             const outletSelect = document.getElementById('scan-outlet');
             const destinationSelect = document.getElementById('scan-destination');
+            const destinationField = document.getElementById('destination-field');
             const scanInput = document.getElementById('scan-input');
             const cameraBtn = document.getElementById('camera-scan-btn');
             const scanLog = document.getElementById('scan-log');
@@ -138,9 +145,17 @@
                 return statusEl.value;
             }
 
+            // "Out for Delivery" needs no destination at all — it's
+            // going straight to the receiver, not to another unit —
+            // so the field itself hides rather than just becoming
+            // optional.
+            function destinationApplies() {
+                return needsDestination && currentStatus() !== 'out_for_delivery';
+            }
+
             function readyToScan() {
                 if (! currentStatus()) return false;
-                if (needsDestination && (! destinationSelect || ! destinationSelect.value)) return false;
+                if (destinationApplies() && (! destinationSelect || ! destinationSelect.value)) return false;
                 if (needsEvidence) {
                     const receiverEl = document.getElementById('scan-receiver-name');
                     if (! receiverEl || ! receiverEl.value.trim()) return false;
@@ -149,6 +164,7 @@
             }
 
             function refreshEnabled() {
+                if (destinationField) { destinationField.classList.toggle('hidden', ! destinationApplies()); }
                 const ready = readyToScan();
                 scanInput.disabled = ! ready;
                 cameraBtn.disabled = ! ready;
@@ -162,9 +178,44 @@
                 if (receiverEl) { receiverEl.addEventListener('input', refreshEnabled); }
             }
 
+            // Same-city destination list — loaded from whichever
+            // origin is actually in effect (the picked hub/outlet, or
+            // the locked one for a location-restricted user), so a
+            // cross-city destination simply never appears as an
+            // option here.
+            function loadNearbyDestinations() {
+                if (! destinationSameCity || ! destinationSelect) return;
+                const hubId = lockedHubId || hubSelect.value || null;
+                const outletId = lockedOutletId || outletSelect.value || null;
+                if (! hubId && ! outletId) {
+                    destinationSelect.innerHTML = '<option value="">— Select an origin first —</option>';
+                    return;
+                }
+                const params = new URLSearchParams();
+                if (outletId) { params.set('outlet_id', outletId); } else { params.set('hub_id', hubId); }
+
+                fetch(@json(route('operational-scans.nearby-destinations')) + '?' + params.toString())
+                    .then(r => r.json())
+                    .then(function (data) {
+                        destinationSelect.innerHTML = '<option value="">— Select —</option>';
+                        (data.hubs || []).forEach(function (hub) {
+                            const opt = document.createElement('option');
+                            opt.value = hub.id;
+                            opt.textContent = hub.name + ' (' + hub.code + ')';
+                            destinationSelect.appendChild(opt);
+                        });
+                    })
+                    .catch(function () {
+                        destinationSelect.innerHTML = '<option value="">Could not load nearby locations</option>';
+                    });
+            }
+            if (destinationSameCity) {
+                loadNearbyDestinations();
+            }
+
             if (hubSelect.tagName === 'SELECT') {
-                hubSelect.addEventListener('change', function () { if (this.value) outletSelect.value = ''; });
-                outletSelect.addEventListener('change', function () { if (this.value) hubSelect.value = ''; });
+                hubSelect.addEventListener('change', function () { if (this.value) outletSelect.value = ''; loadNearbyDestinations(); });
+                outletSelect.addEventListener('change', function () { if (this.value) hubSelect.value = ''; loadNearbyDestinations(); });
             }
 
             // Signature pad — plain canvas drawing, no library needed.

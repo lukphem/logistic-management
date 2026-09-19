@@ -9557,3 +9557,84 @@ resources/views/tracking/search.blade.php   (narrower, textarea for multiple num
 resources/views/tracking/multi.blade.php   (new)
 routes/web.php   (manifests.edit/add-shipments/remove-shipment, tracking.multi)
 ```
+
+## Increment 159 — Custody Enforcement, Local vs. Remote Departure, Separate Staff Tracking
+
+### Pickup/Drop-off: genuinely mutually exclusive
+
+Both represent exactly the same underlying fact — the shipment is now
+in the company's custody — so `ScanService` now rejects doing the
+second one once either has happened (or repeating the same one
+twice), not just skipping straight to it from booked. Verified with a
+6-case simulation covering both directions and the repeat case.
+
+### Departure Scan: local movement only, Manifests for remote
+
+Redesigned around the actual distinction: Departure Scan now offers
+"In Transit" (destination limited to hubs/outlets sharing the same
+`city_id` as the origin, loaded via a new `nearbyDestinations()`
+endpoint) or "Out for Delivery" (no destination at all — last-mile,
+straight to the receiver). A genuinely remote destination simply
+never appears in the list, so staff are naturally routed to a
+Manifest for that instead of being told no. Verified the same-city
+query against two real hubs sharing one city.
+
+### Separate staff tracking, public tracking unchanged
+
+New `StaffTrackingController` and four new views
+(`staff-search`/`staff-show`/`staff-multi`/`staff-batch`), all under
+the app's own sidebar layout, gated by `auth+staff` — a genuinely
+different page, not the public one showing more when someone happens
+to be logged in. The sidebar's "Tracking" link now points here.
+Public tracking (`TrackingController`) had its login-detection logic
+removed entirely and now always shows the same stripped-down view
+regardless of who's viewing it.
+
+New shared `TrackingService` extracts the shipment/manifest/trip
+lookup logic both controllers now call, plus `lastScanSummary()` —
+returns the last scan's date and location, falling back to the
+handling staff member's own assigned hub/outlet when the scan itself
+didn't record a location (staff view only; public tracking shows only
+what the scan itself recorded). Verified this fallback against a real
+scan event with no location and a staff member with an assigned hub.
+
+### Smaller pieces
+
+- A "Back to results" link now carries through from a multi-track
+  search into any individual shipment, manifest, or trip page and
+  back again — both the public and staff versions
+- The login page now links to the public tracking page for anyone
+  who isn't staff
+
+### Verified
+
+Balance-checked, crash-pattern-scanned, duplicate-checked, missing-
+import-scanned across every file (9 blade files, 3 PHP files
+touched or created). Full repo balance check: clean across 123 PHP
+files. Confirmed `/staff-tracking/multi` registers before
+`/staff-tracking/{trackingNumber}`, avoiding the same route-shadowing
+bug fixed twice already this session. Simulated pickup/drop-off
+mutual exclusivity across 6 cases. Verified the same-city hub query
+and the staff-location fallback both against live MySQL with real
+data, cleaning up all test rows afterward.
+
+### Files
+
+```
+app/Services/ScanService.php   (pickup/dropoff mutual exclusivity)
+app/Services/TrackingService.php   (new — shared lookup + last-scan summary)
+app/Http/Controllers/Web/OperationalScanController.php   (same-city departure destinations, nearbyDestinations())
+app/Http/Controllers/Web/TrackingController.php   (rebuilt on TrackingService, back-link support, no staff detection)
+app/Http/Controllers/Web/StaffTrackingController.php   (new)
+resources/views/operational-scans/index.blade.php   (AJAX-loaded same-city destinations, out-for-delivery toggle)
+resources/views/tracking/show.blade.php   (last-scan summary, back link, staff detail removed)
+resources/views/tracking/multi.blade.php   (back-link passthrough)
+resources/views/tracking/batch.blade.php   (back-link support)
+resources/views/tracking/staff-search.blade.php   (new)
+resources/views/tracking/staff-show.blade.php   (new — full internal detail)
+resources/views/tracking/staff-multi.blade.php   (new)
+resources/views/tracking/staff-batch.blade.php   (new)
+resources/views/components/layouts/app.blade.php   (Tracking link -> staff-tracking.search)
+resources/views/auth/login.blade.php   (public tracking link)
+routes/web.php   (staff-tracking.*, operational-scans.nearby-destinations)
+```

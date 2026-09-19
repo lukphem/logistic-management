@@ -43,7 +43,7 @@
                         <tr class="border-b border-line last:border-0">
                             <td class="p-3">
                                 @if ($result['found'])
-                                    <a href="{{ route('tracking.show', $result['number']) }}" class="font-mono text-[var(--brand-primary)] hover:underline">{{ $result['number'] }}</a>
+                                    <a href="{{ route('tracking.show', [$result['number'], 'back' => $numbersParam]) }}" class="font-mono text-[var(--brand-primary)] hover:underline">{{ $result['number'] }}</a>
                                 @else
                                     <span class="font-mono text-ink-500">{{ $result['number'] }}</span>
                                 @endif

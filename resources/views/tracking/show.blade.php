@@ -24,7 +24,11 @@
                 </span>
             @endif
             <span class="text-sm font-semibold text-ink-900">{{ config('branding.company_name') }}</span>
-            <a href="{{ route('tracking.search') }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">Track another shipment</a>
+            @if ($back)
+                <a href="{{ route('tracking.multi', ['numbers' => $back]) }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">← Back to results</a>
+            @else
+                <a href="{{ route('tracking.search') }}" class="ml-auto text-sm text-[var(--brand-primary)] hover:underline">Track another shipment</a>
+            @endif
         </div>
 
         @if (! $shipment)
@@ -56,6 +60,14 @@
                 @if ($shipment->delivered_at)
                     <p class="mt-3 text-sm text-ink-500">Delivered <span class="font-medium text-ink-900">{{ $shipment->delivered_at->format('d M Y, H:i') }}</span></p>
                 @endif
+                @if ($lastScan)
+                    <p class="mt-3 text-sm text-ink-500">
+                        Last updated <span class="font-medium text-ink-900">{{ $lastScan['date']?->format('d M Y, H:i') }}</span>
+                        @if ($lastScan['location'])
+                            — <span class="font-medium text-ink-900">{{ $lastScan['location'] }}</span>
+                        @endif
+                    </p>
+                @endif
             </div>
 
             <div class="mt-6 rounded-xl border border-line bg-white shadow-sm p-6">
@@ -74,34 +86,6 @@
                                     {{ $event->outlet?->name ?? $event->hub?->name ?? '' }}
                                     {{ $event->scanned_at?->format('d M Y, H:i') }}
                                 </p>
-                                @if ($isStaff)
-                                    <p class="mt-0.5 text-xs text-[var(--brand-primary)]">
-                                        Scanned by {{ $event->handler?->name ?? 'Unknown staff' }}
-                                        @if ($event->handedTo)
-                                            · Handed to {{ $event->handedTo->name }}
-                                        @endif
-                                        @if ($event->destinationHub)
-                                            · Heading to {{ $event->destinationHub->name }}
-                                        @endif
-                                    </p>
-                                    @if ($event->receiver_name)
-                                        <p class="text-xs text-ink-500">Received by: {{ $event->receiver_name }}</p>
-                                    @endif
-                                    @if ($event->photo_path || $event->signature_path)
-                                        <p class="mt-0.5 text-xs text-ink-500">
-                                            Evidence:
-                                            @if ($event->photo_path)
-                                                <a href="{{ asset('storage/' . $event->photo_path) }}" target="_blank" class="text-[var(--brand-primary)] hover:underline">photo</a>
-                                            @endif
-                                            @if ($event->photo_path && $event->signature_path)
-                                                ·
-                                            @endif
-                                            @if ($event->signature_path)
-                                                <a href="{{ asset('storage/' . $event->signature_path) }}" target="_blank" class="text-[var(--brand-primary)] hover:underline">signature</a>
-                                            @endif
-                                        </p>
-                                    @endif
-                                @endif
                             </div>
                         </div>
                     @endforeach
