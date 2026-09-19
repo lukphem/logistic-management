@@ -25,6 +25,7 @@ use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
 use App\Http\Controllers\Web\ManifestController;
 use App\Http\Controllers\Web\ManifestTripController;
+use App\Http\Controllers\Web\OperationalScanController;
 use App\Http\Controllers\Web\PaymentReportController;
 use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
@@ -97,6 +98,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/manifests/{manifest}/receive', [ManifestController::class, 'storeReceive'])->name('manifests.store-receive');
     });
     Route::middleware('can:shipments:update')->group(function () {
+        Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
+        Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
     });

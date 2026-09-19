@@ -62,6 +62,21 @@
                         ['label' => 'Payment Reports', 'route' => 'payment-reports.index', 'icon' => 'list-check', 'permission' => 'payments:read'],
                     ];
 
+                    // Operational Scans — five single-purpose scan
+                    // tools, each its own link with the operation
+                    // already locked in rather than one page with a
+                    // dropdown to pick it. All five share the same
+                    // route name (operational-scans.index) with a
+                    // different {type} parameter, so "active" state
+                    // is matched on the parameter, not just the route.
+                    $scanItems = [
+                        ['label' => 'Arrival Scan', 'type' => 'arrival', 'icon' => 'route', 'permission' => 'shipments:update'],
+                        ['label' => 'Departure Scan', 'type' => 'departure', 'icon' => 'route', 'permission' => 'shipments:update'],
+                        ['label' => 'Delivery Scan', 'type' => 'delivery', 'icon' => 'box', 'permission' => 'shipments:update'],
+                        ['label' => 'Pickup Scan', 'type' => 'pickup', 'icon' => 'box', 'permission' => 'shipments:update'],
+                        ['label' => 'Exception Scan', 'type' => 'exception', 'icon' => 'list-check', 'permission' => 'shipments:update'],
+                    ];
+
                     // Billing setup — nested inside Setups alongside
                     // Location, same pattern: a collapsible submenu rather
                     // than a flat list of six items.
@@ -144,6 +159,11 @@
                     );
                     $paymentsActive = collect($paymentItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
 
+                    $visibleScanItems = collect($scanItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $scansActive = request()->routeIs('operational-scans.*');
+
                     // Every Standard Billing sub-item shares the same
                     // route (standard-billing.index) — they're tabs on
                     // one page, not separate pages — so telling them
@@ -191,6 +211,28 @@
                             @foreach ($visiblePaymentItems as $item)
                                 @php $active = request()->routeIs($item['route'] . '*'); @endphp
                                 <a href="{{ route($item['route']) }}"
+                                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                                          {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />
+                                    {{ $item['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
+
+                @if ($visibleScanItems->isNotEmpty())
+                    <details class="group/scans" @if($scansActive) open @endif>
+                        <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
+                            <x-icon name="route" class="h-[18px] w-[18px] shrink-0" />
+                            <span class="flex-1">Operational Scans</span>
+                            <x-icon name="chevron" class="h-4 w-4 shrink-0 transition-transform group-open/scans:rotate-180" />
+                        </summary>
+
+                        <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                            @foreach ($visibleScanItems as $item)
+                                @php $active = request()->routeIs('operational-scans.*') && request()->route('type') === $item['type']; @endphp
+                                <a href="{{ route('operational-scans.index', $item['type']) }}"
                                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
                                           {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
                                     <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />

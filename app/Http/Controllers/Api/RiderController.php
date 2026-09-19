@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Validator;
 
 class RiderController extends Controller
 {
+    public function __construct(private \App\Services\ScanService $scans)
+    {
+    }
+
     public function assignedOrders(Request $request): JsonResponse
     {
         $orders = Shipment::where('assigned_rider_id', $request->user()->id)
@@ -52,72 +56,7 @@ class RiderController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $shipment = Shipment::findOrFail($request->shipment_id);
-        $data = $validator->validated();
-
-        $hubId = $data['hub_id'] ?? null;
-        $outletId = $data['outlet_id'] ?? null;
-
-        if ($outletId) {
-            $outlet = \App\Models\Outlet::find($outletId);
-            $hubId = $outlet?->hub_id ?? $hubId;
-        }
-
-        $scanEvent = ScanEvent::create([
-            ...$data,
-            'hub_id' => $hubId,
-            'handled_by' => $request->user()->id,
-            'scanned_at' => now(),
-        ]);
-
-        $shipmentUpdate = [
-            'current_status' => $request->status,
-            'delivered_at' => $request->status === 'delivered' ? now() : $shipment->delivered_at,
-        ];
-
-        if ($hubId) {
-            $shipmentUpdate['current_hub_id'] = $hubId;
-            $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself
-        }
-
-        // Counts against the shipment's own client account's
-        // Maximum Delivery Attempt limit — not every scan status
-        // qualifies, only ones staff have explicitly marked as
-        // representing an attempt (ScanStatus::is_delivery_attempt),
-        // since statuses are fully staff-configurable and the app has
-        // no reliable way to infer this from a label alone.
-        $scanStatus = \App\Models\ScanStatus::where('key', $request->status)->first();
-
-        if ($scanStatus?->is_delivery_attempt) {
-            $shipmentUpdate['delivery_attempts_count'] = $shipment->delivery_attempts_count + 1;
-
-            $maxAttempts = $shipment->client_account_id
-                ? \App\Models\ClientAccount::find($shipment->client_account_id)?->effectiveMaximumDeliveryAttempts()
-                : null;
-
-            if ($maxAttempts && $shipmentUpdate['delivery_attempts_count'] >= $maxAttempts && ! $shipment->delivery_attempts_exceeded_at) {
-                $shipmentUpdate['delivery_attempts_exceeded_at'] = now();
-            }
-        }
-
-        $shipment->update($shipmentUpdate);
-
-        // Milestone email — only for statuses staff have explicitly
-        // marked notify-worthy (ScanStatus::notify_customer), and only
-        // to whichever of receiver/sender email actually has one on
-        // file (most walk-in senders never give an email at all, and
-        // that's fine — this just quietly sends to whoever's
-        // reachable, never both-or-nothing). Queued via the Mailable's
-        // own ShouldQueue, so this never adds latency to the rider's
-        // own scan response even if the mail server is slow.
-        if ($scanStatus?->notify_customer) {
-            $recipients = array_filter([$shipment->receiver_email, $shipment->sender_email]);
-
-            if (! empty($recipients)) {
-                \Illuminate\Support\Facades\Mail::to($recipients)
-                    ->queue(new \App\Mail\ShipmentStatusUpdated($shipment, $scanStatus->label));
-            }
-        }
+        $scanEvent = $this->scans->recordScan($validator->validated(), $request->user()->id);
 
         return response()->json($scanEvent, 201);
     }

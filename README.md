@@ -9253,3 +9253,70 @@ route, `/manifest-trips/5` still correctly resolves to the show route.
 ```
 routes/web.php   (manifest-trips.create/store reordered before manifest-trips.show)
 ```
+
+## Increment 155 — Operational Scans Module (Web)
+
+A dedicated sidebar module, separate from the manifest system's own
+scanning — five single-purpose scan tools, each its own link with
+the operation already locked in, no dropdown to pick "what am I
+doing" first the way the first draft of this had it.
+
+### The five links
+
+New collapsible "Operational Scans" sidebar group:
+- **Arrival Scan**, **Departure Scan**, **Delivery Scan**, **Pickup
+  Scan** — each opens straight into a scan loop for exactly that one
+  operation
+- **Exception Scan** — the one exception (so to speak): "arrived
+  damaged, missing, etc." genuinely covers several distinct outcomes,
+  so this is the only one of the five that still shows a dropdown,
+  narrowed to just the exception-flavoured statuses rather than every
+  status in the system
+
+Each link maps to a `ScanStatus` key resolved at request time — never
+assumed to exist, so a status a staff member has renamed or removed
+under Scan Statuses just quietly disappears from the relevant link
+rather than breaking the page.
+
+### Shared logic, not a third copy
+
+Extracted `RiderController::scan()`'s core logic — creating the scan
+event, updating the shipment, delivery-attempt counting, the
+notify_customer email — into `ScanService`, exactly the same
+principle applied to the manifest system last increment. Both the
+rider mobile API and this new web module now call the identical
+service method, so a scan recorded from a hub counter's browser
+behaves exactly like one recorded from a rider's phone: same audit
+trail, same notifications, same attempt counting.
+
+### Scanning, same pattern as the manifest system
+
+Keyboard-wedge handheld scanner support (focused input + Enter, no
+library) as the primary path, camera-based scanning (`html5-qrcode`
+via CDN) as the secondary path for a device with no scanner attached
+— identical UX to the manifest create/receive pages, so staff don't
+need to learn a second way of scanning for a different part of the
+app.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including the inline JS brace
+balance), duplicate-checked, missing-import-scanned. Full repo
+balance check: clean across 219 files. Verified against live MySQL:
+seeded the expected default scan statuses, confirmed each of the four
+single-choice links resolves to exactly one status and Exception
+correctly resolves to its narrowed multi-status set, then simulated
+a full Pickup Scan end to end (scan event created, shipment status
+and location updated) matching exactly what `ScanService::recordScan()`
+produces.
+
+### Files
+
+```
+app/Services/ScanService.php   (new — extracted from RiderController::scan())
+app/Http/Controllers/Api/RiderController.php   (scan() now calls ScanService)
+app/Http/Controllers/Web/OperationalScanController.php   (new)
+resources/views/operational-scans/index.blade.php   (new)
+resources/views/components/layouts/app.blade.php   (Operational Scans sidebar group)
+routes/web.php   (operational-scans.index/store, /manifest-trips/{type})
+```
