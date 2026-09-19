@@ -74,6 +74,34 @@
                                     {{ $event->outlet?->name ?? $event->hub?->name ?? '' }}
                                     {{ $event->scanned_at?->format('d M Y, H:i') }}
                                 </p>
+                                @if ($isStaff)
+                                    <p class="mt-0.5 text-xs text-[var(--brand-primary)]">
+                                        Scanned by {{ $event->handler?->name ?? 'Unknown staff' }}
+                                        @if ($event->handedTo)
+                                            · Handed to {{ $event->handedTo->name }}
+                                        @endif
+                                        @if ($event->destinationHub)
+                                            · Heading to {{ $event->destinationHub->name }}
+                                        @endif
+                                    </p>
+                                    @if ($event->receiver_name)
+                                        <p class="text-xs text-ink-500">Received by: {{ $event->receiver_name }}</p>
+                                    @endif
+                                    @if ($event->photo_path || $event->signature_path)
+                                        <p class="mt-0.5 text-xs text-ink-500">
+                                            Evidence:
+                                            @if ($event->photo_path)
+                                                <a href="{{ asset('storage/' . $event->photo_path) }}" target="_blank" class="text-[var(--brand-primary)] hover:underline">photo</a>
+                                            @endif
+                                            @if ($event->photo_path && $event->signature_path)
+                                                ·
+                                            @endif
+                                            @if ($event->signature_path)
+                                                <a href="{{ asset('storage/' . $event->signature_path) }}" target="_blank" class="text-[var(--brand-primary)] hover:underline">signature</a>
+                                            @endif
+                                        </p>
+                                    @endif
+                                @endif
                             </div>
                         </div>
                     @endforeach

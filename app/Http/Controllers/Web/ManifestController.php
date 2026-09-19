@@ -62,6 +62,48 @@ class ManifestController extends \App\Http\Controllers\Controller
     }
 
     /**
+     * Editing an existing manifest that's still a draft — add more
+     * shipments (same eligibility/scan-to-add UI as creating a new
+     * one), or remove ones already on it. Locked the moment the trip
+     * dispatches, same as adding a whole new manifest is.
+     */
+    public function edit(Manifest $manifest): View
+    {
+        abort_if(! $manifest->isDraft(), 403, 'This manifest has already been dispatched and can no longer be edited.');
+
+        $manifest->load(['trip', 'destinationHub', 'manifestShipments.shipment']);
+
+        return view('manifests.manifests.edit', compact('manifest'));
+    }
+
+    public function addShipments(Request $request, Manifest $manifest): RedirectResponse
+    {
+        $data = $request->validate([
+            'shipment_ids' => 'required|array|min:1',
+            'shipment_ids.*' => 'exists:shipments,id',
+        ]);
+
+        try {
+            $this->manifests->addShipmentsToManifest($manifest, $data['shipment_ids']);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('manifests.edit', $manifest)->withErrors(['manifest' => $e->getMessage()]);
+        }
+
+        return redirect()->route('manifests.edit', $manifest)->with('status', 'Shipment(s) added.');
+    }
+
+    public function removeShipment(Manifest $manifest, int $shipment): RedirectResponse
+    {
+        try {
+            $this->manifests->removeShipmentFromManifest($manifest, $shipment);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('manifests.edit', $manifest)->withErrors(['manifest' => $e->getMessage()]);
+        }
+
+        return redirect()->route('manifests.edit', $manifest)->with('status', 'Shipment removed from manifest.');
+    }
+
+    /**
      * The receiving checklist — every shipment expected on this
      * manifest, each with its own condition to record. Only staff
      * with access to the manifest's own destination can receive it,

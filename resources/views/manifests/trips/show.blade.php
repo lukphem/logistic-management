@@ -63,6 +63,7 @@
                     <div class="flex items-center gap-2">
                         @if ($manifest->status === 'draft')
                             <span class="inline-flex items-center rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">Draft</span>
+                            <a href="{{ route('manifests.edit', $manifest) }}" class="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-50">Edit</a>
                         @elseif ($manifest->status === 'dispatched')
                             <span class="inline-flex items-center rounded-full bg-[var(--brand-primary)]/10 px-2.5 py-1 text-xs font-medium text-[var(--brand-primary)]">In transit</span>
                             <a href="{{ route('manifests.receive', $manifest) }}" class="rounded-md border border-line px-3 py-1.5 text-xs font-medium text-ink-700 hover:bg-surface-50">Receive</a>

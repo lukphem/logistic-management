@@ -9468,3 +9468,92 @@ app/Http/Controllers/Web/TrackingController.php   (manifest/trip number routing)
 resources/views/tracking/show.blade.php   (Booked milestone)
 resources/views/tracking/batch.blade.php   (new — manifest/trip batch view)
 ```
+
+## Increment 158 — Critical Hotfix + Departure Handoff + Manifest Editing + Tracking Enhancements
+
+### Critical hotfix: Pickup Scan rejected on the one status meant to be exempt
+
+Root cause traced exactly: an existing `picked_up` `ScanStatus` row
+predates the `is_first_touch` column, and the seeder's
+`firstOrCreate()` — deliberately built to never overwrite a staff
+member's label/sort_order customizations — also means it never
+touches an *existing* row's newer flags. The real effect: Pickup
+Scan itself was rejected with "hasn't been picked up or dropped off
+yet." New data-fix migration force-updates `is_first_touch` on any
+existing `picked_up` row and creates `dropped_off` if it's missing —
+applies automatically on `php artisan migrate`, no manual re-seed
+required. Reproduced the exact reported scenario and confirmed the
+fix resolves it.
+
+### Departure Scan: who's actually carrying it
+
+New optional "Handed to" field — a driver/rider dropdown — backed by
+a new `handed_to_user_id` column on `scan_events`. Recording it also
+updates the shipment's own `assigned_rider_id`, so the assignment
+stays current, not just logged on the one scan event.
+
+### Delivery Scan: receiver name now compulsory
+
+Both server-side validation and the scan-input's own enable/disable
+logic now require it before a delivery scan can go through.
+
+### Manifests: fully editable while draft
+
+New `ManifestService::addShipmentsToManifest()`/
+`removeShipmentFromManifest()` — both reject once a manifest is
+dispatched, exactly mirroring the receive workflow's own status
+guard. New edit page: existing shipments each get a Remove button,
+plus the same scan-to-add flow already used for creating a manifest.
+New "Edit" link on any draft manifest from the trip page.
+
+### Tracking portal: staff see more, public sees the same as before
+
+New `isStaff` distinction (just `auth()->check()` on the same page,
+not a separate one) — logged-in staff now additionally see who
+scanned each event, who it was handed to, the departure destination,
+who actually received a delivery, and links to any photo/signature
+evidence. All of this stays exactly as excluded as before for anyone
+not logged in.
+
+### Tracking portal: narrower field, multiple numbers at once
+
+The single-line input became a compact textarea accepting one number
+per line or comma-separated — narrower by default, and now supports
+tracking several shipments, manifests, or trips in one submission.
+A single number still goes straight to its own detail page exactly
+as before; more than one lands on a new summary page, each row
+resolved through the same shipment/manifest/trip lookup logic and
+linking through to its own full page.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned, nested-form-checked,
+duplicate-checked, missing-import-scanned across every file. Full
+repo balance check: clean across 216 files. Reproduced the exact
+reported Pickup Scan bug against live MySQL and confirmed the fix
+resolves it. Verified add/remove-shipment operations and the
+draft-status edit gate against a real manifest. Simulated the
+multi-number parsing logic across five cases including blank lines
+and duplicates — all correct. Confirmed the new `/track/multi` route
+was registered before the `{trackingNumber}` wildcard, avoiding the
+exact same shadowing bug fixed two increments ago.
+
+### Files
+
+```
+database/migrations/2026_03_23_000001_fix_first_touch_on_existing_scan_statuses.php
+database/migrations/2026_03_23_000002_add_handed_to_user_id_to_scan_events.php
+app/Models/ScanEvent.php   (handed_to_user_id, handedTo())
+app/Services/ScanService.php   (handed_to_user_id handling, assigned_rider_id sync)
+app/Services/ManifestService.php   (addShipmentsToManifest(), removeShipmentFromManifest())
+app/Http/Controllers/Web/OperationalScanController.php   (handoff field, receiver_name required)
+app/Http/Controllers/Web/ManifestController.php   (edit(), addShipments(), removeShipment())
+app/Http/Controllers/Web/TrackingController.php   (isStaff distinction, submit()/multi() for multiple numbers)
+resources/views/operational-scans/index.blade.php   (Handed to dropdown)
+resources/views/manifests/manifests/edit.blade.php   (new)
+resources/views/manifests/trips/show.blade.php   (Edit link on draft manifests)
+resources/views/tracking/show.blade.php   (staff-only detail)
+resources/views/tracking/search.blade.php   (narrower, textarea for multiple numbers)
+resources/views/tracking/multi.blade.php   (new)
+routes/web.php   (manifests.edit/add-shipments/remove-shipment, tracking.multi)
+```

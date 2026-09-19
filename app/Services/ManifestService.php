@@ -163,6 +163,43 @@ class ManifestService
     }
 
     /**
+     * A draft manifest can still have shipments added or removed
+     * right up until it's dispatched — after that it's locked, since
+     * the vehicle's already left with whatever was on it at that
+     * point. Already-attached shipments are silently skipped rather
+     * than erroring, so re-submitting the same edit page twice never
+     * fails on a duplicate.
+     *
+     * @throws \RuntimeException if the manifest isn't a draft
+     */
+    public function addShipmentsToManifest(Manifest $manifest, array $shipmentIds): void
+    {
+        if (! $manifest->isDraft()) {
+            throw new \RuntimeException('This manifest has already been dispatched and can no longer be edited.');
+        }
+
+        $alreadyOnManifest = $manifest->shipments()->pluck('shipments.id')->all();
+
+        foreach (array_unique($shipmentIds) as $shipmentId) {
+            if (! in_array($shipmentId, $alreadyOnManifest, true)) {
+                $manifest->shipments()->attach($shipmentId, ['condition' => 'pending']);
+            }
+        }
+    }
+
+    /**
+     * @throws \RuntimeException if the manifest isn't a draft
+     */
+    public function removeShipmentFromManifest(Manifest $manifest, int $shipmentId): void
+    {
+        if (! $manifest->isDraft()) {
+            throw new \RuntimeException('This manifest has already been dispatched and can no longer be edited.');
+        }
+
+        $manifest->shipments()->detach($shipmentId);
+    }
+
+    /**
      * Locks the whole trip — every draft manifest inside it moves to
      * dispatched, and every shipment on every one of those manifests
      * gets an "in_transit" scan event, same notify_customer check and

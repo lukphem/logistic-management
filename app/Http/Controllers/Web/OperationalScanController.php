@@ -28,7 +28,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         'pickup' => ['label' => 'Pickup Scan', 'keys' => ['picked_up']],
         'dropoff' => ['label' => 'Drop-off Scan', 'keys' => ['dropped_off']],
         'arrival' => ['label' => 'Arrival Scan', 'keys' => ['arrived_at_hub']],
-        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit'], 'needs_destination' => true],
+        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit'], 'needs_destination' => true, 'needs_handoff' => true],
         'delivery' => ['label' => 'Delivery Scan', 'keys' => ['delivered'], 'needs_evidence' => true],
         'exception' => ['label' => 'Exception Scan', 'keys' => ['arrived_damaged', 'missing', 'exception', 'returned', 'cancelled']],
     ];
@@ -54,9 +54,11 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'isMultiChoice' => count($config['keys']) > 1,
             'needsDestination' => $config['needs_destination'] ?? false,
             'needsEvidence' => $config['needs_evidence'] ?? false,
+            'needsHandoff' => $config['needs_handoff'] ?? false,
             'hubs' => $hubs,
             'outlets' => $outlets,
             'destinationHubs' => $config['needs_destination'] ?? false ? Hub::orderBy('name')->get() : collect(),
+            'riders' => $config['needs_handoff'] ?? false ? \App\Models\User::where('user_type', 'rider')->orderBy('name')->get() : collect(),
             'lockedLocationLabel' => $locked,
         ]);
     }
@@ -73,9 +75,10 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'hub_id' => 'nullable|exists:hubs,id',
             'outlet_id' => 'nullable|exists:outlets,id',
             'destination_hub_id' => ($config['needs_destination'] ?? false) ? 'required|exists:hubs,id' : 'nullable|exists:hubs,id',
-            'receiver_name' => 'nullable|string|max:255',
+            'receiver_name' => ($config['needs_evidence'] ?? false) ? 'required|string|max:255' : 'nullable|string|max:255',
             'photo_path' => 'nullable|string',
             'signature_path' => 'nullable|string',
+            'handed_to_user_id' => ($config['needs_handoff'] ?? false) ? 'nullable|exists:users,id' : 'prohibited',
         ]);
 
         $user = $request->user();
@@ -107,6 +110,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
                 'receiver_name' => $data['receiver_name'] ?? null,
                 'photo_path' => $data['photo_path'] ?? null,
                 'signature_path' => $data['signature_path'] ?? null,
+                'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
             ], $user->id);
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

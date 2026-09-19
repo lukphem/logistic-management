@@ -36,9 +36,61 @@ class TrackingController extends \App\Http\Controllers\Controller
 
     public function submit(Request $request): RedirectResponse
     {
-        $request->validate(['tracking_number' => 'required|string|max:64']);
+        $request->validate(['tracking_numbers' => 'required|string|max:4000']);
 
-        return redirect()->route('tracking.show', trim($request->input('tracking_number')));
+        // One per line or comma-separated, both accepted — trimmed
+        // and de-duplicated, since a pasted list often has stray
+        // blank lines or repeats.
+        $numbers = collect(preg_split('/[\r\n,]+/', $request->input('tracking_numbers')))
+            ->map(fn ($n) => trim($n))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($numbers->isEmpty()) {
+            return redirect()->route('tracking.search')->withErrors(['tracking_numbers' => 'Enter at least one number.']);
+        }
+
+        if ($numbers->count() === 1) {
+            return redirect()->route('tracking.show', $numbers->first());
+        }
+
+        return redirect()->route('tracking.multi', ['numbers' => $numbers->implode(',')]);
+    }
+
+    /**
+     * Several numbers at once — each resolved through the exact same
+     * per-number logic show() uses (shipment/manifest/trip), just
+     * summarized into one row per number rather than opening a
+     * separate page for each.
+     */
+    public function multi(Request $request): View
+    {
+        $numbers = collect(explode(',', (string) $request->query('numbers')))
+            ->map(fn ($n) => trim($n))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $results = $numbers->map(function ($number) {
+            if (str_starts_with($number, 'MAN-')) {
+                $manifest = Manifest::where('manifest_number', $number)->with('manifestShipments')->first();
+
+                return ['number' => $number, 'kind' => 'manifest', 'found' => (bool) $manifest, 'count' => $manifest?->manifestShipments->count(), 'status' => $manifest?->status];
+            }
+
+            if (str_starts_with($number, 'TRIP-')) {
+                $trip = ManifestTrip::where('trip_number', $number)->first();
+
+                return ['number' => $number, 'kind' => 'trip', 'found' => (bool) $trip, 'status' => $trip?->isDispatched() ? 'dispatched' : 'draft'];
+            }
+
+            $shipment = Shipment::where('tracking_number', $number)->first();
+
+            return ['number' => $number, 'kind' => 'shipment', 'found' => (bool) $shipment, 'status' => $shipment?->current_status, 'receiver_name' => $shipment?->receiver_name];
+        });
+
+        return view('tracking.multi', compact('results'));
     }
 
     /**
@@ -66,10 +118,31 @@ class TrackingController extends \App\Http\Controllers\Controller
         return $this->showShipment($number);
     }
 
+    /**
+     * Staff who are logged in and viewing this same page see a
+     * richer version — who handled each scan, who it was handed to,
+     * GPS/photo/signature evidence — all deliberately excluded from
+     * the public view. This is the one place that distinction is
+     * actually decided: not a separate page, just more relations
+     * eager-loaded and an isStaff flag the view checks before
+     * showing the extra detail.
+     */
     private function showShipment(string $trackingNumber): View
     {
+        $isStaff = auth()->check();
+
         $shipment = Shipment::where('tracking_number', $trackingNumber)
-            ->with(['scanEvents' => fn ($q) => $q->orderBy('scanned_at'), 'scanEvents.hub', 'scanEvents.outlet', 'scanEvents.destinationHub', 'originCity', 'destinationCity', 'serviceType'])
+            ->with(array_filter([
+                'scanEvents' => fn ($q) => $q->orderBy('scanned_at'),
+                'scanEvents.hub',
+                'scanEvents.outlet',
+                'scanEvents.destinationHub',
+                $isStaff ? 'scanEvents.handler' : null,
+                $isStaff ? 'scanEvents.handedTo' : null,
+                'originCity',
+                'destinationCity',
+                'serviceType',
+            ]))
             ->first();
 
         // Keyed by ScanStatus.key so the timeline can resolve a scan
@@ -80,7 +153,7 @@ class TrackingController extends \App\Http\Controllers\Controller
         // staff actually configured.
         $statusLabels = ScanStatus::all()->pluck('label', 'key');
 
-        return view('tracking.show', compact('shipment', 'trackingNumber', 'statusLabels'));
+        return view('tracking.show', compact('shipment', 'trackingNumber', 'statusLabels', 'isStaff'));
     }
 
     private function showManifest(string $manifestNumber): View

@@ -9,7 +9,7 @@ class ScanEvent extends Model
 {
     protected $fillable = [
         'shipment_id', 'status', 'handled_by', 'hub_id', 'outlet_id', 'destination_hub_id',
-        'latitude', 'longitude', 'photo_path', 'signature_path', 'receiver_name', 'scanned_at',
+        'latitude', 'longitude', 'photo_path', 'signature_path', 'receiver_name', 'handed_to_user_id', 'scanned_at',
     ];
 
     protected $casts = ['scanned_at' => 'datetime'];
@@ -22,6 +22,11 @@ class ScanEvent extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'handled_by');
+    }
+
+    public function handedTo(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'handed_to_user_id');
     }
 
     public function hub(): BelongsTo

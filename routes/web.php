@@ -48,6 +48,7 @@ Route::get('/', fn () => redirect()->route('dashboard'));
 // having an account at all, staff or otherwise.
 Route::get('/track', [TrackingController::class, 'search'])->name('tracking.search');
 Route::post('/track', [TrackingController::class, 'submit'])->name('tracking.submit');
+Route::get('/track/multi', [TrackingController::class, 'multi'])->name('tracking.multi');
 Route::get('/track/{trackingNumber}', [TrackingController::class, 'show'])->name('tracking.show');
 
 Route::middleware('guest')->group(function () {
@@ -85,6 +86,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/manifest-trips', [ManifestTripController::class, 'store'])->name('manifest-trips.store');
         Route::get('/manifest-trips/{trip}/manifests/create', [ManifestController::class, 'create'])->name('manifests.create');
         Route::post('/manifest-trips/{trip}/manifests', [ManifestController::class, 'store'])->name('manifests.store');
+        Route::get('/manifests/{manifest}/edit', [ManifestController::class, 'edit'])->name('manifests.edit');
+        Route::post('/manifests/{manifest}/shipments', [ManifestController::class, 'addShipments'])->name('manifests.add-shipments');
+        Route::delete('/manifests/{manifest}/shipments/{shipment}', [ManifestController::class, 'removeShipment'])->name('manifests.remove-shipment');
     });
     Route::middleware('can:manifests:read')->group(function () {
         Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');

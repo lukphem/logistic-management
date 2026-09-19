@@ -75,6 +75,7 @@ class ScanService
             'photo_path' => $data['photo_path'] ?? null,
             'signature_path' => $data['signature_path'] ?? null,
             'receiver_name' => $data['receiver_name'] ?? null,
+            'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
             'handled_by' => $handledByUserId,
             'scanned_at' => now(),
         ]);
@@ -87,6 +88,13 @@ class ScanService
         if ($hubId) {
             $shipmentUpdate['current_hub_id'] = $hubId;
             $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself
+        }
+
+        // Who's actually carrying the shipment right now — kept in
+        // sync with the departure/handover that just happened, not
+        // just logged on the scan event itself.
+        if (! empty($data['handed_to_user_id'])) {
+            $shipmentUpdate['assigned_rider_id'] = $data['handed_to_user_id'];
         }
 
         // Counts against the shipment's own client account's Maximum

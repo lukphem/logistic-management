@@ -14,7 +14,7 @@
 </head>
 <body class="h-full bg-surface-50 text-ink-900 antialiased">
     <div class="grid h-full place-items-center px-4">
-        <div class="w-full max-w-md">
+        <div class="w-full max-w-sm">
             <div class="mb-8 flex flex-col items-center gap-3 text-center">
                 @if (config('branding.logo_url'))
                     <img src="{{ config('branding.logo_url') }}" alt="{{ config('branding.company_name') }}" class="h-14 w-14 rounded-lg object-cover">
@@ -24,7 +24,7 @@
                     </span>
                 @endif
                 <p class="text-lg font-semibold text-ink-900">{{ config('branding.company_name') }}</p>
-                <p class="text-sm text-ink-500">Enter your tracking number to see where your shipment is.</p>
+                <p class="text-sm text-ink-500">Enter one or more tracking, manifest, or trip numbers to see where they are.</p>
             </div>
 
             @if ($errors->any())
@@ -35,11 +35,12 @@
 
             <form method="POST" action="{{ route('tracking.submit') }}" class="rounded-xl border border-line bg-white shadow-sm p-6">
                 @csrf
-                <label class="mb-1 block text-sm font-medium text-ink-900">Tracking number</label>
-                <input type="text" name="tracking_number" required autofocus placeholder="e.g. LM260913WAAORT" value="{{ old('tracking_number') }}"
-                       class="w-full rounded-md border border-line px-3 py-2.5 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                <label class="mb-1 block text-sm font-medium text-ink-900">Tracking number(s)</label>
+                <textarea name="tracking_numbers" required autofocus rows="3" placeholder="e.g. LM260913WAAORT&#10;One per line for more than one"
+                          class="w-full resize-y rounded-md border border-line px-3 py-2.5 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">{{ old('tracking_numbers') }}</textarea>
+                <p class="mt-1 text-xs text-ink-500">One per line, or separate with commas.</p>
                 <button type="submit" class="mt-4 w-full rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
-                    Track shipment
+                    Track
                 </button>
             </form>
         </div>

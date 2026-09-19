@@ -60,6 +60,18 @@
                     </select>
                 </div>
             @endif
+            @if ($needsHandoff)
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Handed to <span class="text-xs font-normal text-ink-500">(driver/rider — optional)</span></label>
+                    <select id="scan-handoff" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
+                        <option value="">— Not specified —</option>
+                        @foreach ($riders as $rider)
+                            <option value="{{ $rider->id }}">{{ $rider->name }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-ink-500">Whoever it's for delivery or a general departure — this is who's physically carrying it out.</p>
+                </div>
+            @endif
         </div>
 
         @if ($needsEvidence)
@@ -129,6 +141,10 @@
             function readyToScan() {
                 if (! currentStatus()) return false;
                 if (needsDestination && (! destinationSelect || ! destinationSelect.value)) return false;
+                if (needsEvidence) {
+                    const receiverEl = document.getElementById('scan-receiver-name');
+                    if (! receiverEl || ! receiverEl.value.trim()) return false;
+                }
                 return true;
             }
 
@@ -141,6 +157,10 @@
             }
             if (isMultiChoice) { statusEl.addEventListener('change', refreshEnabled); }
             if (destinationSelect) { destinationSelect.addEventListener('change', refreshEnabled); }
+            if (needsEvidence) {
+                const receiverEl = document.getElementById('scan-receiver-name');
+                if (receiverEl) { receiverEl.addEventListener('input', refreshEnabled); }
+            }
 
             if (hubSelect.tagName === 'SELECT') {
                 hubSelect.addEventListener('change', function () { if (this.value) outletSelect.value = ''; });
@@ -226,6 +246,8 @@
                         outlet_id: outletSelect.value || null,
                     };
                     if (needsDestination) { body.destination_hub_id = destinationSelect.value || null; }
+                    const handoffSelect = document.getElementById('scan-handoff');
+                    if (handoffSelect) { body.handed_to_user_id = handoffSelect.value || null; }
                     if (needsEvidence) {
                         body.receiver_name = document.getElementById('scan-receiver-name').value || null;
                         body.signature_path = paths[0];
