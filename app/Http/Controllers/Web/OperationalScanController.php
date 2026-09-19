@@ -29,7 +29,6 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         'dropoff' => ['label' => 'Drop-off Scan', 'keys' => ['dropped_off']],
         'arrival' => ['label' => 'Arrival Scan', 'keys' => ['arrived_at_hub']],
         'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit', 'out_for_delivery'], 'needs_destination' => true, 'needs_handoff' => true, 'destination_same_city' => true],
-        'delivery' => ['label' => 'Delivery Scan', 'keys' => ['delivered'], 'needs_evidence' => true],
         'exception' => ['label' => 'Exception Scan', 'keys' => ['arrived_damaged', 'missing', 'exception', 'returned', 'cancelled']],
     ];
 

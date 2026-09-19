@@ -73,9 +73,18 @@ class StaffTrackingController extends \App\Http\Controllers\Controller
                 return ['number' => $number, 'kind' => 'trip', 'found' => (bool) $trip, 'status' => $trip?->isDispatched() ? 'dispatched' : 'draft'];
             }
 
-            $shipment = $this->tracking->findShipment($number);
+            $shipment = $this->tracking->findShipment($number, withStaffDetail: true);
+            $lastScan = $shipment ? $this->tracking->lastScanSummary($shipment, withStaffFallback: true) : null;
 
-            return ['number' => $number, 'kind' => 'shipment', 'found' => (bool) $shipment, 'status' => $shipment?->current_status, 'receiver_name' => $shipment?->receiver_name];
+            return [
+                'number' => $number,
+                'kind' => 'shipment',
+                'found' => (bool) $shipment,
+                'status' => $shipment?->current_status,
+                'receiver_name' => $shipment?->receiver_name,
+                'last_scan_date' => $lastScan['date'] ?? null,
+                'last_scan_location' => $lastScan['location'] ?? null,
+            ];
         });
 
         return view('tracking.staff-multi', ['results' => $results, 'numbersParam' => $numbers->implode(',')]);

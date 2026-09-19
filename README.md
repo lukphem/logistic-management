@@ -9638,3 +9638,68 @@ resources/views/components/layouts/app.blade.php   (Tracking link -> staff-track
 resources/views/auth/login.blade.php   (public tracking link)
 routes/web.php   (staff-tracking.*, operational-scans.nearby-destinations)
 ```
+
+## Increment 160 — Dedicated Delivery Scan Flow + Richer Multi-Track Tables
+
+### Delivery Scan: fetch-and-verify, batch to one receiver, confirm before committing
+
+Delivery is different enough from the other five scan types that it
+now has its own dedicated controller and page rather than sharing the
+generic scan-and-go loop:
+
+- **Step 1 — scan each waybill**: every tracking number is looked up
+  (new `lookup()` endpoint — deliberately records nothing) and its
+  registered receiver name, phone, and address are shown immediately,
+  so staff can actually check it's the right package before anything
+  is confirmed. Each one lands in a running "ready for delivery" list
+  with a Remove button for anything added by mistake.
+- **Step 2 — one receiver, one piece of evidence, for the whole
+  batch**: since more than one waybill can genuinely go to the same
+  person in one visit, receiver name (compulsory), signature, and
+  photo are captured once and apply to every shipment in the list —
+  not re-entered per item.
+- **Confirmation before submitting**: naming the exact count and
+  receiver, the same principle as the manifest-creation confirmation
+  step, catching an accidental extra scan before it's committed.
+- **Partial success handled per item**: each shipment is recorded
+  through the same `ScanService::recordScan()` every other scan uses,
+  independently — if one item in the batch fails its own check (say,
+  already delivered by the time the batch submits), the rest still go
+  through, with each outcome reported individually rather than
+  failing the whole batch for one bad item.
+
+### Multi-track tables now show more
+
+Both the public and staff multi-number tracking results tables gained
+Receiver and Last Scan columns (date, and location where known) —
+the same "vital information" already shown on the single-shipment
+page, now visible at a glance across a whole batch of numbers too.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace/
+paren/backtick balance on the new delivery page's larger script),
+duplicate-checked, missing-import-scanned. Full repo balance check:
+clean across 124 PHP files. Confirmed the new
+`/operational-scans/delivery` routes register before the generic
+`/operational-scans/{type}` wildcard, avoiding the same shadowing bug
+fixed three times already this session. Simulated a real 2-shipment,
+1-receiver batch delivery against live MySQL and confirmed both
+shipments end up delivered with identical receiver_name and
+delivered_at — matching exactly what the batch endpoint produces —
+and separately confirmed the per-item terminal-status rejection logic
+that keeps one bad item in a batch from blocking the rest.
+
+### Files
+
+```
+app/Http/Controllers/Web/DeliveryScanController.php   (new)
+app/Http/Controllers/Web/OperationalScanController.php   (delivery removed from generic TYPES)
+app/Http/Controllers/Web/TrackingController.php   (multi() now includes last-scan summary)
+app/Http/Controllers/Web/StaffTrackingController.php   (multi() now includes last-scan summary with staff fallback)
+resources/views/operational-scans/delivery.blade.php   (new)
+resources/views/tracking/multi.blade.php   (Receiver, Last scan columns)
+resources/views/tracking/staff-multi.blade.php   (Receiver, Last scan columns)
+resources/views/components/layouts/app.blade.php   (Delivery Scan nav item -> dedicated route)
+routes/web.php   (operational-scans.delivery.index/lookup/store)
+```

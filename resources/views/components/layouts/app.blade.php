@@ -82,7 +82,7 @@
                         ['label' => 'Drop-off Scan', 'type' => 'dropoff', 'icon' => 'box', 'permission' => 'shipments:update'],
                         ['label' => 'Arrival Scan', 'type' => 'arrival', 'icon' => 'route', 'permission' => 'shipments:update'],
                         ['label' => 'Departure Scan', 'type' => 'departure', 'icon' => 'route', 'permission' => 'shipments:update'],
-                        ['label' => 'Delivery Scan', 'type' => 'delivery', 'icon' => 'box', 'permission' => 'shipments:update'],
+                        ['label' => 'Delivery Scan', 'route' => 'operational-scans.delivery.index', 'icon' => 'box', 'permission' => 'shipments:update'],
                         ['label' => 'Exception Scan', 'type' => 'exception', 'icon' => 'list-check', 'permission' => 'shipments:update'],
                     ];
 

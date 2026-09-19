@@ -91,8 +91,17 @@ class TrackingController extends \App\Http\Controllers\Controller
             }
 
             $shipment = $this->tracking->findShipment($number);
+            $lastScan = $shipment ? $this->tracking->lastScanSummary($shipment) : null;
 
-            return ['number' => $number, 'kind' => 'shipment', 'found' => (bool) $shipment, 'status' => $shipment?->current_status, 'receiver_name' => $shipment?->receiver_name];
+            return [
+                'number' => $number,
+                'kind' => 'shipment',
+                'found' => (bool) $shipment,
+                'status' => $shipment?->current_status,
+                'receiver_name' => $shipment?->receiver_name,
+                'last_scan_date' => $lastScan['date'] ?? null,
+                'last_scan_location' => $lastScan['location'] ?? null,
+            ];
         });
 
         return view('tracking.multi', ['results' => $results, 'numbersParam' => $numbers->implode(',')]);

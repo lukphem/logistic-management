@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\ClientController;
 use App\Http\Controllers\Web\CountryController;
 use App\Http\Controllers\Web\CountryRegionController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DeliveryScanController;
 use App\Http\Controllers\Web\DistrictController;
 use App\Http\Controllers\Web\FleetBillingTariffController;
 use App\Http\Controllers\Web\HubController;
@@ -108,6 +109,9 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/manifests/{manifest}/receive', [ManifestController::class, 'storeReceive'])->name('manifests.store-receive');
     });
     Route::middleware('can:shipments:update')->group(function () {
+        Route::get('/operational-scans/delivery', [DeliveryScanController::class, 'index'])->name('operational-scans.delivery.index');
+        Route::post('/operational-scans/delivery/lookup', [DeliveryScanController::class, 'lookup'])->name('operational-scans.delivery.lookup');
+        Route::post('/operational-scans/delivery', [DeliveryScanController::class, 'store'])->name('operational-scans.delivery.store');
         Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
         Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
         Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');

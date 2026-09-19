@@ -13,7 +13,9 @@
                 <tr class="border-b border-line text-left text-xs uppercase tracking-wide text-ink-500">
                     <th class="p-3">Number</th>
                     <th class="p-3">Kind</th>
+                    <th class="p-3">Receiver</th>
                     <th class="p-3">Status</th>
+                    <th class="p-3">Last scan</th>
                 </tr>
             </thead>
             <tbody>
@@ -27,6 +29,7 @@
                             @endif
                         </td>
                         <td class="p-3 text-ink-700">{{ ucfirst($result['kind']) }}</td>
+                        <td class="p-3 text-ink-700">{{ $result['receiver_name'] ?? '—' }}</td>
                         <td class="p-3">
                             @if (! $result['found'])
                                 <span class="text-status-exception">Not found</span>
@@ -36,6 +39,16 @@
                                 <span class="text-ink-700">{{ ucfirst($result['status']) }}</span>
                             @else
                                 <span class="text-ink-700">{{ ucfirst(str_replace('_', ' ', $result['status'])) }}</span>
+                            @endif
+                        </td>
+                        <td class="p-3 text-ink-700">
+                            @if (! empty($result['last_scan_date']))
+                                {{ $result['last_scan_date']->format('d M, H:i') }}
+                                @if (! empty($result['last_scan_location']))
+                                    <span class="block text-xs text-ink-500">{{ $result['last_scan_location'] }}</span>
+                                @endif
+                            @else
+                                —
                             @endif
                         </td>
                     </tr>
