@@ -153,6 +153,7 @@
         (function () {
             const originHubSelect = document.getElementById('origin-hub');
             const originOutletSelect = document.getElementById('origin-outlet');
+            const destinationHubSelect = document.getElementById('destination-hub');
             const groupsContainer = document.getElementById('destination-groups');
             const scanInput = document.getElementById('scan-input');
             const scanFeedback = document.getElementById('scan-feedback');
@@ -215,11 +216,28 @@
 
                 fetch(@json(route('manifests.eligible-shipments')) + '?' + params.toString())
                     .then(r => r.json())
-                    .then(function (groups) {
-                        if (! groups.length) {
+                    .then(function (allGroups) {
+                        if (! allGroups.length) {
                             groupsContainer.innerHTML = '<p class="text-sm text-ink-500">Nothing eligible at this origin right now.</p>';
                             return;
                         }
+
+                        // Once a destination is picked, this is "easy
+                        // batching" — show only the shipments actually
+                        // headed there, all pre-checked, instead of
+                        // making staff hunt through every group and
+                        // click Add all themselves. Change the
+                        // destination and it re-filters automatically.
+                        const destinationHubId = destinationHubSelect.value;
+                        const groups = destinationHubId
+                            ? allGroups.filter(g => String(g.destination_hub_id) === String(destinationHubId))
+                            : allGroups;
+
+                        if (destinationHubId && ! groups.length) {
+                            groupsContainer.innerHTML = '<p class="text-sm text-ink-500">Nothing eligible at this origin for that destination right now.</p>';
+                            return;
+                        }
+
                         groupsContainer.innerHTML = '';
                         groups.forEach(function (group) {
                             const box = document.createElement('div');
@@ -240,10 +258,12 @@
 
                             const list = document.createElement('div');
                             list.className = 'space-y-1';
+                            const autoCheck = destinationHubId && String(group.destination_hub_id) === String(destinationHubId);
                             group.shipments.forEach(function (s) {
                                 const label = document.createElement('label');
                                 label.className = 'flex items-center gap-2 text-sm text-ink-700';
-                                label.innerHTML = `<input type="checkbox" class="group-checkbox rounded border-line" value="${s.id}"> <span class="font-mono">${s.tracking_number}</span> <span class="text-ink-500">${s.receiver_name}</span>`;
+                                label.innerHTML = `<input type="checkbox" class="group-checkbox rounded border-line" value="${s.id}"${autoCheck ? ' checked' : ''}> <span class="font-mono">${s.tracking_number}</span> <span class="text-ink-500">${s.receiver_name}</span>`;
+                                if (autoCheck) { addShipment(s.id, s.tracking_number); }
                                 label.querySelector('input').addEventListener('change', function (e) {
                                     if (e.target.checked) { addShipment(s.id, s.tracking_number); }
                                     else { selected.delete(String(s.id)); syncHiddenInputs(); }
@@ -261,6 +281,24 @@
 
             originHubSelect.addEventListener('change', function () { if (this.value) originOutletSelect.value = ''; loadEligible(); });
             originOutletSelect.addEventListener('change', function () { if (this.value) originHubSelect.value = ''; loadEligible(); });
+            destinationHubSelect.addEventListener('change', loadEligible);
+
+            // A confirmation step before the actual submit — the
+            // whole point of auto-selecting everything for a
+            // destination is speed, which is exactly the situation
+            // where an accidental extra click could add/submit more
+            // than intended. One deliberate stop before anything is
+            // actually created.
+            form.addEventListener('submit', function (e) {
+                const count = selected.size;
+                const destinationLabel = destinationHubSelect.selectedOptions[0]?.textContent?.trim() || 'the selected destination';
+                const message = count > 0
+                    ? `Create this trip with ${count} shipment${count === 1 ? '' : 's'} manifested to ${destinationLabel}?`
+                    : 'Create this trip with no shipments manifested yet? You can add them to the first manifest afterward.';
+                if (! confirm(message)) {
+                    e.preventDefault();
+                }
+            });
 
             // Keyboard-wedge handheld scanners type the code then send
             // Enter automatically — this is the primary scanning path for

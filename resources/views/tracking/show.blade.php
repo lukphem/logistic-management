@@ -61,29 +61,38 @@
             <div class="mt-6 rounded-xl border border-line bg-white shadow-sm p-6">
                 <p class="mb-4 text-sm font-semibold text-ink-900">Tracking history</p>
 
-                @if ($shipment->scanEvents->isEmpty())
-                    <p class="text-sm text-ink-500">No scan history yet — this shipment has just been booked.</p>
-                @else
-                    <div class="space-y-5">
-                        @foreach ($shipment->scanEvents->reverse() as $event)
-                            <div class="flex gap-3">
-                                <div class="flex flex-col items-center">
-                                    <span class="h-2.5 w-2.5 rounded-full {{ $loop->first ? 'bg-[var(--brand-primary)]' : 'bg-line' }}"></span>
-                                    @if (! $loop->last)
-                                        <span class="mt-1 w-px flex-1 bg-line"></span>
-                                    @endif
-                                </div>
-                                <div class="pb-1">
-                                    <p class="text-sm font-medium text-ink-900">{{ $statusLabels[$event->status] ?? ucfirst(str_replace('_', ' ', $event->status)) }}</p>
-                                    <p class="text-xs text-ink-500">
-                                        {{ $event->outlet?->name ?? $event->hub?->name ?? '' }}
-                                        {{ $event->scanned_at?->format('d M Y, H:i') }}
-                                    </p>
-                                </div>
+                <div class="space-y-5">
+                    @foreach ($shipment->scanEvents->reverse() as $event)
+                        <div class="flex gap-3">
+                            <div class="flex flex-col items-center">
+                                <span class="h-2.5 w-2.5 rounded-full {{ $loop->first ? 'bg-[var(--brand-primary)]' : 'bg-line' }}"></span>
+                                <span class="mt-1 w-px flex-1 bg-line"></span>
                             </div>
-                        @endforeach
+                            <div class="pb-1">
+                                <p class="text-sm font-medium text-ink-900">{{ $statusLabels[$event->status] ?? ucfirst(str_replace('_', ' ', $event->status)) }}</p>
+                                <p class="text-xs text-ink-500">
+                                    {{ $event->outlet?->name ?? $event->hub?->name ?? '' }}
+                                    {{ $event->scanned_at?->format('d M Y, H:i') }}
+                                </p>
+                            </div>
+                        </div>
+                    @endforeach
+
+                    {{-- Booking itself is never a ScanEvent (it happens at
+                         creation, not a scan) — shown here from the
+                         shipment's own created_at so the timeline always
+                         starts at the true beginning, not just wherever
+                         the first physical scan happened to occur. --}}
+                    <div class="flex gap-3">
+                        <div class="flex flex-col items-center">
+                            <span class="h-2.5 w-2.5 rounded-full {{ $shipment->scanEvents->isEmpty() ? 'bg-[var(--brand-primary)]' : 'bg-line' }}"></span>
+                        </div>
+                        <div class="pb-1">
+                            <p class="text-sm font-medium text-ink-900">Booked</p>
+                            <p class="text-xs text-ink-500">{{ $shipment->created_at->format('d M Y, H:i') }}</p>
+                        </div>
                     </div>
-                @endif
+                </div>
             </div>
         @endif
 

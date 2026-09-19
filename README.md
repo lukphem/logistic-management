@@ -9408,3 +9408,63 @@ app/Http/Controllers/Web/OperationalScanController.php   (Drop-off type, locatio
 resources/views/operational-scans/index.blade.php   (locked-location display, destination field, signature/photo capture)
 routes/web.php   (operational-scans.upload-evidence)
 ```
+
+## Increment 157 — Operations Consolidation, Manifest UX, and Tracking Portal Enhancements
+
+The remaining pieces from the same round of feedback.
+
+### Sidebar consolidated into "Operations"
+
+Manifest Trips moved out of the flat top-level nav and into the same
+collapsible group as the six scan tools, renamed from "Operational
+Scans" to **Operations** — one place for every way shipments actually
+move, whether that's an individual scan or a batch manifest trip.
+
+### Manifest creation: easy batching, with a safety check
+
+Picking a destination hub now auto-filters the eligible-shipments
+list down to just that destination and pre-checks every shipment in
+it — "all available waybills related to a destination show once the
+route is selected," rather than staff hunting through every group and
+clicking Add all themselves. Changing the destination re-filters
+automatically. A confirmation step was added right before the actual
+submit, naming the shipment count and destination explicitly — the
+exact moment speed (auto-selecting everything) creates the most risk
+of an accidental over-broad selection is also the moment this catches
+it.
+
+### Tracking portal: booked milestone, batch lookup, staff access
+
+- **"Booked" now always appears** as the first timeline entry, pulled
+  from the shipment's own `created_at` rather than requiring a formal
+  scan event to exist for it (booking happens at creation, not via a
+  scan, so there was never one to show before)
+- **The same tracking number field now also accepts a manifest number
+  or a trip number** — `MAN-`/`TRIP-` prefixes route to a new batch
+  view listing every shipment on that manifest or trip, each linking
+  through to its own individual tracking page
+- **New "Tracking" link in the staff sidebar** — the public page,
+  made directly reachable for in-house use without staff having to
+  navigate away from the app manually
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace
+balance on the substantially expanded manifest-create script),
+nested-form-checked, duplicate-checked, missing-import-scanned. Full
+repo balance check: clean across 220 files. Simulated the MAN-/TRIP-/
+shipment routing logic across four representative inputs — all route
+correctly. Created a real test trip, manifest, and shipment
+attachment against live MySQL and confirmed both the manifest-number
+and trip-number lookup queries correctly resolve to the associated
+shipment, matching the controller's actual query shape exactly.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (Operations group — Manifest Trips + 6 scan links, Tracking sidebar link)
+resources/views/manifests/trips/create.blade.php   (auto-filter by destination, confirmation step)
+app/Http/Controllers/Web/TrackingController.php   (manifest/trip number routing)
+resources/views/tracking/show.blade.php   (Booked milestone)
+resources/views/tracking/batch.blade.php   (new — manifest/trip batch view)
+```

@@ -48,7 +48,7 @@
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard', 'permission' => null],
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
-                        ['label' => 'Manifest Trips', 'route' => 'manifest-trips.index', 'icon' => 'route', 'permission' => 'manifests:read'],
+                        ['label' => 'Tracking', 'route' => 'tracking.search', 'icon' => 'search', 'permission' => null],
                         ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
                     ];
 
@@ -67,13 +67,22 @@
                     // already locked in rather than one page with a
                     // dropdown to pick it. All five share the same
                     // route name (operational-scans.index) with a
-                    // different {type} parameter, so "active" state
-                    // is matched on the parameter, not just the route.
+                    // Operations — every individual scan tool plus
+                    // Manifest Trips (batch movement) live together
+                    // here, since they're all different ways of
+                    // moving/tracking shipments day to day. Manifest
+                    // Trips uses its own route name with no
+                    // parameter ('route'), the six scan tools all
+                    // share operational-scans.index with a different
+                    // {type} each ('type') — the render loop below
+                    // branches on which key is present.
                     $scanItems = [
+                        ['label' => 'Manifest Trips', 'route' => 'manifest-trips.index', 'icon' => 'route', 'permission' => 'manifests:read'],
+                        ['label' => 'Pickup Scan', 'type' => 'pickup', 'icon' => 'box', 'permission' => 'shipments:update'],
+                        ['label' => 'Drop-off Scan', 'type' => 'dropoff', 'icon' => 'box', 'permission' => 'shipments:update'],
                         ['label' => 'Arrival Scan', 'type' => 'arrival', 'icon' => 'route', 'permission' => 'shipments:update'],
                         ['label' => 'Departure Scan', 'type' => 'departure', 'icon' => 'route', 'permission' => 'shipments:update'],
                         ['label' => 'Delivery Scan', 'type' => 'delivery', 'icon' => 'box', 'permission' => 'shipments:update'],
-                        ['label' => 'Pickup Scan', 'type' => 'pickup', 'icon' => 'box', 'permission' => 'shipments:update'],
                         ['label' => 'Exception Scan', 'type' => 'exception', 'icon' => 'list-check', 'permission' => 'shipments:update'],
                     ];
 
@@ -162,7 +171,7 @@
                     $visibleScanItems = collect($scanItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
-                    $scansActive = request()->routeIs('operational-scans.*');
+                    $scansActive = request()->routeIs('operational-scans.*') || request()->routeIs('manifest-trips.*') || request()->routeIs('manifests.*');
 
                     // Every Standard Billing sub-item shares the same
                     // route (standard-billing.index) — they're tabs on
@@ -225,14 +234,19 @@
                     <details class="group/scans" @if($scansActive) open @endif>
                         <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
                             <x-icon name="route" class="h-[18px] w-[18px] shrink-0" />
-                            <span class="flex-1">Operational Scans</span>
+                            <span class="flex-1">Operations</span>
                             <x-icon name="chevron" class="h-4 w-4 shrink-0 transition-transform group-open/scans:rotate-180" />
                         </summary>
 
                         <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
                             @foreach ($visibleScanItems as $item)
-                                @php $active = request()->routeIs('operational-scans.*') && request()->route('type') === $item['type']; @endphp
-                                <a href="{{ route('operational-scans.index', $item['type']) }}"
+                                @php
+                                    $itemUrl = isset($item['route']) ? route($item['route']) : route('operational-scans.index', $item['type']);
+                                    $active = isset($item['route'])
+                                        ? request()->routeIs($item['route'] . '*')
+                                        : (request()->routeIs('operational-scans.*') && request()->route('type') === $item['type']);
+                                @endphp
+                                <a href="{{ $itemUrl }}"
                                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
                                           {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
                                     <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />
