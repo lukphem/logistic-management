@@ -24,6 +24,7 @@
         .company-name { font-weight: bold; font-size: 18px; overflow-wrap: break-word; }
         .doc-title { text-align: right; }
         .doc-title h1 { margin: 0; font-size: 22px; color: {{ $settings->color_primary ?? '#1F3864' }}; letter-spacing: 1px; }
+        .doc-title .ref-number { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; margin-top: 4px; }
         .doc-title .doc-date { font-size: 11px; color: #666; margin-top: 2px; }
 
         .route-line { text-align: center; font-size: 14px; font-weight: bold; margin: 10px 0 18px; }
@@ -55,6 +56,9 @@
             </div>
             <div class="doc-title">
                 <h1>TRANSFER CONFIRMATION</h1>
+                @if ($reference)
+                    <div class="ref-number">{{ $reference }}</div>
+                @endif
                 <div class="doc-date">Printed {{ now()->format('d M Y, H:i') }}</div>
             </div>
         </div>

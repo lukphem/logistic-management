@@ -26,6 +26,7 @@
         .company-name { font-weight: bold; font-size: 16px; overflow-wrap: break-word; }
         .doc-title { text-align: right; }
         .doc-title h1 { margin: 0; font-size: 20px; color: {{ $settings->color_primary ?? '#1F3864' }}; letter-spacing: 1px; }
+        .doc-title .ref-number { font-family: 'Courier New', monospace; font-size: 15px; font-weight: bold; margin-top: 4px; }
         .doc-title .doc-date { font-size: 11px; color: #666; margin-top: 2px; }
 
         .meta-line { display: flex; gap: 30px; margin-bottom: 14px; font-size: 11px; }
@@ -59,6 +60,9 @@
             </div>
             <div class="doc-title">
                 <h1>DELIVERY SHEET</h1>
+                @if ($reference)
+                    <div class="ref-number">{{ $reference }}</div>
+                @endif
                 <div class="doc-date">Printed {{ now()->format('d M Y, H:i') }}</div>
             </div>
         </div>

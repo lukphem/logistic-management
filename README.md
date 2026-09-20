@@ -10206,3 +10206,52 @@ resources/views/operational-scans/index.blade.php   (delivery-sheet print link a
 resources/views/print-documents/search.blade.php   (helper text clarifying manifest vs trip)
 routes/web.php   (manifests.print, operational-scans.print-delivery-sheet)
 ```
+
+## Increment 170 — Reference Numbers on Transfer Confirmation and Delivery Sheet
+
+Both ad-hoc departure printouts now carry their own identifying
+number, prefixed by which kind of scan produced them:
+
+- **`TRF-{date}-{random}`** — a local transfer confirmation (In
+  Transit)
+- **`DEL-{date}-{random}`** — a delivery sheet (Out for Delivery)
+
+Generated the moment the batch actually confirms in
+`OperationalScanController::store()` — not fresh on every page
+load — and carried through the print link's own query string, so
+reprinting the same document later shows the same number rather than
+a new one each time. The Confirmed log's print link now shows the
+number inline too (e.g. "🖨️ Print transfer confirmation
+(TRF-260921-ABCDE)"), so staff see it before even opening the
+document. Displayed prominently on the printed page itself, same
+position and styling as a manifest or trip number.
+
+### One real limitation worth knowing
+
+Unlike manifest and trip numbers, these aren't backed by a database
+record — they're generated at confirmation time purely for display
+and reference, not persisted anywhere. That means they can't be
+looked up later through the general Print Documents search page the
+way a manifest or trip number can; the number only exists on the
+document itself (and briefly, in that session's confirmation log) at
+the moment it's printed. Worth flagging in case a future need for
+re-printing by this reference number comes up — that would need an
+actual persisted record behind it, a larger addition than this one.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace/
+paren/backtick balance), duplicate-checked, missing-import-scanned.
+Full repo balance check: clean across 125 PHP files. Simulated the
+prefix-selection logic (TRF vs DEL) and the generate-vs-skip
+condition (only when the type is departure and at least one item
+succeeded) across 6 total cases, all correct.
+
+### Files
+
+```
+app/Http/Controllers/Web/OperationalScanController.php   (reference generation, passthrough on both print actions)
+resources/views/operational-scans/index.blade.php   (reference in print link params + link text)
+resources/views/operational-scans/print-transfer.blade.php   (reference number displayed)
+resources/views/operational-scans/print-delivery-sheet.blade.php   (reference number displayed)
+```

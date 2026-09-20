@@ -208,7 +208,21 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             }
         }
 
-        return response()->json(['results' => $results]);
+        // A reference number, generated the moment the batch actually
+        // confirms rather than fresh on every page load — so if the
+        // resulting document is printed more than once, it's always
+        // the same number, the way any real reference document
+        // would be. The prefix says which kind of scan produced it:
+        // TRF for a local transfer, DEL for an out-for-delivery run —
+        // the only two departure outcomes that generate a printable
+        // document at all.
+        $reference = null;
+        if ($type === 'departure' && array_filter($results, fn ($r) => $r['success'])) {
+            $prefix = $data['status'] === 'out_for_delivery' ? 'DEL' : 'TRF';
+            $reference = $prefix . '-' . now()->format('ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(5));
+        }
+
+        return response()->json(['results' => $results, 'reference' => $reference]);
     }
 
     /**
@@ -271,6 +285,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'shipment_ids' => 'required|string',
             'origin_label' => 'nullable|string',
             'destination_label' => 'nullable|string',
+            'reference' => 'nullable|string',
         ]);
 
         $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
@@ -283,6 +298,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'shipments' => $shipments,
             'originLabel' => $request->input('origin_label'),
             'destinationLabel' => $request->input('destination_label'),
+            'reference' => $request->input('reference'),
             'settings' => $settings,
         ]);
     }
@@ -302,6 +318,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         $request->validate([
             'shipment_ids' => 'required|string',
             'origin_label' => 'nullable|string',
+            'reference' => 'nullable|string',
         ]);
 
         $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
@@ -314,6 +331,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'shipments' => $shipments,
             'originLabel' => $request->input('origin_label'),
             'riderName' => $request->input('rider_name'),
+            'reference' => $request->input('reference'),
             'settings' => $settings,
         ]);
     }

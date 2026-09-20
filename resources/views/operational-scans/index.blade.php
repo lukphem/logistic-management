@@ -427,10 +427,11 @@
                                 shipment_ids: successfulIds.join(','),
                                 origin_label: originLabel,
                                 destination_label: destinationLabel,
+                                reference: data.reference || '',
                             });
                             const printRow = document.createElement('div');
                             printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
-                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-transfer')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print transfer confirmation for this batch</a>';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-transfer')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print transfer confirmation' + (data.reference ? ' (' + data.reference + ')' : '') + '</a>';
                             successLog.prepend(printRow);
                         }
 
@@ -448,10 +449,11 @@
                                 shipment_ids: successfulIds.join(','),
                                 origin_label: originLabel,
                                 rider_name: riderName,
+                                reference: data.reference || '',
                             });
                             const printRow = document.createElement('div');
                             printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
-                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-delivery-sheet')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print delivery sheet for this run</a>';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-delivery-sheet')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print delivery sheet' + (data.reference ? ' (' + data.reference + ')' : '') + '</a>';
                             successLog.prepend(printRow);
                         }
 
