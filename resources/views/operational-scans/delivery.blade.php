@@ -51,9 +51,24 @@
 
         <div id="camera-scanner" class="mt-3 hidden max-w-sm overflow-hidden rounded-lg border border-line"></div>
 
-        <div id="pending-list" class="mt-4 hidden space-y-2">
-            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">Ready for delivery (<span id="pending-count">0</span>)</p>
-            <div id="pending-items" class="space-y-2"></div>
+        <div id="pending-list" class="mt-4 hidden">
+            <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">Ready for delivery (<span id="pending-count">0</span>)</p>
+            <div class="max-h-[28rem] overflow-y-auto overflow-x-auto rounded-lg border border-line">
+                <table class="w-full text-sm">
+                    <thead class="sticky top-0 bg-surface-50">
+                        <tr class="border-b border-line text-left text-xs uppercase tracking-wide text-ink-500">
+                            <th class="p-2.5">Tracking #</th>
+                            <th class="p-2.5">Registered to</th>
+                            <th class="p-2.5">Phone</th>
+                            <th class="p-2.5">Address</th>
+                            <th class="p-2.5">Pieces</th>
+                            <th class="p-2.5">Service type</th>
+                            <th class="p-2.5"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-items"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -135,15 +150,18 @@
                 detailsSection.classList.toggle('hidden', pending.size === 0);
                 pendingItems.innerHTML = '';
                 pending.forEach(function (shipment, trackingNumber) {
-                    const row = document.createElement('div');
-                    row.className = 'flex items-center justify-between rounded-lg border border-line p-3';
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-line last:border-0';
                     row.innerHTML = `
-                        <div>
-                            <p class="font-mono text-sm font-medium text-ink-900">${shipment.tracking_number}</p>
-                            <p class="text-xs text-ink-500">Registered to: ${shipment.receiver_name || '—'} ${shipment.receiver_phone ? '· ' + shipment.receiver_phone : ''}</p>
-                            <p class="text-xs text-ink-500">${shipment.destination_address || ''}</p>
-                        </div>
+                        <td class="p-2.5 font-mono text-ink-900">${shipment.tracking_number}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.receiver_name || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.receiver_phone || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.destination_address || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.quantity || 1}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.service_type || '—'}</td>
                     `;
+                    const removeCell = document.createElement('td');
+                    removeCell.className = 'p-2.5';
                     const removeBtn = document.createElement('button');
                     removeBtn.type = 'button';
                     removeBtn.textContent = 'Remove';
@@ -153,25 +171,21 @@
                         renderPending();
                         refreshConfirmEnabled();
                     };
-                    row.appendChild(removeBtn);
+                    removeCell.appendChild(removeBtn);
+                    row.appendChild(removeCell);
                     pendingItems.appendChild(row);
                 });
                 refreshConfirmEnabled();
             }
 
-            function lookupAndAdd(trackingNumber) {
-                if (pending.has(trackingNumber)) {
-                    scanFeedback.textContent = trackingNumber + ' is already in this batch.';
-                    scanFeedback.className = 'text-xs text-ink-500';
-                    return;
-                }
+            function lookupAndAdd(number) {
                 scanFeedback.textContent = 'Looking up…';
                 scanFeedback.className = 'text-xs text-ink-500';
 
                 fetch(@json(route('operational-scans.delivery.lookup')), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
-                    body: JSON.stringify({ tracking_number: trackingNumber }),
+                    body: JSON.stringify({ number: number }),
                 })
                     .then(r => r.json().then(data => ({ ok: r.ok, data: data })))
                     .then(function (result) {
@@ -180,9 +194,15 @@
                             scanFeedback.className = 'text-xs text-status-exception';
                             return;
                         }
-                        pending.set(result.data.tracking_number, result.data);
+                        let added = 0;
+                        (result.data.shipments || []).forEach(function (shipment) {
+                            if (! pending.has(shipment.tracking_number)) {
+                                pending.set(shipment.tracking_number, shipment);
+                                added++;
+                            }
+                        });
                         renderPending();
-                        scanFeedback.textContent = '✓ Added ' + result.data.tracking_number + ' — verify the details below match';
+                        scanFeedback.textContent = added > 1 ? `✓ Added ${added} shipments — verify the details` : (added === 1 ? '✓ Added — verify the details match' : 'Already in this batch.');
                         scanFeedback.className = 'text-xs text-status-delivered';
                     })
                     .catch(function () {

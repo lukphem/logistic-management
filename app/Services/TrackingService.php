@@ -53,15 +53,31 @@ class TrackingService
     public function findManifest(string $manifestNumber): ?Manifest
     {
         return Manifest::where('manifest_number', $manifestNumber)
-            ->with(['trip', 'destinationHub', 'destinationOutlet', 'manifestShipments.shipment'])
+            ->with(['trip', 'destinationHub', 'destinationOutlet', 'manifestShipments.shipment' => $this->shipmentEagerLoads()])
             ->first();
     }
 
     public function findTrip(string $tripNumber): ?ManifestTrip
     {
         return ManifestTrip::where('trip_number', $tripNumber)
-            ->with(['originHub', 'originOutlet', 'manifests.destinationHub', 'manifests.manifestShipments.shipment'])
+            ->with(['originHub', 'originOutlet', 'manifests.destinationHub', 'manifests.manifestShipments.shipment' => $this->shipmentEagerLoads()])
             ->first();
+    }
+
+    /**
+     * The relations verificationSummary()/lastScanSummary() actually
+     * read — eager-loaded on batch lookups (a manifest or trip can
+     * carry hundreds of shipments) so building the verification list
+     * for a large batch is a handful of queries, not hundreds.
+     */
+    private function shipmentEagerLoads(): \Closure
+    {
+        return fn ($query) => $query->with([
+            'originCity', 'destinationCity', 'serviceType',
+            'scanEvents' => fn ($q) => $q->orderBy('scanned_at'),
+            'scanEvents.hub', 'scanEvents.outlet',
+            'scanEvents.handler.hub', 'scanEvents.handler.outlet',
+        ]);
     }
 
     public function shipmentsOnTrip(ManifestTrip $trip): Collection
@@ -147,6 +163,7 @@ class TrackingService
             'weight_kg' => $shipment->weight_kg,
             'origin' => $shipment->originCity?->name,
             'destination' => $shipment->destinationCity?->name,
+            'service_type' => $shipment->serviceType?->name,
             'current_status' => $shipment->current_status,
             'last_scan_date' => $lastScan['date'] ?? null,
             'last_scan_location' => $lastScan['location'] ?? null,

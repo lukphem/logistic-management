@@ -13,7 +13,7 @@ class ScanStatusSeeder extends Seeder
             ['key' => 'booked', 'label' => 'Booked', 'is_terminal' => false, 'notify_customer' => true, 'is_first_touch' => false],
             ['key' => 'picked_up', 'label' => 'Picked Up', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => true],
             ['key' => 'dropped_off', 'label' => 'Dropped Off', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => true],
-            ['key' => 'in_transit', 'label' => 'In Transit', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => false],
+            ['key' => 'in_transit', 'label' => 'Transfer to Another Unit for Processing', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => false],
             ['key' => 'transloaded', 'label' => 'Transloaded', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => false],
             ['key' => 'arrived_at_hub', 'label' => 'Arrived at Hub', 'is_terminal' => false, 'notify_customer' => false, 'is_first_touch' => false],
             ['key' => 'arrived_damaged', 'label' => 'Arrived Damaged', 'is_terminal' => false, 'notify_customer' => true, 'is_first_touch' => false],

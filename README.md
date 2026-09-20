@@ -9825,3 +9825,62 @@ capture for photos and a file-upload alternative for signatures.
 ```
 resources/views/operational-scans/index.blade.php   (rebuilt — lookup/pending-list/confirm/split-results flow)
 ```
+
+## Increment 163 — Tabular Confirmation Lists, "Transfer to Another Unit" Label, N+1 Fix
+
+### Pending lists rebuilt as tables
+
+Both scan pages' confirmation lists moved from stacked cards to a
+proper scrollable table with a sticky header row — the format that
+stays readable whether it's 3 shipments or 300. Every column has a
+header, every row still has its own Remove action. Generic scans:
+Tracking #, Receiver, Phone, Route, Pieces, Weight, Status, Last
+scan. Delivery: Tracking #, Registered to, Phone, Address, Pieces,
+Service type — added `service_type` to the shared
+`verificationSummary()` so it's available everywhere that needs it.
+
+### "In Transit" renamed
+
+Was too generic for what Departure Scan actually means by it — now
+"Transfer to Another Unit for Processing," describing the actual
+local handover rather than movement in general. New data-fix
+migration (not just a seeder change, since `firstOrCreate()` never
+touches an existing row) — only updates installs still on the exact
+default label, leaving anything a company has since customized alone.
+
+### Fixed a real N+1 risk on large batches
+
+`findManifest()`/`findTrip()` weren't eager-loading the nested
+shipment relations (`originCity`, `destinationCity`, `serviceType`,
+scan events) that `verificationSummary()` actually reads — meaning a
+100-shipment manifest scan would have triggered hundreds of extra
+queries building the verification table. Now eager-loaded up front,
+so a large batch lookup stays a handful of queries.
+
+### Also fixed: delivery.blade.php was still on the old lookup contract
+
+Found while updating the table: `delivery.blade.php`'s `lookupAndAdd()`
+was still sending `tracking_number` and expecting a single shipment
+back, from before `DeliveryScanController::lookup()` was rebuilt to
+accept `number` and return a `shipments` array — this would have
+broken every delivery lookup. Fixed to match.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace/
+paren/backtick balance on both rewritten scripts). Full repo balance
+check: clean across 226 PHP files. Verified the label-rename migration
+against live MySQL, including that its guard clause correctly leaves
+an already-customized label untouched. Verified the eager-loaded
+batch query returns the exact fields the table needs, against a real
+manifest.
+
+### Files
+
+```
+database/migrations/2026_03_24_000001_rename_in_transit_scan_status_label.php
+database/seeders/ScanStatusSeeder.php   (in_transit default label)
+app/Services/TrackingService.php   (service_type in verificationSummary(), eager-loading fix)
+resources/views/operational-scans/index.blade.php   (table-based pending list)
+resources/views/operational-scans/delivery.blade.php   (table-based pending list, lookup contract fix)
+```

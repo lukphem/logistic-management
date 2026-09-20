@@ -103,7 +103,28 @@
                 Confirm
             </button>
         </div>
-        <div id="pending-items" class="space-y-2"></div>
+        {{-- A scrollable table rather than stacked cards — this is
+             the format that stays readable whether it's 3 shipments
+             or 300; the header row keeps every column labeled no
+             matter how far the list scrolls. --}}
+        <div class="max-h-[28rem] overflow-y-auto overflow-x-auto rounded-lg border border-line">
+            <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-surface-50">
+                    <tr class="border-b border-line text-left text-xs uppercase tracking-wide text-ink-500">
+                        <th class="p-2.5">Tracking #</th>
+                        <th class="p-2.5">Receiver</th>
+                        <th class="p-2.5">Phone</th>
+                        <th class="p-2.5">Route</th>
+                        <th class="p-2.5">Pieces</th>
+                        <th class="p-2.5">Weight</th>
+                        <th class="p-2.5">Status</th>
+                        <th class="p-2.5">Last scan</th>
+                        <th class="p-2.5"></th>
+                    </tr>
+                </thead>
+                <tbody id="pending-items"></tbody>
+            </table>
+        </div>
     </div>
 
     <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -217,28 +238,33 @@
                 pendingSection.classList.toggle('hidden', pending.size === 0);
                 pendingItems.innerHTML = '';
                 pending.forEach(function (shipment, trackingNumber) {
-                    const row = document.createElement('div');
-                    row.className = 'flex items-start justify-between gap-3 rounded-lg border border-line p-3';
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-line last:border-0';
                     const lastScan = shipment.last_scan_date
-                        ? new Date(shipment.last_scan_date).toLocaleString() + (shipment.last_scan_location ? ' — ' + shipment.last_scan_location : '')
+                        ? new Date(shipment.last_scan_date).toLocaleDateString() + (shipment.last_scan_location ? ' — ' + shipment.last_scan_location : '')
                         : 'No scans yet';
                     row.innerHTML = `
-                        <div class="text-sm">
-                            <p class="font-mono font-medium text-ink-900">${shipment.tracking_number}</p>
-                            <p class="text-xs text-ink-500">${shipment.receiver_name || '—'} ${shipment.receiver_phone ? '· ' + shipment.receiver_phone : ''}</p>
-                            <p class="text-xs text-ink-500">${shipment.origin || '—'} → ${shipment.destination || '—'} · ${shipment.quantity || 1} pc(s) ${shipment.weight_kg ? '· ' + shipment.weight_kg + ' kg' : ''}</p>
-                            <p class="text-xs text-ink-500">Current: ${shipment.current_status} · Last scan: ${lastScan}</p>
-                        </div>
+                        <td class="p-2.5 font-mono text-ink-900">${shipment.tracking_number}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.receiver_name || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.receiver_phone || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.origin || '—'} → ${shipment.destination || '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.quantity || 1}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.weight_kg ? shipment.weight_kg + ' kg' : '—'}</td>
+                        <td class="p-2.5 text-ink-700">${shipment.current_status}</td>
+                        <td class="p-2.5 text-ink-700">${lastScan}</td>
                     `;
+                    const removeCell = document.createElement('td');
+                    removeCell.className = 'p-2.5';
                     const removeBtn = document.createElement('button');
                     removeBtn.type = 'button';
                     removeBtn.textContent = 'Remove';
-                    removeBtn.className = 'shrink-0 text-xs font-medium text-status-exception hover:underline';
+                    removeBtn.className = 'text-xs font-medium text-status-exception hover:underline';
                     removeBtn.onclick = function () {
                         pending.delete(trackingNumber);
                         renderPending();
                     };
-                    row.appendChild(removeBtn);
+                    removeCell.appendChild(removeBtn);
+                    row.appendChild(removeCell);
                     pendingItems.appendChild(row);
                 });
             }
