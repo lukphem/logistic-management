@@ -9703,3 +9703,75 @@ resources/views/tracking/staff-multi.blade.php   (Receiver, Last scan columns)
 resources/views/components/layouts/app.blade.php   (Delivery Scan nav item -> dedicated route)
 routes/web.php   (operational-scans.delivery.index/lookup/store)
 ```
+
+## Increment 161 — Per-Flow Scan Permissions + Batch/Verification Backend Foundation
+
+### Every scan flow now has its own permission
+
+Six new permission modules (`pickup-scan`, `dropoff-scan`,
+`arrival-scan`, `departure-scan`, `delivery-scan`, `exception-scan`),
+replacing the single shared `shipments:update` that previously gated
+all of them together. A company can now give a counter clerk Pickup
+and Drop-off without also handing them Exception, say — each flow's
+access is decided independently. Delivery, having its own distinct
+routes, is gated with standard route middleware
+(`can:delivery-scan:update`); the other five share one route via a
+`{type}` wildcard, so their permissions are checked inside
+`OperationalScanController` itself at runtime, based on which type
+was actually requested — a single `can:` middleware can't distinguish
+between them at the route level. Hub Staff and Ops Manager both get
+all six by default, matching what they already had; the roles admin
+page picks up the six new modules automatically since it renders
+permissions dynamically rather than off a hardcoded list.
+
+### Backend foundation for verify-then-confirm on every scan type
+
+The larger piece — "confirm the list of shipment details before
+submitting, on every operation" — got its shared foundation this
+round:
+
+- `TrackingService::resolveShipmentsForScan()` — resolves ANY number
+  a scan input receives (a shipment's own tracking number, or a
+  manifest/trip batch number) into the full list of shipments it
+  represents, so scanning a batch number can load an entire batch for
+  verification in one action
+- `TrackingService::verificationSummary()` — the detail card every
+  scan type will show before confirming: tracking number, receiver
+  name/phone, destination address, piece count, weight in kilograms,
+  origin→destination, current status, and last-scan date/location
+- `OperationalScanController` rebuilt with a `lookup()` endpoint
+  (records nothing) and a `store()` that now takes an array of
+  shipment IDs and reports each result individually, successes and
+  failures never merged into one ambiguous outcome
+- `DeliveryScanController::lookup()` updated to use the same shared
+  logic, so it now also accepts manifest/trip numbers
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every file. Full repo balance check: clean across 130 PHP files.
+Verified the new permission rows are created correctly against live
+MySQL. Simulated the per-type authorization logic with a partial-
+access user (only Pickup and Drop-off granted) across all five
+generic types — correctly allowed exactly those two and blocked the
+rest.
+
+### Still to come
+
+Rebuilding both `operational-scans/index.blade.php` and
+`delivery.blade.php` to actually use the new lookup/confirm flow —
+pending list with full detail, one explicit confirmation, separated
+success/error results — plus camera capture for photos and a
+file-upload alternative for signatures. The backend is ready; the
+UI work is next.
+
+### Files
+
+```
+database/seeders/RolePermissionSeeder.php   (6 new scan permission modules)
+app/Http/Controllers/Web/OperationalScanController.php   (authorizeType(), lookup(), batch store())
+app/Http/Controllers/Web/DeliveryScanController.php   (lookup() uses shared TrackingService logic)
+app/Services/TrackingService.php   (resolveShipmentsForScan(), verificationSummary())
+resources/views/components/layouts/app.blade.php   (each scan nav item -> its own permission)
+routes/web.php   (delivery-scan:update route group; generic {type} routes ungated at route level)
+```

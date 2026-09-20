@@ -13,13 +13,13 @@ class RolePermissionSeeder extends Seeder
      * controllers/routes and the Blade admin. Extend this list as new
      * modules are added rather than hardcoding checks elsewhere.
      */
-    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations', 'billing', 'users', 'clients', 'payments', 'manifests'];
+    private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations', 'billing', 'users', 'clients', 'payments', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan'];
     private array $actions = ['create', 'read', 'update', 'delete'];
 
     private array $defaultRoles = [
         'Super Admin' => '*', // gets every permission
-        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read', 'clients', 'payments:read', 'manifests'],
-        'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read', 'payments:read', 'manifests'],
+        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read', 'clients', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan'],
+        'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan'],
         'Finance' => ['reports:read', 'settings:read', 'rates', 'billing', 'clients', 'payments'],
         'Support' => ['shipments:read', 'clients:read'],
     ];

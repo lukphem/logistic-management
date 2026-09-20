@@ -70,6 +70,90 @@ class TrackingService
     }
 
     /**
+     * Resolves ANY number a scan input might receive — a shipment's
+     * own tracking number, or a manifest/trip batch number — into the
+     * full list of shipments it represents. A tracking number
+     * resolves to itself (one shipment); a manifest or trip number
+     * pulls in every shipment riding on it, so scanning a batch
+     * number loads the whole batch for verification in one action
+     * instead of the individual pieces one at a time.
+     *
+     * @return array{found: bool, message?: string, shipments: Collection<int, Shipment>}
+     */
+    public function resolveShipmentsForScan(string $number): array
+    {
+        $kind = $this->resolveKind($number);
+
+        if ($kind === 'manifest') {
+            $manifest = $this->findManifest($number);
+
+            if (! $manifest) {
+                return ['found' => false, 'message' => "No manifest with that number.", 'shipments' => collect()];
+            }
+
+            $shipments = $manifest->manifestShipments->pluck('shipment')->filter();
+
+            if ($shipments->isEmpty()) {
+                return ['found' => false, 'message' => "Manifest {$number} has no shipments on it.", 'shipments' => collect()];
+            }
+
+            return ['found' => true, 'shipments' => $shipments];
+        }
+
+        if ($kind === 'trip') {
+            $trip = $this->findTrip($number);
+
+            if (! $trip) {
+                return ['found' => false, 'message' => "No trip with that number.", 'shipments' => collect()];
+            }
+
+            $shipments = $this->shipmentsOnTrip($trip);
+
+            if ($shipments->isEmpty()) {
+                return ['found' => false, 'message' => "Trip {$number} has no shipments on it.", 'shipments' => collect()];
+            }
+
+            return ['found' => true, 'shipments' => $shipments];
+        }
+
+        $shipment = $this->findShipment($number);
+
+        if (! $shipment) {
+            return ['found' => false, 'message' => "No shipment with that tracking number.", 'shipments' => collect()];
+        }
+
+        return ['found' => true, 'shipments' => collect([$shipment])];
+    }
+
+    /**
+     * The verification card every scan type shows before submitting
+     * — tracking number, who it's registered to, piece count, current
+     * status, and when/where it was last scanned. Same shape whether
+     * it came from a single tracking number or one entry in a
+     * manifest/trip batch, so the confirmation list looks identical
+     * either way.
+     */
+    public function verificationSummary(Shipment $shipment, bool $withStaffFallback = false): array
+    {
+        $lastScan = $this->lastScanSummary($shipment, $withStaffFallback);
+
+        return [
+            'id' => $shipment->id,
+            'tracking_number' => $shipment->tracking_number,
+            'receiver_name' => $shipment->receiver_name,
+            'receiver_phone' => $shipment->receiver_phone,
+            'destination_address' => $shipment->destination_address,
+            'quantity' => $shipment->quantity,
+            'weight_kg' => $shipment->weight_kg,
+            'origin' => $shipment->originCity?->name,
+            'destination' => $shipment->destinationCity?->name,
+            'current_status' => $shipment->current_status,
+            'last_scan_date' => $lastScan['date'] ?? null,
+            'last_scan_location' => $lastScan['location'] ?? null,
+        ];
+    }
+
+    /**
      * @return array{date: ?\Carbon\Carbon, location: ?string}|null
      */
     public function lastScanSummary(Shipment $shipment, bool $withStaffFallback = false): ?array

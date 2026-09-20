@@ -108,14 +108,23 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/manifests/{manifest}/receive', [ManifestController::class, 'receive'])->name('manifests.receive');
         Route::post('/manifests/{manifest}/receive', [ManifestController::class, 'storeReceive'])->name('manifests.store-receive');
     });
-    Route::middleware('can:shipments:update')->group(function () {
+    Route::middleware('can:delivery-scan:update')->group(function () {
         Route::get('/operational-scans/delivery', [DeliveryScanController::class, 'index'])->name('operational-scans.delivery.index');
         Route::post('/operational-scans/delivery/lookup', [DeliveryScanController::class, 'lookup'])->name('operational-scans.delivery.lookup');
         Route::post('/operational-scans/delivery', [DeliveryScanController::class, 'store'])->name('operational-scans.delivery.store');
-        Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
-        Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
-        Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');
-        Route::get('/operational-scans-nearby-destinations', [OperationalScanController::class, 'nearbyDestinations'])->name('operational-scans.nearby-destinations');
+    });
+    // The other five scan types share one route each (the {type}
+    // wildcard), so a single can: middleware can't gate them
+    // separately — each one's own permission (pickup-scan:update,
+    // departure-scan:update, and so on) is instead checked inside
+    // OperationalScanController itself, at runtime, based on which
+    // type was actually requested.
+    Route::get('/operational-scans/{type}', [OperationalScanController::class, 'index'])->name('operational-scans.index');
+    Route::post('/operational-scans/{type}/lookup', [OperationalScanController::class, 'lookup'])->name('operational-scans.lookup');
+    Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
+    Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');
+    Route::get('/operational-scans-nearby-destinations', [OperationalScanController::class, 'nearbyDestinations'])->name('operational-scans.nearby-destinations');
+    Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
     });

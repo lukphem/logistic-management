@@ -78,12 +78,12 @@
                     // branches on which key is present.
                     $scanItems = [
                         ['label' => 'Manifest Trips', 'route' => 'manifest-trips.index', 'icon' => 'route', 'permission' => 'manifests:read'],
-                        ['label' => 'Pickup Scan', 'type' => 'pickup', 'icon' => 'box', 'permission' => 'shipments:update'],
-                        ['label' => 'Drop-off Scan', 'type' => 'dropoff', 'icon' => 'box', 'permission' => 'shipments:update'],
-                        ['label' => 'Arrival Scan', 'type' => 'arrival', 'icon' => 'route', 'permission' => 'shipments:update'],
-                        ['label' => 'Departure Scan', 'type' => 'departure', 'icon' => 'route', 'permission' => 'shipments:update'],
-                        ['label' => 'Delivery Scan', 'route' => 'operational-scans.delivery.index', 'icon' => 'box', 'permission' => 'shipments:update'],
-                        ['label' => 'Exception Scan', 'type' => 'exception', 'icon' => 'list-check', 'permission' => 'shipments:update'],
+                        ['label' => 'Pickup Scan', 'type' => 'pickup', 'icon' => 'box', 'permission' => 'pickup-scan:update'],
+                        ['label' => 'Drop-off Scan', 'type' => 'dropoff', 'icon' => 'box', 'permission' => 'dropoff-scan:update'],
+                        ['label' => 'Arrival Scan', 'type' => 'arrival', 'icon' => 'route', 'permission' => 'arrival-scan:update'],
+                        ['label' => 'Departure Scan', 'type' => 'departure', 'icon' => 'route', 'permission' => 'departure-scan:update'],
+                        ['label' => 'Delivery Scan', 'route' => 'operational-scans.delivery.index', 'icon' => 'box', 'permission' => 'delivery-scan:update'],
+                        ['label' => 'Exception Scan', 'type' => 'exception', 'icon' => 'list-check', 'permission' => 'exception-scan:update'],
                     ];
 
                     // Billing setup — nested inside Setups alongside

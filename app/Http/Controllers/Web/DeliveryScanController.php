@@ -7,6 +7,7 @@ use App\Models\Outlet;
 use App\Models\ScanStatus;
 use App\Models\Shipment;
 use App\Services\ScanService;
+use App\Services\TrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +26,7 @@ use Illuminate\View\View;
  */
 class DeliveryScanController extends \App\Http\Controllers\Controller
 {
-    public function __construct(private ScanService $scans)
+    public function __construct(private ScanService $scans, private TrackingService $tracking)
     {
     }
 
@@ -51,29 +52,25 @@ class DeliveryScanController extends \App\Http\Controllers\Controller
      */
     public function lookup(Request $request): JsonResponse
     {
-        $request->validate(['tracking_number' => 'required|string']);
+        $request->validate(['number' => 'required|string']);
 
-        $shipment = Shipment::where('tracking_number', trim($request->input('tracking_number')))
-            ->with(['originCity', 'destinationCity', 'serviceType'])
-            ->first();
+        $result = $this->tracking->resolveShipmentsForScan(trim($request->input('number')));
 
-        if (! $shipment) {
-            return response()->json(['found' => false, 'message' => 'No shipment with that tracking number.'], 404);
+        if (! $result['found']) {
+            return response()->json(['found' => false, 'message' => $result['message']], 404);
         }
 
-        if (in_array($shipment->current_status, ['delivered', 'returned', 'cancelled'], true)) {
-            return response()->json(['found' => false, 'message' => "{$shipment->tracking_number} is already {$shipment->current_status} — it's out of the company's hands."], 422);
+        $eligible = $result['shipments']->reject(
+            fn ($s) => in_array($s->current_status, ['delivered', 'returned', 'cancelled'], true)
+        )->values();
+
+        if ($eligible->isEmpty()) {
+            return response()->json(['found' => false, 'message' => 'Every shipment in that batch is already out of the company\'s hands.'], 422);
         }
 
         return response()->json([
             'found' => true,
-            'id' => $shipment->id,
-            'tracking_number' => $shipment->tracking_number,
-            'receiver_name' => $shipment->receiver_name,
-            'receiver_phone' => $shipment->receiver_phone,
-            'destination_address' => $shipment->destination_address,
-            'service_type' => $shipment->serviceType?->name,
-            'current_status' => $shipment->current_status,
+            'shipments' => $eligible->map(fn ($s) => $this->tracking->verificationSummary($s, withStaffFallback: true))->values(),
         ]);
     }
 

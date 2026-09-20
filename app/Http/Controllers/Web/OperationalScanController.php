@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Models\Hub;
 use App\Models\Outlet;
 use App\Models\ScanStatus;
-use App\Models\Shipment;
 use App\Services\ScanService;
+use App\Services\TrackingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -21,24 +21,33 @@ use Illuminate\View\View;
  * notify_customer emails, delivery-attempt counting, terminal-status
  * blocking, and first-touch gating all behave identically to a
  * rider's own scan.
+ *
+ * Every type follows the same two-step flow: scan/type a number
+ * (a shipment's own tracking number, or a manifest/trip batch number
+ * — either loads every shipment it represents), see its registered
+ * details for verification, then one explicit confirmation before
+ * anything is actually recorded. Errors and successes are reported
+ * separately in the response so a batch with one bad item doesn't
+ * bury the successful ones.
  */
 class OperationalScanController extends \App\Http\Controllers\Controller
 {
     private const TYPES = [
-        'pickup' => ['label' => 'Pickup Scan', 'keys' => ['picked_up']],
-        'dropoff' => ['label' => 'Drop-off Scan', 'keys' => ['dropped_off']],
-        'arrival' => ['label' => 'Arrival Scan', 'keys' => ['arrived_at_hub']],
-        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit', 'out_for_delivery'], 'needs_destination' => true, 'needs_handoff' => true, 'destination_same_city' => true],
-        'exception' => ['label' => 'Exception Scan', 'keys' => ['arrived_damaged', 'missing', 'exception', 'returned', 'cancelled']],
+        'pickup' => ['label' => 'Pickup Scan', 'keys' => ['picked_up'], 'permission' => 'pickup-scan:update'],
+        'dropoff' => ['label' => 'Drop-off Scan', 'keys' => ['dropped_off'], 'permission' => 'dropoff-scan:update'],
+        'arrival' => ['label' => 'Arrival Scan', 'keys' => ['arrived_at_hub'], 'permission' => 'arrival-scan:update'],
+        'departure' => ['label' => 'Departure Scan', 'keys' => ['in_transit', 'out_for_delivery'], 'needs_destination' => true, 'needs_handoff' => true, 'destination_same_city' => true, 'permission' => 'departure-scan:update'],
+        'exception' => ['label' => 'Exception Scan', 'keys' => ['arrived_damaged', 'missing', 'exception', 'returned', 'cancelled'], 'permission' => 'exception-scan:update'],
     ];
 
-    public function __construct(private ScanService $scans)
+    public function __construct(private ScanService $scans, private TrackingService $tracking)
     {
     }
 
     public function index(string $type): View
     {
         abort_unless(array_key_exists($type, self::TYPES), 404);
+        $this->authorizeType($type);
 
         $config = self::TYPES[$type];
         $availableStatuses = ScanStatus::whereIn('key', $config['keys'])->get();
@@ -52,7 +61,6 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'availableStatuses' => $availableStatuses,
             'isMultiChoice' => count($config['keys']) > 1,
             'needsDestination' => $config['needs_destination'] ?? false,
-            'needsEvidence' => $config['needs_evidence'] ?? false,
             'needsHandoff' => $config['needs_handoff'] ?? false,
             'destinationSameCity' => $config['destination_same_city'] ?? false,
             'hubs' => $hubs,
@@ -65,65 +73,94 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         ]);
     }
 
+    /**
+     * Records nothing — resolves whatever number was scanned (a
+     * tracking number, or a manifest/trip batch number) into the
+     * shipment(s) it represents, and returns their verification
+     * detail for the pending list. A batch number can add several
+     * shipments to the list in one scan.
+     */
+    public function lookup(Request $request, string $type): JsonResponse
+    {
+        abort_unless(array_key_exists($type, self::TYPES), 404);
+        $this->authorizeType($type);
+
+        $request->validate(['number' => 'required|string']);
+
+        $result = $this->tracking->resolveShipmentsForScan(trim($request->input('number')));
+
+        if (! $result['found']) {
+            return response()->json(['found' => false, 'message' => $result['message']], 404);
+        }
+
+        $eligible = $result['shipments']->reject(
+            fn ($s) => in_array($s->current_status, ['delivered', 'returned', 'cancelled'], true)
+        )->values();
+
+        if ($eligible->isEmpty()) {
+            return response()->json(['found' => false, 'message' => 'Every shipment in that batch is already out of the company\'s hands.'], 422);
+        }
+
+        return response()->json([
+            'found' => true,
+            'shipments' => $eligible->map(fn ($s) => $this->tracking->verificationSummary($s, withStaffFallback: true))->values(),
+        ]);
+    }
+
+    /**
+     * One status (and, for Departure, one destination/handoff)
+     * applied to every shipment_id in the batch — each recorded
+     * independently through ScanService::recordScan(), so one item
+     * failing its own check doesn't block the rest. Results report
+     * each outcome individually.
+     */
     public function store(Request $request, string $type): JsonResponse
     {
         abort_unless(array_key_exists($type, self::TYPES), 404);
+        $this->authorizeType($type);
 
         $config = self::TYPES[$type];
 
         $data = $request->validate([
-            'tracking_number' => 'required|string',
+            'shipment_ids' => 'required|array|min:1',
+            'shipment_ids.*' => 'exists:shipments,id',
             'status' => 'required|string|in:' . implode(',', $config['keys']),
             'hub_id' => 'nullable|exists:hubs,id',
             'outlet_id' => 'nullable|exists:outlets,id',
             'destination_hub_id' => ($config['needs_destination'] ?? false) ? 'required_unless:status,out_for_delivery|nullable|exists:hubs,id' : 'nullable|exists:hubs,id',
-            'receiver_name' => ($config['needs_evidence'] ?? false) ? 'required|string|max:255' : 'nullable|string|max:255',
-            'photo_path' => 'nullable|string',
-            'signature_path' => 'nullable|string',
             'handed_to_user_id' => ($config['needs_handoff'] ?? false) ? 'nullable|exists:users,id' : 'prohibited',
         ]);
 
         $user = $request->user();
 
-        // Location is resolved server-side from the user's own access
-        // level, never trusted from the request alone — a hub/outlet-
-        // scoped user's submitted hub_id/outlet_id is simply
-        // overridden with their own, and a regional user's choice is
-        // verified against their own region before being accepted.
         [$hubId, $outletId, $locationError] = $this->resolveScanLocation($user, $data['hub_id'] ?? null, $data['outlet_id'] ?? null);
 
         if ($locationError) {
             return response()->json(['message' => $locationError], 403);
         }
 
-        $shipment = Shipment::where('tracking_number', trim($data['tracking_number']))->first();
+        $results = [];
 
-        if (! $shipment) {
-            return response()->json(['message' => 'No shipment with that tracking number.'], 404);
+        foreach (array_unique($data['shipment_ids']) as $shipmentId) {
+            $shipment = \App\Models\Shipment::find($shipmentId);
+
+            try {
+                $scanEvent = $this->scans->recordScan([
+                    'shipment_id' => $shipmentId,
+                    'status' => $data['status'],
+                    'hub_id' => $hubId,
+                    'outlet_id' => $outletId,
+                    'destination_hub_id' => $data['destination_hub_id'] ?? null,
+                    'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
+                ], $user->id);
+
+                $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => true, 'status' => $scanEvent->status];
+            } catch (\RuntimeException $e) {
+                $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => false, 'message' => $e->getMessage()];
+            }
         }
 
-        try {
-            $scanEvent = $this->scans->recordScan([
-                'shipment_id' => $shipment->id,
-                'status' => $data['status'],
-                'hub_id' => $hubId,
-                'outlet_id' => $outletId,
-                'destination_hub_id' => $data['destination_hub_id'] ?? null,
-                'receiver_name' => $data['receiver_name'] ?? null,
-                'photo_path' => $data['photo_path'] ?? null,
-                'signature_path' => $data['signature_path'] ?? null,
-                'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
-            ], $user->id);
-        } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        return response()->json([
-            'tracking_number' => $shipment->tracking_number,
-            'receiver_name' => $shipment->receiver_name,
-            'status' => $scanEvent->status,
-            'scanned_at' => $scanEvent->scanned_at,
-        ], 201);
+        return response()->json(['results' => $results]);
     }
 
     /**
@@ -174,11 +211,11 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'data_url' => 'required|string',
         ]);
 
-        // Signature pad and photo capture both hand back a data: URL
-        // (canvas.toDataURL() for the signature, FileReader for the
-        // photo) — decoded and stored here rather than trusting the
-        // client to have already uploaded anywhere, so this is the
-        // one place either kind of evidence actually lands on disk.
+        // Signature (canvas draw, camera, or a picked file) and photo
+        // (camera capture or a picked file) all hand back a data: URL
+        // — decoded and stored here rather than trusting the client
+        // to have already uploaded anywhere, so this is the one place
+        // any kind of evidence actually lands on disk.
         if (! preg_match('/^data:image\/(png|jpe?g|webp);base64,(.+)$/', $request->input('data_url'), $matches)) {
             return response()->json(['message' => 'Invalid image data.'], 422);
         }
@@ -196,6 +233,22 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         \Illuminate\Support\Facades\Storage::disk('public')->put($filename, $binary);
 
         return response()->json(['path' => $filename]);
+    }
+
+    /**
+     * Each of the six scan tools has its own permission (e.g.
+     * pickup-scan:update) rather than all of them sharing the same
+     * generic shipments:update — a company may want a rider-facing
+     * counter clerk who can do Pickup and Drop-off but not Exception,
+     * say, and that's only possible if each flow is gated separately.
+     */
+    private function authorizeType(string $type): void
+    {
+        $permission = self::TYPES[$type]['permission'] ?? null;
+
+        if ($permission && ! auth()->user()->can($permission)) {
+            abort(403, "You don't have permission for " . self::TYPES[$type]['label'] . '.');
+        }
     }
 
     private function resolveLocationOptions($user): array
