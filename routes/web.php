@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
+use App\Http\Controllers\Web\PrintDocumentController;
 use App\Http\Controllers\Web\ManifestController;
 use App\Http\Controllers\Web\ManifestTripController;
 use App\Http\Controllers\Web\OperationalScanController;
@@ -96,6 +97,14 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/manifests/{manifest}/edit', [ManifestController::class, 'edit'])->name('manifests.edit');
         Route::post('/manifests/{manifest}/shipments', [ManifestController::class, 'addShipments'])->name('manifests.add-shipments');
         Route::delete('/manifests/{manifest}/shipments/{shipment}', [ManifestController::class, 'removeShipment'])->name('manifests.remove-shipment');
+    });
+    // Registered here (before the /manifest-trips/{trip} wildcard
+    // further down) purely to avoid the exact route-shadowing risk
+    // fixed earlier this session — "print" would otherwise be
+    // captured as a {trip} value.
+    Route::middleware('can:manifests:read')->group(function () {
+        Route::get('/print-documents', [PrintDocumentController::class, 'search'])->name('print-documents.search');
+        Route::post('/print-documents', [PrintDocumentController::class, 'lookup'])->name('print-documents.lookup');
     });
     Route::middleware('can:manifests:read')->group(function () {
         Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');

@@ -10059,3 +10059,44 @@ app/Services/ScanService.php   (unit-level location tracking on recordScan())
 app/Http/Controllers/Web/OperationalScanController.php   (unit-aware location resolution, custody check, same-unit guard, unit destinations)
 resources/views/operational-scans/index.blade.php   (unit options in Heading to, destination_unit_id in submit)
 ```
+
+## Increment 167 — General "Print Documents" Page (Waybill, Manifest, Trip)
+
+A single, general place to print by number, separate from the
+per-record Print buttons already on a shipment's or a trip's own
+page — new sidebar link ("Print Documents," next to Tracking) opens
+a one-field form: enter a tracking number, a manifest number, or a
+trip number, and land straight on the right document.
+
+Uses the same three-way detection (`TrackingService::resolveKind()`)
+already relied on for tracking lookups rather than a second
+implementation — a `MAN-`/`TRIP-` prefix routes to the manifest/trip
+print document (a manifest number resolves to its parent trip, since
+the printable document is trip-scoped), anything else is treated as
+a shipment's own tracking number and opens its waybill. Respects the
+existing per-shipment access check (`canAccessShipment()`) the same
+way opening a shipment's waybill from its own page already does.
+
+Where printing is available, in full: immediately after
+submission/dispatch (the Print button is on the same page the action
+just completed on), from within the module where the work happens
+(a trip's own page, or the link that appears after a Departure Scan
+batch confirms), and now this general, number-based entry point too.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned. Full
+repo balance check: clean across 125 PHP files. Confirmed the new
+`/print-documents` route doesn't collide with any existing route
+(distinct path, no shared prefix). Simulated the three-way number
+detection across 4 cases — all correct — and confirmed a real
+shipment record resolves correctly for the waybill path.
+
+### Files
+
+```
+app/Http/Controllers/Web/PrintDocumentController.php   (new)
+resources/views/print-documents/search.blade.php   (new)
+resources/views/components/layouts/app.blade.php   (Print Documents nav item)
+routes/web.php   (print-documents.search/lookup)
+```
