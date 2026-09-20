@@ -9984,3 +9984,78 @@ resources/views/operational-scans/print-transfer.blade.php   (new)
 resources/views/operational-scans/index.blade.php   (print-confirmation link after a successful departure batch)
 routes/web.php   (manifest-trips.print, operational-scans.print-transfer)
 ```
+
+## Increment 166 — Units Within a Hub: Default Location, Custody-Gated Transfer
+
+Wires up a concept that mostly already existed. The `units` table,
+`Unit` model, its admin CRUD, and the `unit_id` dropdown on the user
+form were all already built from earlier in this project — the
+`users.unit_id` and `shipments.current_unit_id` columns were the only
+genuinely missing pieces, without which none of it could actually
+take effect.
+
+### Default scanning location
+
+A hub-scoped staff member with a unit assigned now has their scanning
+location default to that unit specifically — one level finer than
+the hub — resolved server-side the same way hub/outlet locking
+already was.
+
+### Custody-gated unit-to-unit transfer
+
+New `User::canActOnUnit()`: a user pinned to one unit can only act on
+that unit; hub-wide access (no unit pinned) or region/global access
+oversees every unit beneath it. Applied specifically to Departure
+Scan — a shipment can only depart a unit if it's actually arrived
+there (`current_unit_id` matches), unless the person scanning
+oversees rather than is pinned to that unit. An arrival scan isn't
+gated this way, since it's what establishes custody in the first
+place.
+
+### Destination: hub or unit, kept genuinely separate
+
+New `scan_events.destination_unit_id`, deliberately not reusing
+`destination_hub_id` — a unit-to-unit transfer staying within the
+same hub is a different kind of "heading to" than a hub-to-hub one,
+and conflating them would have collided with the existing same-place
+guard (which correctly rejects a hub-to-itself "transfer" but must
+never reject a legitimate unit-to-unit move within that same hub).
+Departure Scan's "Heading to" dropdown now shows units within the
+same hub grouped separately from other hubs nearby. Recording a
+unit-to-unit transfer moves the shipment straight to the receiving
+unit — a direct handoff, not something waiting on a separate arrival
+scan, since both units are in the same building.
+
+### Caught before shipping
+
+Two real mistakes fixed during this build: an assumed `is_active`
+column on `Unit` that doesn't actually exist in the schema (would
+have caused a hard SQL error the first time the destination dropdown
+loaded), and a `required_unless` validation rule on
+`destination_hub_id` that would have wrongly rejected a legitimate
+unit-only destination selection.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+crash-pattern-scanned across every touched file. Full repo balance
+check: clean across 222 files. Verified the full custody scenario
+against live MySQL — staff at one unit can depart a shipment sitting
+there; staff at a different unit cannot touch the same shipment until
+it actually arrives at theirs — and confirmed `current_unit_id`
+updates correctly to the destination unit afterward. Simulated
+`canActOnUnit()` across 5 cases and the same-unit self-transfer guard
+across 4, all correct.
+
+### Files
+
+```
+database/migrations/2026_03_25_000001_add_unit_id_to_users_and_shipments.php
+database/migrations/2026_03_25_000002_add_destination_unit_id_to_scan_events.php
+app/Models/User.php   (canActOnUnit())
+app/Models/Shipment.php   (current_unit_id, currentUnit())
+app/Models/ScanEvent.php   (destination_unit_id, destinationUnit())
+app/Services/ScanService.php   (unit-level location tracking on recordScan())
+app/Http/Controllers/Web/OperationalScanController.php   (unit-aware location resolution, custody check, same-unit guard, unit destinations)
+resources/views/operational-scans/index.blade.php   (unit options in Heading to, destination_unit_id in submit)
+```

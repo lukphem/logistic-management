@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Mail;
 class ScanService
 {
     /**
-     * @param array{shipment_id: int, status: string, hub_id?: ?int, outlet_id?: ?int, destination_hub_id?: ?int, latitude?: ?float, longitude?: ?float, photo_path?: ?string, signature_path?: ?string, receiver_name?: ?string} $data
+     * @param array{shipment_id: int, status: string, hub_id?: ?int, outlet_id?: ?int, unit_id?: ?int, destination_hub_id?: ?int, destination_unit_id?: ?int, latitude?: ?float, longitude?: ?float, photo_path?: ?string, signature_path?: ?string, receiver_name?: ?string} $data
      *
      * @throws \RuntimeException if the shipment is terminal, or still
      *         booked and the target status isn't a first-touch one
@@ -81,6 +81,7 @@ class ScanService
             'hub_id' => $hubId,
             'outlet_id' => $outletId,
             'destination_hub_id' => $data['destination_hub_id'] ?? null,
+            'destination_unit_id' => $data['destination_unit_id'] ?? null,
             'latitude' => $data['latitude'] ?? null,
             'longitude' => $data['longitude'] ?? null,
             'photo_path' => $data['photo_path'] ?? null,
@@ -99,6 +100,16 @@ class ScanService
         if ($hubId) {
             $shipmentUpdate['current_hub_id'] = $hubId;
             $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself
+            // A unit-to-unit transfer (destination_unit_id) moves the
+            // shipment straight to the receiving unit — the two units
+            // are in the same physical hub, so this is a direct
+            // handoff, not something that waits for a separate
+            // arrival scan. Short of that, unit_id is wherever this
+            // scan itself physically happened (a unit-scoped staff
+            // member receiving/handling it at their own unit). With
+            // neither, the shipment's unit-level location is no
+            // longer known and is cleared rather than left stale.
+            $shipmentUpdate['current_unit_id'] = $data['destination_unit_id'] ?? $data['unit_id'] ?? null;
         }
 
         // Who's actually carrying the shipment right now — kept in

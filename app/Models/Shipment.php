@@ -19,7 +19,7 @@ class Shipment extends Model
         'payment_status', 'payment_reference', 'paid_at',
         'collection_method', 'cash_collected_at', 'cash_settlement_id',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
-        'current_status', 'assigned_rider_id', 'current_hub_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
+        'current_status', 'assigned_rider_id', 'current_hub_id', 'current_unit_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
         'sla_breached', 'promised_delivery_at', 'delivered_at',
     ];
 
@@ -256,6 +256,11 @@ class Shipment extends Model
     public function currentHub(): BelongsTo
     {
         return $this->belongsTo(Hub::class, 'current_hub_id');
+    }
+
+    public function currentUnit(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Unit::class, 'current_unit_id');
     }
 
     public function currentOutlet(): BelongsTo

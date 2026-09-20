@@ -273,6 +273,37 @@ class User extends Authenticatable
     }
 
     /**
+     * unit_id is independent of access_scope — an organizational tag,
+     * not a scope level (see UserController::validateForm) — but it
+     * does mean something specific for departure/transfer scanning: a
+     * user pinned to one unit can only move shipments that have
+     * actually arrived there, while a user whose access is hub-wide
+     * (no unit_id) or broader (region/global) oversees every unit
+     * inside whatever hub(s) they already have access to. This is the
+     * one check that decides which case applies for a given unit.
+     */
+    public function canActOnUnit(?int $unitId): bool
+    {
+        if (! $unitId) {
+            return true;
+        }
+
+        if ($this->hasGlobalAccess() || $this->hasRegionAccess()) {
+            return true;
+        }
+
+        $unit = \App\Models\Unit::find($unitId);
+
+        if (! $unit || ! in_array($unit->hub_id, $this->accessibleHubIds(), true)) {
+            return false;
+        }
+
+        // Hub-wide (no unit_id of their own) oversees every unit in
+        // that hub; pinned to a specific unit means only that one.
+        return $this->unit_id === null || (int) $this->unit_id === (int) $unitId;
+    }
+
+    /**
      * The precise check for a single shipment — used by
      * ShipmentController::show(). Outlet-scoped users are checked against
      * current_outlet_id specifically (not just the parent hub), since

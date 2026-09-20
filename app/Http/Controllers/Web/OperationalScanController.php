@@ -53,7 +53,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         $availableStatuses = ScanStatus::whereIn('key', $config['keys'])->get();
 
         $user = auth()->user();
-        [$hubs, $outlets, $locked] = $this->resolveLocationOptions($user);
+        [$hubs, $outlets, $locked, $lockedUnitId] = $this->resolveLocationOptions($user);
 
         return view('operational-scans.index', [
             'type' => $type,
@@ -70,6 +70,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'lockedLocationLabel' => $locked,
             'lockedHubId' => $locked ? $user->hub_id : null,
             'lockedOutletId' => $locked ? $user->outlet_id : null,
+            'lockedUnitId' => $lockedUnitId,
         ]);
     }
 
@@ -127,13 +128,23 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'status' => 'required|string|in:' . implode(',', $config['keys']),
             'hub_id' => 'nullable|exists:hubs,id',
             'outlet_id' => 'nullable|exists:outlets,id',
-            'destination_hub_id' => ($config['needs_destination'] ?? false) ? 'required_unless:status,out_for_delivery|nullable|exists:hubs,id' : 'nullable|exists:hubs,id',
+            'destination_hub_id' => 'nullable|exists:hubs,id',
+            'destination_unit_id' => ($config['needs_destination'] ?? false) ? 'nullable|exists:units,id' : 'prohibited',
             'handed_to_user_id' => ($config['needs_handoff'] ?? false) ? 'nullable|exists:users,id' : 'prohibited',
         ]);
 
+        // Heading to is required for a destination-needing type
+        // unless it's "Out for Delivery" (no destination at all) —
+        // but it can be satisfied by either a hub or a unit, the two
+        // different kinds of "heading to" this flow supports, so this
+        // is checked as a pair rather than as a single required field.
+        if (($config['needs_destination'] ?? false) && $data['status'] !== 'out_for_delivery' && empty($data['destination_hub_id']) && empty($data['destination_unit_id'])) {
+            return response()->json(['message' => 'Choose where this is heading.'], 422);
+        }
+
         $user = $request->user();
 
-        [$hubId, $outletId, $locationError] = $this->resolveScanLocation($user, $data['hub_id'] ?? null, $data['outlet_id'] ?? null);
+        [$hubId, $outletId, $locationError, $unitId] = $this->resolveScanLocation($user, $data['hub_id'] ?? null, $data['outlet_id'] ?? null);
 
         if ($locationError) {
             return response()->json(['message' => $locationError], 403);
@@ -141,6 +152,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
 
         $results = [];
         $destinationHubId = $data['destination_hub_id'] ?? null;
+        $destinationUnitId = $data['destination_unit_id'] ?? null;
 
         foreach (array_unique($data['shipment_ids']) as $shipmentId) {
             $shipment = \App\Models\Shipment::find($shipmentId);
@@ -149,9 +161,32 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             // transfer at all — most likely the origin and
             // destination were picked the wrong way round, so this
             // is caught here rather than silently recorded as a
-            // no-op movement.
+            // no-op movement. Two separate checks since hub-to-hub
+            // and unit-to-unit are two different kinds of "heading
+            // to" — a unit-to-unit destination staying within the
+            // same hub is expected, not a mistake, so only an
+            // identical unit (not an identical hub) trips this one.
             if ($destinationHubId && (int) $destinationHubId === (int) $hubId) {
                 $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => false, 'message' => "{$shipment?->tracking_number} is already at that location — pick a different destination."];
+                continue;
+            }
+            if ($destinationUnitId && $unitId && (int) $destinationUnitId === (int) $unitId) {
+                $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => false, 'message' => "{$shipment?->tracking_number} is already at that unit — pick a different destination."];
+                continue;
+            }
+
+            // The custody rule for unit-to-unit transfer: a shipment
+            // can only depart a unit if it's actually arrived there,
+            // unless the person scanning oversees the unit rather
+            // than being pinned to it — which is exactly what $unitId
+            // being set here already means (resolveScanLocation only
+            // returns one for a hub-scoped user with a specific unit
+            // assigned; anyone broader gets null and skips this
+            // entirely). This only applies to departure-type moves —
+            // an arrival is what establishes custody in the first
+            // place, so it can't require it as a precondition.
+            if ($unitId && $type === 'departure' && (int) $shipment?->current_unit_id !== (int) $unitId) {
+                $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => false, 'message' => "{$shipment?->tracking_number} hasn't arrived at your unit yet — it can't be sent onward from here."];
                 continue;
             }
 
@@ -161,7 +196,9 @@ class OperationalScanController extends \App\Http\Controllers\Controller
                     'status' => $data['status'],
                     'hub_id' => $hubId,
                     'outlet_id' => $outletId,
+                    'unit_id' => $unitId,
                     'destination_hub_id' => $destinationHubId,
+                    'destination_unit_id' => $destinationUnitId,
                     'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
                 ], $user->id);
 
@@ -174,15 +211,6 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         return response()->json(['results' => $results]);
     }
 
-    /**
-     * Global staff pick freely from every hub/outlet. Regional staff
-     * pick freely, but only within their own region. Hub- and outlet-
-     * scoped staff aren't offered a choice at all — their own single
-     * location is all that's ever available, so there's nothing to
-     * pick.
-     *
-     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: ?string} [hubs, outlets, lockedLocationLabel]
-     */
     /**
      * Departure Scan's destination is deliberately scoped to local
      * movement — same city, outlet-to-outlet or unit-to-unit — not
@@ -201,18 +229,31 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             'outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        $originHub = $request->input('outlet_id')
-            ? Outlet::find($request->input('outlet_id'))?->hub
-            : Hub::find($request->input('hub_id'));
+        $originHubId = $request->input('outlet_id')
+            ? Outlet::find($request->input('outlet_id'))?->hub_id
+            : $request->input('hub_id');
+
+        $originHub = $originHubId ? Hub::find($originHubId) : null;
+
+        // Units within the origin hub itself — the unit-to-unit case,
+        // available regardless of whether the hub has a city set,
+        // since this never leaves the building. Excludes the
+        // scanning user's own unit if they're pinned to one (can't
+        // transfer to where it already is).
+        $sameHubUnits = $originHubId
+            ? \App\Models\Unit::where('hub_id', $originHubId)
+                ->when(auth()->user()->unit_id, fn ($q) => $q->where('id', '!=', auth()->user()->unit_id))
+                ->orderBy('name')->get(['id', 'name', 'code'])
+            : collect();
 
         if (! $originHub || ! $originHub->city_id) {
-            return response()->json(['hubs' => [], 'outlets' => []]);
+            return response()->json(['hubs' => [], 'outlets' => [], 'units' => $sameHubUnits]);
         }
 
         $cityHubs = Hub::where('city_id', $originHub->city_id)->orderBy('name')->get(['id', 'name', 'code']);
         $cityOutlets = Outlet::whereIn('hub_id', $cityHubs->pluck('id'))->orderBy('name')->get(['id', 'name', 'hub_id']);
 
-        return response()->json(['hubs' => $cityHubs, 'outlets' => $cityOutlets]);
+        return response()->json(['hubs' => $cityHubs, 'outlets' => $cityOutlets, 'units' => $sameHubUnits]);
     }
 
     /**
@@ -293,73 +334,94 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         }
     }
 
+    /**
+     * Global staff pick freely from every hub/outlet. Regional staff
+     * pick freely, but only within their own region. Hub- and outlet-
+     * scoped staff aren't offered a choice at all — their own single
+     * location is all that's ever available, so there's nothing to
+     * pick. A hub-scoped user with a specific unit assigned is locked
+     * to that unit specifically, one level finer than the hub itself
+     * — matching "by default users' location is set to that" for
+     * scanning.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: ?string, 3: ?int} [hubs, outlets, lockedLocationLabel, lockedUnitId]
+     */
     private function resolveLocationOptions($user): array
     {
         if ($user->hasGlobalAccess()) {
-            return [Hub::orderBy('name')->get(), Outlet::orderBy('name')->get(), null];
+            return [Hub::orderBy('name')->get(), Outlet::orderBy('name')->get(), null, null];
         }
 
         if ($user->hasRegionAccess()) {
             $hubs = Hub::where('region_id', $user->region_id)->orderBy('name')->get();
             $outlets = Outlet::whereIn('hub_id', $hubs->pluck('id'))->orderBy('name')->get();
 
-            return [$hubs, $outlets, null];
+            return [$hubs, $outlets, null, null];
         }
 
         if ($user->hasOutletAccess()) {
             $outlet = Outlet::find($user->outlet_id);
 
-            return [collect(), collect(), $outlet?->name ?? 'Your outlet'];
+            return [collect(), collect(), $outlet?->name ?? 'Your outlet', null];
         }
 
         if ($user->hasHubAccess()) {
+            if ($user->unit_id) {
+                $unit = \App\Models\Unit::find($user->unit_id);
+
+                return [collect(), collect(), $unit ? "{$unit->name} ({$unit->hub->name})" : 'Your unit', $user->unit_id];
+            }
+
             $hub = Hub::find($user->hub_id);
 
-            return [collect(), collect(), $hub?->name ?? 'Your hub'];
+            return [collect(), collect(), $hub?->name ?? 'Your hub', null];
         }
 
-        return [collect(), collect(), null];
+        return [collect(), collect(), null, null];
     }
 
     /**
-     * @return array{0: ?int, 1: ?int, 2: ?string} [hubId, outletId, errorMessage]
+     * @return array{0: ?int, 1: ?int, 2: ?string, 3: ?int} [hubId, outletId, errorMessage, unitId]
      */
     private function resolveScanLocation($user, ?int $requestedHubId, ?int $requestedOutletId): array
     {
         if ($user->hasGlobalAccess()) {
-            return [$requestedHubId, $requestedOutletId, null];
+            return [$requestedHubId, $requestedOutletId, null, null];
         }
 
         if ($user->hasRegionAccess()) {
             if ($requestedOutletId) {
                 $outlet = Outlet::find($requestedOutletId);
                 if (! $outlet || $outlet->hub?->region_id !== $user->region_id) {
-                    return [null, null, "That outlet isn't in your region."];
+                    return [null, null, "That outlet isn't in your region.", null];
                 }
 
-                return [$outlet->hub_id, $requestedOutletId, null];
+                return [$outlet->hub_id, $requestedOutletId, null, null];
             }
 
             if ($requestedHubId) {
                 $hub = Hub::find($requestedHubId);
                 if (! $hub || $hub->region_id !== $user->region_id) {
-                    return [null, null, "That hub isn't in your region."];
+                    return [null, null, "That hub isn't in your region.", null];
                 }
             }
 
-            return [$requestedHubId, null, null];
+            return [$requestedHubId, null, null, null];
         }
 
         if ($user->hasOutletAccess()) {
             $outlet = Outlet::find($user->outlet_id);
 
-            return [$outlet?->hub_id, $user->outlet_id, null];
+            return [$outlet?->hub_id, $user->outlet_id, null, null];
         }
 
         if ($user->hasHubAccess()) {
-            return [$user->hub_id, null, null];
+            // Never trust a client-supplied unit — the scanning
+            // unit is always the user's own assigned one, resolved
+            // server-side, the same as hub/outlet are above.
+            return [$user->hub_id, null, null, $user->unit_id];
         }
 
-        return [null, null, null];
+        return [null, null, null, null];
     }
 }

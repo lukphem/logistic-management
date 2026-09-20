@@ -218,12 +218,36 @@
                     .then(r => r.json())
                     .then(function (data) {
                         destinationSelect.innerHTML = '<option value="">— Select —</option>';
-                        (data.hubs || []).forEach(function (hub) {
-                            const opt = document.createElement('option');
-                            opt.value = hub.id;
-                            opt.textContent = hub.name + ' (' + hub.code + ')';
-                            destinationSelect.appendChild(opt);
-                        });
+
+                        // Units within the same hub — the unit-to-unit
+                        // case — come first, kept visually distinct
+                        // from other hubs entirely, since one stays in
+                        // the building and the other doesn't.
+                        if ((data.units || []).length) {
+                            const unitGroup = document.createElement('optgroup');
+                            unitGroup.label = 'Units in this hub';
+                            data.units.forEach(function (unit) {
+                                const opt = document.createElement('option');
+                                opt.value = unit.id;
+                                opt.dataset.kind = 'unit';
+                                opt.textContent = unit.name + (unit.code ? ' (' + unit.code + ')' : '');
+                                unitGroup.appendChild(opt);
+                            });
+                            destinationSelect.appendChild(unitGroup);
+                        }
+
+                        if ((data.hubs || []).length) {
+                            const hubGroup = document.createElement('optgroup');
+                            hubGroup.label = 'Other hubs nearby';
+                            data.hubs.forEach(function (hub) {
+                                const opt = document.createElement('option');
+                                opt.value = hub.id;
+                                opt.dataset.kind = 'hub';
+                                opt.textContent = hub.name + ' (' + hub.code + ')';
+                                hubGroup.appendChild(opt);
+                            });
+                            destinationSelect.appendChild(hubGroup);
+                        }
                     })
                     .catch(function () {
                         destinationSelect.innerHTML = '<option value="">Could not load nearby locations</option>';
@@ -374,7 +398,8 @@
                         status: currentStatus(),
                         hub_id: lockedHubId || hubSelect.value || null,
                         outlet_id: lockedOutletId || outletSelect.value || null,
-                        destination_hub_id: destinationApplies() ? (destinationSelect ? destinationSelect.value : null) : null,
+                        destination_hub_id: (destinationApplies() && destinationSelect && destinationSelect.selectedOptions[0]?.dataset.kind === 'hub') ? destinationSelect.value : null,
+                        destination_unit_id: (destinationApplies() && destinationSelect && destinationSelect.selectedOptions[0]?.dataset.kind === 'unit') ? destinationSelect.value : null,
                         handed_to_user_id: (function () { const el = document.getElementById('scan-handoff'); return el ? (el.value || null) : null; })(),
                     }),
                 })
