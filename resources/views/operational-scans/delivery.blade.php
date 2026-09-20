@@ -46,8 +46,8 @@
                        class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20" autocomplete="off">
             </div>
             <button type="button" id="camera-scan-btn" class="rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-50">📷 Scan with camera</button>
-            <span id="scan-feedback" class="text-xs"></span>
         </div>
+        <p id="scan-feedback" class="mt-2 text-xs"></p>
 
         <div id="camera-scanner" class="mt-3 hidden max-w-sm overflow-hidden rounded-lg border border-line"></div>
 

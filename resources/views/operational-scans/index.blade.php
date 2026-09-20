@@ -90,8 +90,8 @@
             <button type="button" id="camera-scan-btn" disabled class="rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:opacity-40">
                 📷 Scan with camera
             </button>
-            <span id="scan-feedback" class="text-xs"></span>
         </div>
+        <p id="scan-feedback" class="mt-2 text-xs"></p>
 
         <div id="camera-scanner" class="mt-3 hidden max-w-sm overflow-hidden rounded-lg border border-line"></div>
     </div>
@@ -127,18 +127,20 @@
         </div>
     </div>
 
-    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-            <p class="mb-3 text-sm font-semibold text-status-delivered">Confirmed</p>
-            <div id="success-log" class="space-y-2">
-                <p class="text-sm text-ink-500">Nothing confirmed yet.</p>
-            </div>
+    {{-- Stacked, not side-by-side — Confirmed sits directly above
+         Errors instead of the two being pulled apart to opposite
+         edges of a wide screen, which made them read as unrelated
+         rather than as the two halves of one result. --}}
+    <div class="mt-6">
+        <p class="mb-3 text-sm font-semibold text-status-delivered">Confirmed</p>
+        <div id="success-log" class="space-y-2">
+            <p class="text-sm text-ink-500">Nothing confirmed yet.</p>
         </div>
-        <div>
-            <p class="mb-3 text-sm font-semibold text-status-exception">Errors — please review</p>
-            <div id="error-log" class="space-y-2">
-                <p class="text-sm text-ink-500">No errors.</p>
-            </div>
+    </div>
+    <div class="mt-6">
+        <p class="mb-3 text-sm font-semibold text-status-exception">Errors — please review</p>
+        <div id="error-log" class="space-y-2">
+            <p class="text-sm text-ink-500">No errors.</p>
         </div>
     </div>
 

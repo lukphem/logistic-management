@@ -9884,3 +9884,45 @@ app/Services/TrackingService.php   (service_type in verificationSummary(), eager
 resources/views/operational-scans/index.blade.php   (table-based pending list)
 resources/views/operational-scans/delivery.blade.php   (table-based pending list, lookup contract fix)
 ```
+
+## Increment 164 — UI Fixes: Feedback Position, Results Layout, Same-Place Departure Guard
+
+Three quick fixes from a direct screenshot review.
+
+### Scan feedback message repositioned
+
+Was floating inline at the far right of the scan-input row, easy to
+miss and disconnected from the input it was responding to. Moved to
+its own line directly below the input/camera-button row on both
+scan pages, where it reads naturally as a direct response to the
+scan just performed.
+
+### Confirmed/Errors results stacked, not side-by-side
+
+The two-column layout pulled "Confirmed" to the far left and "Errors"
+toward the center on a wide screen, reading as two unrelated things
+rather than the two halves of one result. Now stacked — Confirmed
+directly above Errors, both full-width.
+
+### Departure Scan: can't transfer a shipment to where it already is
+
+New check in `OperationalScanController::store()` — if a shipment's
+chosen destination is the same hub it's currently scanning from, that
+item is rejected with a clear message rather than silently recorded
+as a no-op "transfer." Checked per shipment in the batch, so one
+shipment with a same-place mistake doesn't block the rest.
+
+### Verified
+
+Balance-checked, duplicate-checked across every touched file. Full
+repo balance check: clean across 121 PHP files. Simulated the
+same-place check across three cases (same hub, different hub, no
+destination set) — all correct.
+
+### Files
+
+```
+resources/views/operational-scans/index.blade.php   (feedback position, stacked results)
+resources/views/operational-scans/delivery.blade.php   (feedback position)
+app/Http/Controllers/Web/OperationalScanController.php   (same-place departure guard)
+```

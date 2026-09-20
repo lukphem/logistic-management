@@ -140,9 +140,20 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         }
 
         $results = [];
+        $destinationHubId = $data['destination_hub_id'] ?? null;
 
         foreach (array_unique($data['shipment_ids']) as $shipmentId) {
             $shipment = \App\Models\Shipment::find($shipmentId);
+
+            // A "transfer" to the same place it's already at isn't a
+            // transfer at all — most likely the origin and
+            // destination were picked the wrong way round, so this
+            // is caught here rather than silently recorded as a
+            // no-op movement.
+            if ($destinationHubId && (int) $destinationHubId === (int) $hubId) {
+                $results[] = ['id' => $shipmentId, 'tracking_number' => $shipment?->tracking_number, 'success' => false, 'message' => "{$shipment?->tracking_number} is already at that location — pick a different destination."];
+                continue;
+            }
 
             try {
                 $scanEvent = $this->scans->recordScan([
@@ -150,7 +161,7 @@ class OperationalScanController extends \App\Http\Controllers\Controller
                     'status' => $data['status'],
                     'hub_id' => $hubId,
                     'outlet_id' => $outletId,
-                    'destination_hub_id' => $data['destination_hub_id'] ?? null,
+                    'destination_hub_id' => $destinationHubId,
                     'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
                 ], $user->id);
 
