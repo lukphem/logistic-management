@@ -125,6 +125,28 @@ class ManifestTripController extends \App\Http\Controllers\Controller
         return view('manifests.trips.show', compact('trip'));
     }
 
+    /**
+     * The document that accompanies the driver — one sheet covering
+     * every manifest on the trip, each shipment's key details
+     * (pieces, service type, receiver phone, weight), and a
+     * signature block per destination so whoever receives that
+     * manifest's batch can sign for it right there on the page the
+     * driver is already carrying — no separate confirmation slip
+     * needed.
+     */
+    public function print(ManifestTrip $trip): View
+    {
+        $trip->load([
+            'originHub', 'originOutlet', 'vehicleType', 'dispatchedBy',
+            'manifests.destinationHub', 'manifests.destinationOutlet',
+            'manifests.manifestShipments.shipment' => fn ($q) => $q->with('serviceType'),
+        ]);
+
+        $settings = \App\Models\Setting::current();
+
+        return view('manifests.trips.print', compact('trip', 'settings'));
+    }
+
     public function dispatch(ManifestTrip $trip): RedirectResponse
     {
         $user = auth()->user();

@@ -24,6 +24,7 @@
             </p>
         </div>
         <div class="flex items-center gap-3">
+            <a href="{{ route('manifest-trips.print', $trip) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">🖨️ Print</a>
             @if ($trip->isDispatched())
                 <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-3 py-1 text-sm font-medium text-status-delivered">Dispatched</span>
             @else

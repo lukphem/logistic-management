@@ -152,6 +152,7 @@
             const destinationSameCity = @json($destinationSameCity);
             const lockedHubId = @json($lockedHubId);
             const lockedOutletId = @json($lockedOutletId);
+            const lockedLocationLabel = @json($lockedLocationLabel);
             const typeLabel = @json($typeLabel);
             const statusEl = document.getElementById('scan-status');
             const hubSelect = document.getElementById('scan-hub');
@@ -379,13 +380,35 @@
                 })
                     .then(r => r.json())
                     .then(function (data) {
+                        const successfulIds = [];
                         (data.results || []).forEach(function (result) {
                             if (result.success) {
                                 logSuccess('✓ ' + result.tracking_number + ' — ' + typeLabel.toLowerCase() + ' recorded');
+                                successfulIds.push(result.id);
                             } else {
                                 logError('✗ ' + result.tracking_number + ' — ' + result.message);
                             }
                         });
+
+                        // A local transfer (Departure, "In Transit" —
+                        // not Out for Delivery, which has no second
+                        // party to hand a slip to) gets an offer to
+                        // print a confirmation slip for whoever just
+                        // received the batch to sign.
+                        if ('{{ $type }}' === 'departure' && destinationApplies() && successfulIds.length > 0) {
+                            const originLabel = lockedLocationLabel || (hubSelect.selectedOptions[0]?.textContent) || (outletSelect.selectedOptions[0]?.textContent) || '';
+                            const destinationLabel = destinationSelect ? (destinationSelect.selectedOptions[0]?.textContent || '') : '';
+                            const printParams = new URLSearchParams({
+                                shipment_ids: successfulIds.join(','),
+                                origin_label: originLabel,
+                                destination_label: destinationLabel,
+                            });
+                            const printRow = document.createElement('div');
+                            printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-transfer')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print transfer confirmation for this batch</a>';
+                            successLog.prepend(printRow);
+                        }
+
                         pending.clear();
                         renderPending();
                     })

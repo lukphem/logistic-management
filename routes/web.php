@@ -100,6 +100,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::middleware('can:manifests:read')->group(function () {
         Route::get('/manifest-trips', [ManifestTripController::class, 'index'])->name('manifest-trips.index');
         Route::get('/manifest-trips/{trip}', [ManifestTripController::class, 'show'])->name('manifest-trips.show');
+        Route::get('/manifest-trips/{trip}/print', [ManifestTripController::class, 'print'])->name('manifest-trips.print');
         Route::get('/manifest-shipments/eligible', [ManifestTripController::class, 'eligibleShipments'])->name('manifests.eligible-shipments');
         Route::post('/manifest-shipments/lookup', [ManifestTripController::class, 'lookupByTrackingNumber'])->name('manifests.lookup-tracking-number');
     });
@@ -124,6 +125,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::post('/operational-scans/{type}', [OperationalScanController::class, 'store'])->name('operational-scans.store');
     Route::post('/operational-scans-evidence', [OperationalScanController::class, 'uploadEvidence'])->name('operational-scans.upload-evidence');
     Route::get('/operational-scans-nearby-destinations', [OperationalScanController::class, 'nearbyDestinations'])->name('operational-scans.nearby-destinations');
+    Route::get('/operational-scans-print-transfer', [OperationalScanController::class, 'printTransfer'])->name('operational-scans.print-transfer');
     Route::middleware('can:shipments:update')->group(function () {
         Route::get('/shipments/{shipment}/edit', [ShipmentController::class, 'edit'])->name('shipments.edit');
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');

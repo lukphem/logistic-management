@@ -9926,3 +9926,61 @@ resources/views/operational-scans/index.blade.php   (feedback position, stacked 
 resources/views/operational-scans/delivery.blade.php   (feedback position)
 app/Http/Controllers/Web/OperationalScanController.php   (same-place departure guard)
 ```
+
+## Increment 165 — Printable Manifest/Trip Document + Local Transfer Confirmation Slip
+
+The standing task from before the screenshot review — official,
+tabular printouts, matching the styling already established for
+waybills/labels.
+
+### Manifest trip document — accompanies the driver
+
+New "🖨️ Print" link on any trip's page. One sheet: trip number,
+origin, transport mode, carrier (company or named 3PL), vehicle,
+driver name/phone. Then, per destination manifest on the trip, its
+own heading, a table of every shipment on it (tracking #, receiver,
+phone, pieces, service type, weight), and its own signature block —
+"Dispatched by" on one side, a blank "Received by (name & signature)
+— Date" on the other. This is the one document that does double
+duty: it's what the driver carries showing what's on board, and it's
+also what the receiving unit signs right there when the batch
+arrives — no separate confirmation slip needed for manifest-based
+movement.
+
+### Local transfer confirmation — for the second person to sign
+
+New printout for ad-hoc Departure Scan transfers (local, "In Transit"
+— not "Out for Delivery," which has no second party involved).
+Since there's no persisted batch record for an ad-hoc local transfer
+the way there is for a manifest, the confirmed shipment IDs and the
+origin/destination labels are passed straight through as the
+confirmation completes, and their current details pulled fresh for
+the printout. Same tabular shape (tracking #, receiver, phone,
+pieces, service type, weight), with a two-party signature block:
+handed over by / received by. A "🖨️ Print transfer confirmation for
+this batch" link appears automatically at the top of the Confirmed
+list right after a successful local-transfer batch — no extra step
+to find it.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned, duplicate-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 124 PHP files. Created a real trip/manifest/shipment
+against live MySQL and confirmed the full print-document data
+chain resolves correctly (driver, vehicle, carrier, manifest,
+destination, and every shipment field the document needs), and
+separately confirmed the transfer-confirmation shipment-ID parsing
+and lookup query.
+
+### Files
+
+```
+app/Http/Controllers/Web/ManifestTripController.php   (print())
+app/Http/Controllers/Web/OperationalScanController.php   (printTransfer())
+resources/views/manifests/trips/print.blade.php   (new)
+resources/views/manifests/trips/show.blade.php   (Print link)
+resources/views/operational-scans/print-transfer.blade.php   (new)
+resources/views/operational-scans/index.blade.php   (print-confirmation link after a successful departure batch)
+routes/web.php   (manifest-trips.print, operational-scans.print-transfer)
+```

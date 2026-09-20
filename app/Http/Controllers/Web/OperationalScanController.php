@@ -215,6 +215,37 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         return response()->json(['hubs' => $cityHubs, 'outlets' => $cityOutlets]);
     }
 
+    /**
+     * A printable confirmation slip for a local (Departure Scan)
+     * transfer — the same shape as the manifest/trip document, scaled
+     * down to what an ad-hoc local handover actually needs: no
+     * persisted batch record to look up, so the shipment IDs just
+     * confirmed are passed straight through and their current details
+     * pulled fresh. One signature line for the second person — the
+     * receiving unit — to sign for the handover.
+     */
+    public function printTransfer(Request $request): View
+    {
+        $request->validate([
+            'shipment_ids' => 'required|string',
+            'origin_label' => 'nullable|string',
+            'destination_label' => 'nullable|string',
+        ]);
+
+        $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
+
+        $shipments = \App\Models\Shipment::whereIn('id', $ids)->with('serviceType')->get();
+
+        $settings = \App\Models\Setting::current();
+
+        return view('operational-scans.print-transfer', [
+            'shipments' => $shipments,
+            'originLabel' => $request->input('origin_label'),
+            'destinationLabel' => $request->input('destination_label'),
+            'settings' => $settings,
+        ]);
+    }
+
     public function uploadEvidence(Request $request): JsonResponse
     {
         $request->validate([
