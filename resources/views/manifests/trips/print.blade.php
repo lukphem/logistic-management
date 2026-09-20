@@ -34,7 +34,13 @@
         .field-row dt { color: #666; flex-shrink: 0; }
         .field-row dd { margin: 0; font-weight: 500; text-align: right; overflow-wrap: break-word; }
 
-        .manifest-block { margin-top: 24px; page-break-inside: avoid; }
+        /* Each manifest is its own printed page — own header, own
+           trip-context recap, own table, own signatures — so a page
+           handed to one destination's receiving staff stands alone
+           and doesn't require the rest of the trip's paperwork to
+           make sense. */
+        .manifest-page { page-break-before: always; }
+        .manifest-page:first-child { page-break-before: avoid; }
         .manifest-heading { display: flex; justify-content: space-between; align-items: baseline; background: #f4f4f4; padding: 8px 10px; border-radius: 4px; }
         .manifest-heading .dest { font-weight: bold; font-size: 13px; }
         .manifest-heading .man-number { font-family: 'Courier New', monospace; font-size: 11px; color: #555; }
@@ -44,7 +50,10 @@
         table.shipments td { padding: 5px 4px; border-bottom: 1px solid #eee; overflow-wrap: break-word; }
         table.shipments tr:last-child td { border-bottom: 1px solid #999; }
 
-        .signatures { display: flex; gap: 40px; margin-top: 18px; }
+        /* Three signees, driver in the middle — the person carrying
+           it sits visually between who released it and who's about
+           to receive it, matching their actual role in the handoff. */
+        .signatures { display: flex; gap: 24px; margin-top: 18px; }
         .signature-block { flex: 1; }
         .signature-line { border-top: 1px solid #111; margin-top: 36px; padding-top: 4px; font-size: 10px; color: #555; }
 
@@ -57,46 +66,46 @@
     </div>
 
     <div class="paper">
-        <div class="header">
-            <div class="company">
-                @if ($settings->logo_path)
-                    <img src="{{ asset('storage/' . $settings->logo_path) }}" alt="{{ $settings->company_name }}">
-                @endif
-                <div class="company-name">{{ $settings->company_name }}</div>
-            </div>
-            <div class="doc-title">
-                <h1>TRIP MANIFEST</h1>
-                <div class="trip-number">{{ $trip->trip_number }}</div>
-                <div class="doc-date">Printed {{ now()->format('d M Y, H:i') }}</div>
-            </div>
-        </div>
-
-        <div class="section-title">Trip Details</div>
-        <div class="grid-2">
-            <div>
-                <dl>
-                    <div class="field-row"><dt>Origin</dt><dd>{{ $trip->originHub?->name ?? $trip->originOutlet?->name ?? '—' }}</dd></div>
-                    <div class="field-row"><dt>Transport mode</dt><dd>{{ ucfirst($trip->transport_mode) }}</dd></div>
-                    <div class="field-row"><dt>Carrier</dt><dd>{{ $trip->carrier_type === 'third_party' ? $trip->carrier_name : 'Company vehicle' }}</dd></div>
-                </dl>
-            </div>
-            <div>
-                <dl>
-                    <div class="field-row"><dt>Vehicle</dt><dd>{{ $trip->vehicleType?->name }} {{ $trip->vehicle_identifier }}</dd></div>
-                    <div class="field-row"><dt>Driver</dt><dd>{{ $trip->driver_name ?? '—' }}</dd></div>
-                    <div class="field-row"><dt>Driver phone</dt><dd>{{ $trip->driver_phone ?? '—' }}</dd></div>
-                </dl>
-            </div>
-        </div>
-
-        @if ($trip->notes)
-            <div class="section-title">Notes</div>
-            <p>{{ $trip->notes }}</p>
-        @endif
-
         @foreach ($trip->manifests as $manifest)
-            <div class="manifest-block">
-                <div class="manifest-heading">
+            <div class="manifest-page">
+                <div class="header">
+                    <div class="company">
+                        @if ($settings->logo_path)
+                            <img src="{{ asset('storage/' . $settings->logo_path) }}" alt="{{ $settings->company_name }}">
+                        @endif
+                        <div class="company-name">{{ $settings->company_name }}</div>
+                    </div>
+                    <div class="doc-title">
+                        <h1>TRIP MANIFEST</h1>
+                        <div class="trip-number">{{ $trip->trip_number }}</div>
+                        <div class="doc-date">Printed {{ now()->format('d M Y, H:i') }}</div>
+                    </div>
+                </div>
+
+                <div class="section-title">Trip Details</div>
+                <div class="grid-2">
+                    <div>
+                        <dl>
+                            <div class="field-row"><dt>Origin</dt><dd>{{ $trip->originHub?->name ?? $trip->originOutlet?->name ?? '—' }}</dd></div>
+                            <div class="field-row"><dt>Transport mode</dt><dd>{{ ucfirst($trip->transport_mode) }}</dd></div>
+                            <div class="field-row"><dt>Carrier</dt><dd>{{ $trip->carrier_type === 'third_party' ? $trip->carrier_name : 'Company vehicle' }}</dd></div>
+                        </dl>
+                    </div>
+                    <div>
+                        <dl>
+                            <div class="field-row"><dt>Vehicle</dt><dd>{{ $trip->vehicleType?->name }} {{ $trip->vehicle_identifier }}</dd></div>
+                            <div class="field-row"><dt>Driver</dt><dd>{{ $trip->driver_name ?? '—' }}</dd></div>
+                            <div class="field-row"><dt>Driver phone</dt><dd>{{ $trip->driver_phone ?? '—' }}</dd></div>
+                        </dl>
+                    </div>
+                </div>
+
+                @if ($trip->notes)
+                    <div class="section-title">Notes</div>
+                    <p>{{ $trip->notes }}</p>
+                @endif
+
+                <div class="manifest-heading" style="margin-top: 18px;">
                     <span class="dest">→ {{ $manifest->destinationHub?->name ?? $manifest->destinationOutlet?->name ?? '—' }}</span>
                     <span class="man-number">{{ $manifest->manifest_number }} · {{ $manifest->manifestShipments->count() }} shipment(s)</span>
                 </div>
@@ -105,8 +114,8 @@
                     <thead>
                         <tr>
                             <th>Tracking #</th>
-                            <th>Receiver</th>
-                            <th>Phone</th>
+                            <th>Description</th>
+                            <th>Destination</th>
                             <th>Pieces</th>
                             <th>Service type</th>
                             <th>Weight</th>
@@ -118,8 +127,8 @@
                             @if ($s)
                                 <tr>
                                     <td>{{ $s->tracking_number }}</td>
-                                    <td>{{ $s->receiver_name }}</td>
-                                    <td>{{ $s->receiver_phone }}</td>
+                                    <td>{{ $s->package_description ?? '—' }}</td>
+                                    <td>{{ $s->destinationCity?->name }}{{ $s->destinationCity?->state ? ', ' . $s->destinationCity->state->name : '' }}</td>
                                     <td>{{ $s->quantity ?? 1 }}</td>
                                     <td>{{ $s->serviceType?->name ?? '—' }}</td>
                                     <td>{{ $s->weight_kg ? $s->weight_kg . ' kg' : '—' }}</td>
@@ -134,13 +143,16 @@
                         <div class="signature-line">Dispatched by ({{ $trip->dispatchedBy?->name ?? '—' }}) — Date: {{ $trip->dispatched_at?->format('d M Y') }}</div>
                     </div>
                     <div class="signature-block">
+                        <div class="signature-line">Driver signature ({{ $trip->driver_name ?? '—' }}) — Date</div>
+                    </div>
+                    <div class="signature-block">
                         <div class="signature-line">Received by (name &amp; signature) — Date</div>
                     </div>
                 </div>
+
+                <div class="footer">{{ $settings->company_name }} — Trip Manifest {{ $trip->trip_number }} — {{ $manifest->manifest_number }}</div>
             </div>
         @endforeach
-
-        <div class="footer">{{ $settings->company_name }} — Trip Manifest {{ $trip->trip_number }}</div>
     </div>
 </body>
 </html>

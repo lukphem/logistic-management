@@ -10100,3 +10100,50 @@ resources/views/print-documents/search.blade.php   (new)
 resources/views/components/layouts/app.blade.php   (Print Documents nav item)
 routes/web.php   (print-documents.search/lookup)
 ```
+
+## Increment 168 — Trip Manifest Print: One Page Per Manifest, Description/Destination Columns, Driver Signature
+
+Three refinements to the trip manifest print document.
+
+### Each manifest starts on its own page
+
+Previously all manifests ran together on however many pages the
+content naturally wrapped to. Now each destination manifest gets its
+own page (`page-break-before: always`, with the first one exempted so
+it doesn't leave a blank leading page), and every page repeats the
+full trip header and trip-details recap rather than just showing the
+company letterhead once at the top — so a page handed to one
+destination's receiving staff stands alone and makes sense without
+needing the rest of the trip's paperwork alongside it.
+
+### Description and destination replace receiver name and phone
+
+The shipments table's "Receiver"/"Phone" columns are now
+"Description"/"Destination" — the shipment's own `package_description`,
+and its destination city with state (e.g. "Ikeja, Lagos"). More
+useful for a manifest document's actual purpose (what's in the batch,
+where each piece is ultimately headed) than the receiver's personal
+contact details, which don't have much bearing on the driver/
+receiving-unit handoff this document supports.
+
+### Driver signature, in the middle
+
+The signature block goes from two signees to three — Dispatched by,
+Driver, Received by — with the driver's line placed between the
+other two, matching their actual role in the physical handoff: they
+receive custody from whoever dispatched it and hand it to whoever
+receives it.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned. Full repo balance check:
+clean across 122 PHP files. Verified the destination city/state
+resolution chain and the `package_description` field against live
+MySQL with a real city→state relationship, confirming the exact
+rendered output ("Ikeja, TestLagos").
+
+### Files
+
+```
+resources/views/manifests/trips/print.blade.php   (per-manifest pages, column changes, 3-way signature block)
+```
