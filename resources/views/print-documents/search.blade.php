@@ -2,7 +2,7 @@
 
     <div class="mb-6">
         <p class="text-2xl font-semibold text-ink-900">Print Documents</p>
-        <p class="mt-1 text-sm text-ink-500">A tracking number opens its waybill. A manifest number prints just that one destination's batch. A trip number prints every manifest on the trip.</p>
+        <p class="mt-1 text-sm text-ink-500">A tracking number opens its waybill. A manifest number prints just that one destination's batch. A trip number prints every manifest on the trip. A TRF-/DEL- reference reprints a transfer confirmation or delivery sheet.</p>
     </div>
 
     @if ($errors->any())

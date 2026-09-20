@@ -208,18 +208,34 @@ class OperationalScanController extends \App\Http\Controllers\Controller
             }
         }
 
-        // A reference number, generated the moment the batch actually
-        // confirms rather than fresh on every page load — so if the
-        // resulting document is printed more than once, it's always
-        // the same number, the way any real reference document
-        // would be. The prefix says which kind of scan produced it:
-        // TRF for a local transfer, DEL for an out-for-delivery run —
-        // the only two departure outcomes that generate a printable
-        // document at all.
+        // A persisted record behind the batch — created the moment
+        // it actually confirms, not just a number shown on a page —
+        // so the resulting document can be looked up and reprinted
+        // later by its reference, the way a manifest or trip already
+        // can be. Only for departure, and only when at least one
+        // shipment in the batch actually succeeded (nothing to
+        // record if every item failed).
         $reference = null;
-        if ($type === 'departure' && array_filter($results, fn ($r) => $r['success'])) {
-            $prefix = $data['status'] === 'out_for_delivery' ? 'DEL' : 'TRF';
-            $reference = $prefix . '-' . now()->format('ymd') . '-' . strtoupper(\Illuminate\Support\Str::random(5));
+        $successfulShipmentIds = collect($results)->where('success', true)->pluck('id');
+
+        if ($type === 'departure' && $successfulShipmentIds->isNotEmpty()) {
+            $kind = $data['status'] === 'out_for_delivery' ? 'delivery' : 'transfer';
+            $reference = \App\Models\ScanBatch::generateReference($kind);
+
+            $batch = \App\Models\ScanBatch::create([
+                'reference' => $reference,
+                'kind' => $kind,
+                'status_key' => $data['status'],
+                'origin_hub_id' => $hubId,
+                'origin_outlet_id' => $outletId,
+                'origin_unit_id' => $unitId,
+                'destination_hub_id' => $kind === 'transfer' ? $destinationHubId : null,
+                'destination_unit_id' => $kind === 'transfer' ? $destinationUnitId : null,
+                'handed_to_user_id' => $data['handed_to_user_id'] ?? null,
+                'created_by_user_id' => $user->id,
+            ]);
+
+            $batch->shipments()->attach($successfulShipmentIds);
         }
 
         return response()->json(['results' => $results, 'reference' => $reference]);
@@ -281,24 +297,18 @@ class OperationalScanController extends \App\Http\Controllers\Controller
      */
     public function printTransfer(Request $request): View
     {
-        $request->validate([
-            'shipment_ids' => 'required|string',
-            'origin_label' => 'nullable|string',
-            'destination_label' => 'nullable|string',
-            'reference' => 'nullable|string',
-        ]);
+        $request->validate(['reference' => 'required|string']);
 
-        $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
-
-        $shipments = \App\Models\Shipment::whereIn('id', $ids)->with('serviceType')->get();
+        $batch = \App\Models\ScanBatch::where('reference', $request->input('reference'))->where('kind', 'transfer')->firstOrFail();
+        $batch->load(['originHub', 'originOutlet', 'originUnit', 'destinationHub', 'destinationUnit', 'shipments.serviceType']);
 
         $settings = \App\Models\Setting::current();
 
         return view('operational-scans.print-transfer', [
-            'shipments' => $shipments,
-            'originLabel' => $request->input('origin_label'),
-            'destinationLabel' => $request->input('destination_label'),
-            'reference' => $request->input('reference'),
+            'shipments' => $batch->shipments,
+            'originLabel' => $batch->originUnit?->name ?? $batch->originOutlet?->name ?? $batch->originHub?->name,
+            'destinationLabel' => $batch->destinationUnit?->name ?? $batch->destinationHub?->name,
+            'reference' => $batch->reference,
             'settings' => $settings,
         ]);
     }
@@ -315,23 +325,18 @@ class OperationalScanController extends \App\Http\Controllers\Controller
      */
     public function printDeliverySheet(Request $request): View
     {
-        $request->validate([
-            'shipment_ids' => 'required|string',
-            'origin_label' => 'nullable|string',
-            'reference' => 'nullable|string',
-        ]);
+        $request->validate(['reference' => 'required|string']);
 
-        $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
-
-        $shipments = \App\Models\Shipment::whereIn('id', $ids)->with(['serviceType', 'destinationCity.state'])->get();
+        $batch = \App\Models\ScanBatch::where('reference', $request->input('reference'))->where('kind', 'delivery')->firstOrFail();
+        $batch->load(['originHub', 'originOutlet', 'originUnit', 'handedTo', 'shipments.serviceType', 'shipments.destinationCity.state']);
 
         $settings = \App\Models\Setting::current();
 
         return view('operational-scans.print-delivery-sheet', [
-            'shipments' => $shipments,
-            'originLabel' => $request->input('origin_label'),
-            'riderName' => $request->input('rider_name'),
-            'reference' => $request->input('reference'),
+            'shipments' => $batch->shipments,
+            'originLabel' => $batch->originUnit?->name ?? $batch->originOutlet?->name ?? $batch->originHub?->name,
+            'riderName' => $batch->handedTo?->name,
+            'reference' => $batch->reference,
             'settings' => $settings,
         ]);
     }

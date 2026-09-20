@@ -36,6 +36,24 @@ class PrintDocumentController extends \App\Http\Controllers\Controller
         $request->validate(['number' => 'required|string|max:64']);
 
         $number = trim($request->input('number'));
+
+        // TRF-/DEL- batch references aren't part of TrackingService's
+        // own three-way detection (they're print-specific, not a
+        // tracking concept), so they're checked here directly before
+        // falling through to manifest/trip/shipment.
+        if (str_starts_with($number, 'TRF-') || str_starts_with($number, 'DEL-')) {
+            $batch = \App\Models\ScanBatch::where('reference', $number)->first();
+
+            if (! $batch) {
+                return redirect()->route('print-documents.search')->withErrors(['number' => "No record found for \"{$number}\"."]);
+            }
+
+            return redirect()->route(
+                $batch->kind === 'delivery' ? 'operational-scans.print-delivery-sheet' : 'operational-scans.print-transfer',
+                ['reference' => $batch->reference]
+            );
+        }
+
         $kind = $this->tracking->resolveKind($number);
 
         if ($kind === 'manifest') {

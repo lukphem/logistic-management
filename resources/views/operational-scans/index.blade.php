@@ -419,19 +419,16 @@
                         // not Out for Delivery, which has no second
                         // party to hand a slip to) gets an offer to
                         // print a confirmation slip for whoever just
-                        // received the batch to sign.
-                        if ('{{ $type }}' === 'departure' && destinationApplies() && successfulIds.length > 0) {
-                            const originLabel = lockedLocationLabel || (hubSelect.selectedOptions[0]?.textContent) || (outletSelect.selectedOptions[0]?.textContent) || '';
-                            const destinationLabel = destinationSelect ? (destinationSelect.selectedOptions[0]?.textContent || '') : '';
-                            const printParams = new URLSearchParams({
-                                shipment_ids: successfulIds.join(','),
-                                origin_label: originLabel,
-                                destination_label: destinationLabel,
-                                reference: data.reference || '',
-                            });
+                        // received the batch to sign. The reference
+                        // is all the print link needs now — the batch
+                        // itself (shipments, origin, destination) is
+                        // looked up server-side from what was just
+                        // persisted, not passed through the URL.
+                        if ('{{ $type }}' === 'departure' && destinationApplies() && successfulIds.length > 0 && data.reference) {
+                            const printParams = new URLSearchParams({ reference: data.reference });
                             const printRow = document.createElement('div');
                             printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
-                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-transfer')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print transfer confirmation' + (data.reference ? ' (' + data.reference + ')' : '') + '</a>';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-transfer')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print transfer confirmation (' + data.reference + ')</a>';
                             successLog.prepend(printRow);
                         }
 
@@ -441,19 +438,11 @@
                         // instead: one row per shipment, each with its
                         // own signature space, for the rider to carry
                         // and get signed as they go.
-                        if ('{{ $type }}' === 'departure' && currentStatus() === 'out_for_delivery' && successfulIds.length > 0) {
-                            const originLabel = lockedLocationLabel || (hubSelect.selectedOptions[0]?.textContent) || (outletSelect.selectedOptions[0]?.textContent) || '';
-                            const handoffEl = document.getElementById('scan-handoff');
-                            const riderName = handoffEl ? (handoffEl.selectedOptions[0]?.textContent || '') : '';
-                            const printParams = new URLSearchParams({
-                                shipment_ids: successfulIds.join(','),
-                                origin_label: originLabel,
-                                rider_name: riderName,
-                                reference: data.reference || '',
-                            });
+                        if ('{{ $type }}' === 'departure' && currentStatus() === 'out_for_delivery' && successfulIds.length > 0 && data.reference) {
+                            const printParams = new URLSearchParams({ reference: data.reference });
                             const printRow = document.createElement('div');
                             printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
-                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-delivery-sheet')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print delivery sheet' + (data.reference ? ' (' + data.reference + ')' : '') + '</a>';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-delivery-sheet')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print delivery sheet (' + data.reference + ')</a>';
                             successLog.prepend(printRow);
                         }
 

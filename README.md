@@ -10255,3 +10255,57 @@ resources/views/operational-scans/index.blade.php   (reference in print link par
 resources/views/operational-scans/print-transfer.blade.php   (reference number displayed)
 resources/views/operational-scans/print-delivery-sheet.blade.php   (reference number displayed)
 ```
+
+## Increment 171 — Transfer Confirmations and Delivery Sheets Are Now Fully Reprintable
+
+Closes the gap flagged last round — these documents now have a real
+database record behind them, not just a display-only number.
+
+### New `scan_batches` / `scan_batch_shipments` tables
+
+One `ScanBatch` model covers both document kinds (`transfer` /
+`delivery`) — same underlying shape either way: a batch of
+shipments, an origin, who handled it and when, just used for two
+different departure outcomes. Created the moment a batch actually
+confirms in `OperationalScanController::store()`, with the
+successfully-scanned shipments attached to it.
+
+### Print actions now look up by reference, not by trusting the URL
+
+`printTransfer()`/`printDeliverySheet()` rebuilt to require just a
+`reference` and pull everything else — shipments, origin,
+destination, who it was handed to — from the persisted record. The
+print link itself simplified to match: it used to carry
+shipment IDs and labels through the query string; now it's just the
+reference. More secure (can't be tampered with via URL) and it's what
+makes reprinting possible — the same reference always resolves to the
+same, real data, not whatever happened to be in a URL at the time.
+
+### Reprintable from the general Print Documents page
+
+A `TRF-`/`DEL-` reference now works there too, alongside tracking/
+manifest/trip numbers — type it in, land straight on the same
+document, any time after the fact. Closes exactly the limitation
+flagged in the previous increment.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+duplicate-route-checked. Full repo balance check: clean across 225
+PHP files. Verified the complete chain against live MySQL: created a
+real batch with two attached shipments, confirmed the reference
+resolves to the correct origin, destination, and both shipments,
+confirmed the unique constraint on `reference` correctly rejects a
+duplicate, and simulated the four-way prefix routing (TRF-/DEL-/
+MAN-/TRIP-/plain tracking number) across 5 cases — all correct.
+
+### Files
+
+```
+database/migrations/2026_03_26_000001_create_scan_batches_table.php
+app/Models/ScanBatch.php   (new)
+app/Http/Controllers/Web/OperationalScanController.php   (persist batch in store(), print actions look up by reference)
+app/Http/Controllers/Web/PrintDocumentController.php   (TRF-/DEL- reference routing)
+resources/views/operational-scans/index.blade.php   (simplified print links — reference only)
+resources/views/print-documents/search.blade.php   (helper text)
+```
