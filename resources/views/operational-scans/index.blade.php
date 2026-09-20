@@ -2,7 +2,7 @@
 
     <div class="mb-6">
         <p class="text-2xl font-semibold text-ink-900">{{ $typeLabel }}</p>
-        <p class="mt-1 text-sm text-ink-500">Scan shipments one after another — each one takes effect immediately.</p>
+        <p class="mt-1 text-sm text-ink-500">Scan each waybill (or a manifest/trip number to load a whole batch) — verify the details, then confirm once for everything.</p>
     </div>
 
     <div class="rounded-xl border border-line bg-surface-0 shadow-sm p-5">
@@ -77,48 +77,47 @@
             @endif
         </div>
 
-        @if ($needsEvidence)
-            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Received by <span class="text-xs font-normal text-ink-500">(who actually signed for it)</span></label>
-                    <input type="text" id="scan-receiver-name" placeholder="Name of person receiving"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Photo evidence <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <input type="file" id="scan-photo-input" accept="image/*" capture="environment"
-                           class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
-                </div>
-                <div class="sm:col-span-2">
-                    <label class="mb-1 block text-sm font-medium text-ink-900">Signature <span class="text-xs font-normal text-ink-500">(optional)</span></label>
-                    <canvas id="signature-pad" width="500" height="150" class="w-full max-w-md rounded-md border border-line bg-white touch-none"></canvas>
-                    <button type="button" id="clear-signature" class="mt-1 text-xs text-ink-500 hover:underline">Clear signature</button>
-                </div>
-            </div>
-        @endif
-
         @unless ($availableStatuses->isNotEmpty())
             <p class="mt-4 text-sm text-status-exception">No scan status is currently configured for {{ $typeLabel }} — add or rename one under Scan Statuses first.</p>
         @endunless
 
         <div class="mt-5 flex flex-wrap items-end gap-3 rounded-lg border border-dashed border-line p-3">
             <div class="flex-1 min-w-[220px]">
-                <label class="mb-1 block text-xs font-medium text-ink-900">Scan or type a tracking number</label>
-                <input type="text" id="scan-input" disabled placeholder="Select a reason above first"
+                <label class="mb-1 block text-xs font-medium text-ink-900">Scan or type a tracking, manifest, or trip number</label>
+                <input type="text" id="scan-input" disabled placeholder="Select the fields above first"
                        class="w-full rounded-md border border-line px-3 py-2 text-sm font-mono outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20 disabled:bg-surface-50 disabled:text-ink-400" autocomplete="off">
             </div>
             <button type="button" id="camera-scan-btn" disabled class="rounded-md border border-line px-3 py-2 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:opacity-40">
                 📷 Scan with camera
             </button>
+            <span id="scan-feedback" class="text-xs"></span>
         </div>
 
         <div id="camera-scanner" class="mt-3 hidden max-w-sm overflow-hidden rounded-lg border border-line"></div>
     </div>
 
-    <div class="mt-6">
-        <p class="mb-3 text-sm font-semibold text-ink-900">This session's scans</p>
-        <div id="scan-log" class="space-y-2">
-            <p class="text-sm text-ink-500">Nothing scanned yet.</p>
+    <div id="pending-section" class="mt-4 hidden rounded-xl border border-line bg-surface-0 shadow-sm p-5">
+        <div class="mb-3 flex items-center justify-between">
+            <p class="text-sm font-semibold text-ink-900">Ready to confirm (<span id="pending-count">0</span>)</p>
+            <button type="button" id="confirm-btn" class="rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+                Confirm
+            </button>
+        </div>
+        <div id="pending-items" class="space-y-2"></div>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+            <p class="mb-3 text-sm font-semibold text-status-delivered">Confirmed</p>
+            <div id="success-log" class="space-y-2">
+                <p class="text-sm text-ink-500">Nothing confirmed yet.</p>
+            </div>
+        </div>
+        <div>
+            <p class="mb-3 text-sm font-semibold text-status-exception">Errors — please review</p>
+            <div id="error-log" class="space-y-2">
+                <p class="text-sm text-ink-500">No errors.</p>
+            </div>
         </div>
     </div>
 
@@ -127,10 +126,10 @@
         (function () {
             const isMultiChoice = @json($isMultiChoice);
             const needsDestination = @json($needsDestination);
-            const needsEvidence = @json($needsEvidence);
             const destinationSameCity = @json($destinationSameCity);
             const lockedHubId = @json($lockedHubId);
             const lockedOutletId = @json($lockedOutletId);
+            const typeLabel = @json($typeLabel);
             const statusEl = document.getElementById('scan-status');
             const hubSelect = document.getElementById('scan-hub');
             const outletSelect = document.getElementById('scan-outlet');
@@ -138,17 +137,27 @@
             const destinationField = document.getElementById('destination-field');
             const scanInput = document.getElementById('scan-input');
             const cameraBtn = document.getElementById('camera-scan-btn');
-            const scanLog = document.getElementById('scan-log');
-            let logStarted = false;
+            const scanFeedback = document.getElementById('scan-feedback');
+            const pendingSection = document.getElementById('pending-section');
+            const pendingItems = document.getElementById('pending-items');
+            const pendingCount = document.getElementById('pending-count');
+            const confirmBtn = document.getElementById('confirm-btn');
+            const successLog = document.getElementById('success-log');
+            const errorLog = document.getElementById('error-log');
+            let successStarted = false;
+            let errorStarted = false;
+
+            // tracking_number -> full verification detail, so what's
+            // shown for review and what's actually submitted stay the
+            // same list. Removing an item here is exactly the "I
+            // spotted a mistake" escape hatch — nothing is recorded
+            // until Confirm is pressed.
+            const pending = new Map();
 
             function currentStatus() {
                 return statusEl.value;
             }
 
-            // "Out for Delivery" needs no destination at all — it's
-            // going straight to the receiver, not to another unit —
-            // so the field itself hides rather than just becoming
-            // optional.
             function destinationApplies() {
                 return needsDestination && currentStatus() !== 'out_for_delivery';
             }
@@ -156,10 +165,6 @@
             function readyToScan() {
                 if (! currentStatus()) return false;
                 if (destinationApplies() && (! destinationSelect || ! destinationSelect.value)) return false;
-                if (needsEvidence) {
-                    const receiverEl = document.getElementById('scan-receiver-name');
-                    if (! receiverEl || ! receiverEl.value.trim()) return false;
-                }
                 return true;
             }
 
@@ -173,16 +178,7 @@
             }
             if (isMultiChoice) { statusEl.addEventListener('change', refreshEnabled); }
             if (destinationSelect) { destinationSelect.addEventListener('change', refreshEnabled); }
-            if (needsEvidence) {
-                const receiverEl = document.getElementById('scan-receiver-name');
-                if (receiverEl) { receiverEl.addEventListener('input', refreshEnabled); }
-            }
 
-            // Same-city destination list — loaded from whichever
-            // origin is actually in effect (the picked hub/outlet, or
-            // the locked one for a location-restricted user), so a
-            // cross-city destination simply never appears as an
-            // option here.
             function loadNearbyDestinations() {
                 if (! destinationSameCity || ! destinationSelect) return;
                 const hubId = lockedHubId || hubSelect.value || null;
@@ -209,118 +205,74 @@
                         destinationSelect.innerHTML = '<option value="">Could not load nearby locations</option>';
                     });
             }
-            if (destinationSameCity) {
-                loadNearbyDestinations();
-            }
+            if (destinationSameCity) { loadNearbyDestinations(); }
 
             if (hubSelect.tagName === 'SELECT') {
                 hubSelect.addEventListener('change', function () { if (this.value) outletSelect.value = ''; loadNearbyDestinations(); });
                 outletSelect.addEventListener('change', function () { if (this.value) hubSelect.value = ''; loadNearbyDestinations(); });
             }
 
-            // Signature pad — plain canvas drawing, no library needed.
-            let signatureDataUrl = null;
-            if (needsEvidence) {
-                const canvas = document.getElementById('signature-pad');
-                const ctx = canvas.getContext('2d');
-                ctx.strokeStyle = '#111';
-                ctx.lineWidth = 2;
-                ctx.lineJoin = 'round';
-                ctx.lineCap = 'round';
-                let drawing = false;
-                let hasDrawn = false;
-
-                function pos(e) {
-                    const rect = canvas.getBoundingClientRect();
-                    const scaleX = canvas.width / rect.width;
-                    const scaleY = canvas.height / rect.height;
-                    const point = e.touches ? e.touches[0] : e;
-                    return { x: (point.clientX - rect.left) * scaleX, y: (point.clientY - rect.top) * scaleY };
-                }
-                function start(e) { drawing = true; hasDrawn = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
-                function move(e) { if (! drawing) return; e.preventDefault(); const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
-                function end() { drawing = false; if (hasDrawn) signatureDataUrl = canvas.toDataURL('image/png'); }
-
-                canvas.addEventListener('mousedown', start);
-                canvas.addEventListener('mousemove', move);
-                window.addEventListener('mouseup', end);
-                canvas.addEventListener('touchstart', start);
-                canvas.addEventListener('touchmove', move);
-                canvas.addEventListener('touchend', end);
-
-                document.getElementById('clear-signature').addEventListener('click', function () {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    hasDrawn = false;
-                    signatureDataUrl = null;
+            function renderPending() {
+                pendingCount.textContent = pending.size;
+                pendingSection.classList.toggle('hidden', pending.size === 0);
+                pendingItems.innerHTML = '';
+                pending.forEach(function (shipment, trackingNumber) {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-start justify-between gap-3 rounded-lg border border-line p-3';
+                    const lastScan = shipment.last_scan_date
+                        ? new Date(shipment.last_scan_date).toLocaleString() + (shipment.last_scan_location ? ' — ' + shipment.last_scan_location : '')
+                        : 'No scans yet';
+                    row.innerHTML = `
+                        <div class="text-sm">
+                            <p class="font-mono font-medium text-ink-900">${shipment.tracking_number}</p>
+                            <p class="text-xs text-ink-500">${shipment.receiver_name || '—'} ${shipment.receiver_phone ? '· ' + shipment.receiver_phone : ''}</p>
+                            <p class="text-xs text-ink-500">${shipment.origin || '—'} → ${shipment.destination || '—'} · ${shipment.quantity || 1} pc(s) ${shipment.weight_kg ? '· ' + shipment.weight_kg + ' kg' : ''}</p>
+                            <p class="text-xs text-ink-500">Current: ${shipment.current_status} · Last scan: ${lastScan}</p>
+                        </div>
+                    `;
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.className = 'shrink-0 text-xs font-medium text-status-exception hover:underline';
+                    removeBtn.onclick = function () {
+                        pending.delete(trackingNumber);
+                        renderPending();
+                    };
+                    row.appendChild(removeBtn);
+                    pendingItems.appendChild(row);
                 });
             }
 
-            function uploadEvidence(kind, dataUrl) {
-                return fetch(@json(route('operational-scans.upload-evidence')), {
+            function lookupAndAdd(number) {
+                scanFeedback.textContent = 'Looking up…';
+                scanFeedback.className = 'text-xs text-ink-500';
+
+                fetch(@json(route('operational-scans.lookup', ['type' => $type])), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
-                    body: JSON.stringify({ kind: kind, data_url: dataUrl }),
-                })
-                    .then(r => r.json())
-                    .then(data => data.path || null)
-                    .catch(() => null);
-            }
-
-            function readPhotoAsDataUrl() {
-                const input = document.getElementById('scan-photo-input');
-                if (! input || ! input.files || ! input.files[0]) return Promise.resolve(null);
-                return new Promise(function (resolve) {
-                    const reader = new FileReader();
-                    reader.onload = function () { resolve(reader.result); };
-                    reader.onerror = function () { resolve(null); };
-                    reader.readAsDataURL(input.files[0]);
-                });
-            }
-
-            function logResult(success, message) {
-                if (! logStarted) { scanLog.innerHTML = ''; logStarted = true; }
-                const row = document.createElement('div');
-                row.className = 'rounded-lg border p-3 text-sm ' + (success ? 'border-status-delivered/30 bg-status-delivered/5 text-status-delivered' : 'border-status-exception/30 bg-status-exception/5 text-status-exception');
-                row.textContent = message;
-                scanLog.prepend(row);
-            }
-
-            function submitScan(trackingNumber) {
-                Promise.all([
-                    needsEvidence && signatureDataUrl ? uploadEvidence('signature', signatureDataUrl) : Promise.resolve(null),
-                    needsEvidence ? readPhotoAsDataUrl().then(dataUrl => dataUrl ? uploadEvidence('photo', dataUrl) : null) : Promise.resolve(null),
-                ]).then(function (paths) {
-                    const body = {
-                        tracking_number: trackingNumber,
-                        status: currentStatus(),
-                        hub_id: hubSelect.value || null,
-                        outlet_id: outletSelect.value || null,
-                    };
-                    if (needsDestination) { body.destination_hub_id = destinationSelect.value || null; }
-                    const handoffSelect = document.getElementById('scan-handoff');
-                    if (handoffSelect) { body.handed_to_user_id = handoffSelect.value || null; }
-                    if (needsEvidence) {
-                        body.receiver_name = document.getElementById('scan-receiver-name').value || null;
-                        body.signature_path = paths[0];
-                        body.photo_path = paths[1];
-                    }
-
-                    return fetch(window.location.pathname, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
-                        body: JSON.stringify(body),
-                    });
+                    body: JSON.stringify({ number: number }),
                 })
                     .then(r => r.json().then(data => ({ ok: r.ok, data: data })))
                     .then(function (result) {
-                        if (! result.ok) {
-                            logResult(false, trackingNumber + ' — ' + (result.data.message || 'Failed.'));
+                        if (! result.ok || ! result.data.found) {
+                            scanFeedback.textContent = result.data.message || 'Not found.';
+                            scanFeedback.className = 'text-xs text-status-exception';
                             return;
                         }
-                        logResult(true, '✓ ' + result.data.tracking_number + ' — ' + result.data.receiver_name);
+                        let added = 0;
+                        (result.data.shipments || []).forEach(function (shipment) {
+                            if (! pending.has(shipment.tracking_number)) {
+                                pending.set(shipment.tracking_number, shipment);
+                                added++;
+                            }
+                        });
+                        renderPending();
+                        scanFeedback.textContent = added > 1 ? `✓ Added ${added} shipments` : (added === 1 ? '✓ Added — verify the details' : 'Already in the list.');
+                        scanFeedback.className = 'text-xs text-status-delivered';
                     })
                     .catch(function () {
-                        logResult(false, trackingNumber + ' — network error, try again.');
+                        scanFeedback.textContent = 'Lookup failed — try again.';
+                        scanFeedback.className = 'text-xs text-status-exception';
                     });
             }
 
@@ -331,7 +283,7 @@
                 const value = scanInput.value.trim();
                 scanInput.value = '';
                 if (! value) return;
-                submitScan(value);
+                lookupAndAdd(value);
             });
 
             let html5QrCode = null;
@@ -350,13 +302,72 @@
                     { fps: 10, qrbox: 220 },
                     function (decodedText) {
                         if (! readyToScan()) return;
-                        submitScan(decodedText);
+                        lookupAndAdd(decodedText);
                     },
                     function () { /* per-frame scan failures are normal, ignore */ }
                 ).catch(function () {
-                    logResult(false, 'Could not access camera.');
+                    scanFeedback.textContent = 'Could not access camera.';
+                    scanFeedback.className = 'text-xs text-status-exception';
                     container.classList.add('hidden');
                 });
+            });
+
+            function logSuccess(message) {
+                if (! successStarted) { successLog.innerHTML = ''; successStarted = true; }
+                const row = document.createElement('div');
+                row.className = 'rounded-lg border border-status-delivered/30 bg-status-delivered/5 p-3 text-sm text-status-delivered';
+                row.textContent = message;
+                successLog.prepend(row);
+            }
+            function logError(message) {
+                if (! errorStarted) { errorLog.innerHTML = ''; errorStarted = true; }
+                const row = document.createElement('div');
+                row.className = 'rounded-lg border border-status-exception/30 bg-status-exception/5 p-3 text-sm text-status-exception';
+                row.textContent = message;
+                errorLog.prepend(row);
+            }
+
+            confirmBtn.addEventListener('click', function () {
+                const count = pending.size;
+                if (count === 0) return;
+                if (! confirm(`Confirm ${typeLabel.toLowerCase()} for ${count} shipment${count === 1 ? '' : 's'}?`)) {
+                    return;
+                }
+
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Confirming…';
+
+                fetch(@json(route('operational-scans.store', ['type' => $type])), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
+                    body: JSON.stringify({
+                        shipment_ids: Array.from(pending.values()).map(s => s.id),
+                        status: currentStatus(),
+                        hub_id: lockedHubId || hubSelect.value || null,
+                        outlet_id: lockedOutletId || outletSelect.value || null,
+                        destination_hub_id: destinationApplies() ? (destinationSelect ? destinationSelect.value : null) : null,
+                        handed_to_user_id: (function () { const el = document.getElementById('scan-handoff'); return el ? (el.value || null) : null; })(),
+                    }),
+                })
+                    .then(r => r.json())
+                    .then(function (data) {
+                        (data.results || []).forEach(function (result) {
+                            if (result.success) {
+                                logSuccess('✓ ' + result.tracking_number + ' — ' + typeLabel.toLowerCase() + ' recorded');
+                            } else {
+                                logError('✗ ' + result.tracking_number + ' — ' + result.message);
+                            }
+                        });
+                        pending.clear();
+                        renderPending();
+                    })
+                    .catch(function () {
+                        logError('Something went wrong submitting this batch — try again.');
+                    })
+                    .finally(function () {
+                        confirmBtn.disabled = false;
+                        confirmBtn.textContent = 'Confirm';
+                    });
             });
 
             refreshEnabled();

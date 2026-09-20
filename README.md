@@ -9775,3 +9775,53 @@ app/Services/TrackingService.php   (resolveShipmentsForScan(), verificationSumma
 resources/views/components/layouts/app.blade.php   (each scan nav item -> its own permission)
 routes/web.php   (delivery-scan:update route group; generic {type} routes ungated at route level)
 ```
+
+## Increment 162 — Verify-Then-Confirm Rebuilt for All Five Generic Scan Types
+
+The other half of the redesign started last increment — the backend
+was ready, this delivers it on the page itself for Pickup, Drop-off,
+Arrival, Departure, and Exception (Delivery already had its own
+version).
+
+### The new flow
+
+1. **Scan a tracking number, or a manifest/trip batch number** — a
+   batch number loads every eligible shipment on it into the pending
+   list in one action (already-terminal shipments in the batch are
+   quietly excluded, not treated as errors — the rest of the batch is
+   still valid)
+2. **Each pending item shows full verification detail**: receiver
+   name/phone, origin→destination, piece count, weight in kilograms,
+   current status, and last-scan date/location — everything asked for
+   as "vital information," visible before anything is recorded
+3. **Remove anything added by mistake** — every pending item has its
+   own Remove button; nothing is recorded until Confirm, so spotting
+   an error before that point costs nothing
+4. **One explicit confirmation**, naming the exact count and operation,
+   before the batch actually submits
+5. **Confirmed and Errors are two separate lists** — a batch with one
+   bad item never buries the shipments that succeeded inside a mixed
+   log; each outcome lands in its own clearly labeled column
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace/
+paren/backtick balance on the substantially larger script),
+duplicate-checked. Full repo balance check: clean across 124 PHP
+files. No forms used on this page at all (pure AJAX), confirmed no
+nested-form risk. Created a real 3-shipment manifest against live
+MySQL, two of them already delivered, and confirmed the batch lookup
+correctly includes only the one still-eligible shipment — matching
+the controller's terminal-status filter exactly.
+
+### Still to come
+
+`delivery.blade.php` needs the same batch-number support extended to
+it (its lookup already accepts one), plus proper in-page camera
+capture for photos and a file-upload alternative for signatures.
+
+### Files
+
+```
+resources/views/operational-scans/index.blade.php   (rebuilt — lookup/pending-list/confirm/split-results flow)
+```
