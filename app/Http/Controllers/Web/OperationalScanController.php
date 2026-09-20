@@ -287,6 +287,37 @@ class OperationalScanController extends \App\Http\Controllers\Controller
         ]);
     }
 
+    /**
+     * A delivery run sheet for "Out for Delivery" — a genuinely
+     * different shape from the local-transfer confirmation
+     * (printTransfer() above), which stays standard: one shared
+     * handover to one receiving unit. Out for Delivery usually means
+     * several different customers on one run, so each shipment gets
+     * its own signature and printed-name space — one shared line at
+     * the bottom wouldn't make sense when the run has five different
+     * receivers on it.
+     */
+    public function printDeliverySheet(Request $request): View
+    {
+        $request->validate([
+            'shipment_ids' => 'required|string',
+            'origin_label' => 'nullable|string',
+        ]);
+
+        $ids = collect(explode(',', $request->input('shipment_ids')))->map(fn ($id) => (int) trim($id))->filter();
+
+        $shipments = \App\Models\Shipment::whereIn('id', $ids)->with(['serviceType', 'destinationCity.state'])->get();
+
+        $settings = \App\Models\Setting::current();
+
+        return view('operational-scans.print-delivery-sheet', [
+            'shipments' => $shipments,
+            'originLabel' => $request->input('origin_label'),
+            'riderName' => $request->input('rider_name'),
+            'settings' => $settings,
+        ]);
+    }
+
     public function uploadEvidence(Request $request): JsonResponse
     {
         $request->validate([

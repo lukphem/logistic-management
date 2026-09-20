@@ -434,6 +434,27 @@
                             successLog.prepend(printRow);
                         }
 
+                        // Out for Delivery — no second party at this
+                        // point (that's the customer, at the end of
+                        // the run), so this offers a delivery sheet
+                        // instead: one row per shipment, each with its
+                        // own signature space, for the rider to carry
+                        // and get signed as they go.
+                        if ('{{ $type }}' === 'departure' && currentStatus() === 'out_for_delivery' && successfulIds.length > 0) {
+                            const originLabel = lockedLocationLabel || (hubSelect.selectedOptions[0]?.textContent) || (outletSelect.selectedOptions[0]?.textContent) || '';
+                            const handoffEl = document.getElementById('scan-handoff');
+                            const riderName = handoffEl ? (handoffEl.selectedOptions[0]?.textContent || '') : '';
+                            const printParams = new URLSearchParams({
+                                shipment_ids: successfulIds.join(','),
+                                origin_label: originLabel,
+                                rider_name: riderName,
+                            });
+                            const printRow = document.createElement('div');
+                            printRow.className = 'rounded-lg border border-line bg-surface-50 p-3 text-sm';
+                            printRow.innerHTML = '<a href="' + @json(route('operational-scans.print-delivery-sheet')) + '?' + printParams.toString() + '" target="_blank" class="font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print delivery sheet for this run</a>';
+                            successLog.prepend(printRow);
+                        }
+
                         pending.clear();
                         renderPending();
                     })

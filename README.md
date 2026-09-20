@@ -10147,3 +10147,62 @@ rendered output ("Ikeja, TestLagos").
 ```
 resources/views/manifests/trips/print.blade.php   (per-manifest pages, column changes, 3-way signature block)
 ```
+
+## Increment 169 — Per-Manifest Printing + Delivery Sheet for Out-for-Delivery Runs
+
+### Manifest number prints just that manifest; trip number prints everything
+
+New `ManifestController::print()` — a single-manifest version of the
+trip-wide document, same styling and three-way signature block, but
+scoped to just one destination's batch. `PrintDocumentController` now
+routes a `MAN-` number here instead of to the whole trip's document;
+a `TRIP-` number still opens everything, unchanged. New "🖨️ Print"
+link added directly on each manifest's row on the trip page too, for
+one-click access without going through the number lookup. Verified
+against a real two-manifest trip in MySQL: the manifest-number query
+correctly returns only its own shipment while the trip-level query
+correctly returns both — the exact distinction asked for.
+
+### Out for Delivery gets its own delivery sheet, standard stays standard for transfers
+
+New `printDeliverySheet()` action and view — landscape, one row per
+shipment, each with its own **Signature** and **Received by (printed
+name)** columns plus a date/time field, with enough row height for an
+actual pen signature. Includes tracking #, registered receiver name/
+phone, address, destination (city + state), pieces, and service
+type — everything a real delivery record needs, per shipment, since
+an Out for Delivery run usually means several different customers on
+one trip, not one shared handover. A "🖨️ Print delivery sheet for
+this run" link now appears automatically after a successful Out for
+Delivery batch confirms.
+
+The local-transfer confirmation (In Transit / unit-to-unit) stays
+exactly as it was — one shared handover, one signature block, per
+the instruction to leave that case standard.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned (including inline JS brace/
+paren/backtick balance), duplicate-checked, missing-import-scanned,
+duplicate-route-checked across every touched file. Full repo balance
+check: clean across 125 PHP files. MySQL wasn't pre-installed in this
+session's sandbox, so it was freshly installed and a minimal schema
+built specifically to verify this increment's logic: confirmed the
+manifest-vs-trip scoping distinction, and confirmed every field the
+delivery sheet needs (receiver, phone, address, destination city+
+state, pieces, weight, service type) resolves correctly against real
+data.
+
+### Files
+
+```
+app/Http/Controllers/Web/ManifestController.php   (print())
+app/Http/Controllers/Web/PrintDocumentController.php   (manifest number -> single manifest, not trip)
+app/Http/Controllers/Web/OperationalScanController.php   (printDeliverySheet())
+resources/views/manifests/manifests/print.blade.php   (new)
+resources/views/manifests/trips/show.blade.php   (Print link per manifest)
+resources/views/operational-scans/print-delivery-sheet.blade.php   (new)
+resources/views/operational-scans/index.blade.php   (delivery-sheet print link after Out for Delivery)
+resources/views/print-documents/search.blade.php   (helper text clarifying manifest vs trip)
+routes/web.php   (manifests.print, operational-scans.print-delivery-sheet)
+```

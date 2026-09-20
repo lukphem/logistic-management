@@ -104,6 +104,27 @@ class ManifestController extends \App\Http\Controllers\Controller
     }
 
     /**
+     * Prints just this one manifest — one destination's batch — as
+     * opposed to ManifestTripController::print(), which prints every
+     * manifest on the whole trip. Same document shape (trip context,
+     * shipment table, three-way signature block) so the two look and
+     * read the same whichever one someone happens to have in hand;
+     * this is just scoped to a single destination.
+     */
+    public function print(Manifest $manifest): View
+    {
+        $manifest->load([
+            'trip.originHub', 'trip.originOutlet', 'trip.vehicleType', 'trip.dispatchedBy',
+            'destinationHub', 'destinationOutlet',
+            'manifestShipments.shipment' => fn ($q) => $q->with(['serviceType', 'destinationCity.state']),
+        ]);
+
+        $settings = \App\Models\Setting::current();
+
+        return view('manifests.manifests.print', compact('manifest', 'settings'));
+    }
+
+    /**
      * The receiving checklist — every shipment expected on this
      * manifest, each with its own condition to record. Only staff
      * with access to the manifest's own destination can receive it,

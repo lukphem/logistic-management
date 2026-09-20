@@ -39,13 +39,13 @@ class PrintDocumentController extends \App\Http\Controllers\Controller
         $kind = $this->tracking->resolveKind($number);
 
         if ($kind === 'manifest') {
-            $trip = Manifest::where('manifest_number', $number)->first()?->trip;
+            $manifest = Manifest::where('manifest_number', $number)->first();
 
-            if (! $trip) {
+            if (! $manifest) {
                 return redirect()->route('print-documents.search')->withErrors(['number' => "No manifest found for \"{$number}\"."]);
             }
 
-            return redirect()->route('manifest-trips.print', $trip);
+            return redirect()->route('manifests.print', $manifest);
         }
 
         if ($kind === 'trip') {
