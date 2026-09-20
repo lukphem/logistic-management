@@ -97,7 +97,7 @@
                     / {{ $shipment->receiver_alternate_phone }}
                 @endif
             </div>
-            <div class="addr-line">{{ $shipment->destination_address }}</div>
+            <div class="addr-line">{{ \Illuminate\Support\Str::limit($shipment->destination_address, 120) }}</div>
         </div>
 
         <div class="addr-box from">
@@ -110,7 +110,7 @@
         <table class="details">
             <tr>
                 <td class="label">Description</td>
-                <td>{{ $shipment->package_description }}</td>
+                <td>{{ \Illuminate\Support\Str::limit($shipment->package_description, 70) }}</td>
             </tr>
             <tr>
                 <td class="label">Weight / Qty</td>

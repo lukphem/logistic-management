@@ -98,11 +98,11 @@
                     · {{ $shipment->receiver_alternate_phone }}
                 @endif
             </div>
-            <div class="party-detail">{{ $shipment->destination_address }}</div>
+            <div class="party-detail">{{ \Illuminate\Support\Str::limit($shipment->destination_address, 120) }}</div>
         </div>
 
         <div class="package-box">
-            <div><strong>{{ $shipment->package_description }}</strong></div>
+            <div><strong>{{ \Illuminate\Support\Str::limit($shipment->package_description, 70) }}</strong></div>
             <div>
                 {{ $shipment->weight_kg ?? '—' }} kg · Qty {{ $shipment->quantity ?? 1 }}
                 @if ($shipment->carton_size)

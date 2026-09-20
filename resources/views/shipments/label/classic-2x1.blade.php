@@ -50,7 +50,7 @@
         <div class="tracking-number">{{ $piece['code'] }}</div>
         <div class="receiver-name">{{ $shipment->receiver_name }}</div>
         <div class="receiver-line">{{ $shipment->receiver_phone }}</div>
-        <div class="receiver-line">{{ $shipment->destinationCity?->name ?? $shipment->destination_address }}</div>
+        <div class="receiver-line">{{ $shipment->destinationCity?->name ?? \Illuminate\Support\Str::limit($shipment->destination_address, 40) }}</div>
     </div>
     </div>
     @endforeach

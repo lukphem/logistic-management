@@ -10309,3 +10309,71 @@ app/Http/Controllers/Web/PrintDocumentController.php   (TRF-/DEL- reference rout
 resources/views/operational-scans/index.blade.php   (simplified print links — reference only)
 resources/views/print-documents/search.blade.php   (helper text)
 ```
+
+## Increment 172 — Standard Character Limits for Address/Description + Label Overflow Safeguard
+
+### New standard limits, matching professional courier practice
+
+Previously `origin_address`/`destination_address` allowed up to 2,000
+characters and `package_description` up to 1,000 — far beyond what
+any real shipping label or waybill has room for, and much looser
+than how DHL/FedEx/UPS-style systems actually constrain these fields.
+Tightened to:
+
+- **Address (origin/destination): 150 characters** — enough for a
+  full Nigerian address with street, area, and a landmark reference,
+  without allowing a paragraph
+- **Package description: 100 characters** — a short, clear category
+  ("Documents", "Electronics x2"), not an itemized essay
+- **Special instructions: 500 characters** — kept more generous
+  since these are internal operational notes rather than something
+  printed on a label, but still bounded (was 2,000)
+
+Applied consistently across all four places these fields are
+validated: the web create form, the web edit form, and both API
+shipment-creation controllers (`Api\ShipmentController`,
+`Api\ClientShipmentController`) — the same four locations Increment
+142's quantity validation had to reach, so no path was left on the
+old, looser limits.
+
+### Label printing: a hard backstop against ever spilling to a second page
+
+Even with the tighter input limit, a label's own physical size (a
+2×1" sticker has almost no room at all) still needed its own
+safeguard — this is in addition to, not instead of, the auto-fit
+script already shrinking font size to match content. Every label
+template across all three designs (classic/modern/compact) and both
+sizes now truncates with `Str::limit()`:
+
+- **2×1 labels**: destination address capped at 40 characters (only
+  shown at all when no destination city is set, since the city name
+  is already the preferred, shorter fallback)
+- **4×6 labels**: destination address capped at 120 characters,
+  package description capped at 70 — generous enough to read
+  normally in the overwhelming majority of cases, hard enough to
+  guarantee the auto-fit script is never handed more text than the
+  label could ever physically hold
+
+### Verified
+
+Balance-checked, crash-pattern-scanned across every touched file
+(4 controllers, 6 label templates). Full repo balance check: clean
+across 123 PHP files. Confirmed no other file in the codebase still
+validates these fields against the old limits. Simulated the
+truncation logic across three cases (address over the limit,
+description over the limit, text under the limit left untouched) —
+all correct.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (update() and validateShipment())
+app/Http/Controllers/Api/ClientShipmentController.php
+app/Http/Controllers/Api/ShipmentController.php
+resources/views/shipments/label/classic-2x1.blade.php
+resources/views/shipments/label/compact-2x1.blade.php
+resources/views/shipments/label/modern-2x1.blade.php
+resources/views/shipments/label/classic-4x6.blade.php
+resources/views/shipments/label/compact-4x6.blade.php
+resources/views/shipments/label/modern-4x6.blade.php
+```
