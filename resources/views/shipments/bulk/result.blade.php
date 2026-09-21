@@ -2,7 +2,7 @@
 
     <div class="mb-5">
         <p class="text-2xl font-semibold text-ink-900">Bulk Upload Complete</p>
-        <p class="mt-1 text-sm text-ink-500">{{ count($created) }} created, {{ count($failed) }} failed.</p>
+        <p class="mt-1 text-sm text-ink-500">Batch <span class="font-mono font-medium text-ink-900">{{ $batch->batch_number }}</span> — {{ count($created) }} created, {{ count($failed) }} failed.</p>
     </div>
 
     @if (count($created) > 0)
@@ -59,6 +59,9 @@
         </div>
     @endif
 
-    <a href="{{ route('shipments.bulk.create') }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">← Upload another batch</a>
+    @if (count($failed) > 0)
+        <a href="{{ route('shipments.bulk.upload', $batch) }}" class="mr-4 text-sm font-medium text-[var(--brand-primary)] hover:underline">Fix the failed rows and re-upload to this batch</a>
+    @endif
+    <a href="{{ route('shipments.bulk.create') }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Start a new batch</a>
 
 </x-layouts.app>

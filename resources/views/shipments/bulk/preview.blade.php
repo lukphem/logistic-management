@@ -3,7 +3,7 @@
     <div class="mb-5">
         <p class="text-2xl font-semibold text-ink-900">Preview</p>
         <p class="mt-1 text-sm text-ink-500">
-            {{ $account->account_name }} — {{ count($validRows) }} ready to create, {{ count($invalidRows) }} with errors.
+            Batch <span class="font-mono font-medium text-ink-900">{{ $batch->batch_number }}</span> — {{ $batch->isWalkIn() ? 'Walk-in customer' : $batch->clientAccount?->account_name }} — {{ count($validRows) }} ready to create, {{ count($invalidRows) }} with errors.
             Nothing has been created yet.
         </p>
     </div>
@@ -63,19 +63,20 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ route('shipments.bulk.store') }}">
+        <form method="POST" action="{{ route('shipments.bulk.store', $batch) }}">
             @csrf
             <input type="hidden" name="token" value="{{ $token }}">
             <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
                 Create {{ count($validRows) }} shipment(s)
             </button>
-            <a href="{{ route('shipments.bulk.create') }}" class="ml-3 text-sm font-medium text-ink-500 hover:text-ink-900">Start over</a>
+            <a href="{{ route('shipments.bulk.upload', $batch) }}" class="ml-3 text-sm font-medium text-ink-500 hover:text-ink-900">Fix the file and re-upload to this batch instead</a>
+            <a href="{{ route('shipments.bulk.create') }}" class="ml-3 text-sm font-medium text-ink-500 hover:text-ink-900">Start a new batch</a>
         </form>
     @else
         <div class="rounded-lg border border-line bg-surface-50 p-4 text-sm text-ink-500">
             No valid rows to create — fix the errors above and upload again.
         </div>
-        <a href="{{ route('shipments.bulk.create') }}" class="mt-3 inline-block text-sm font-medium text-[var(--brand-primary)] hover:underline">← Back to upload</a>
+        <a href="{{ route('shipments.bulk.upload', $batch) }}" class="mt-3 inline-block text-sm font-medium text-[var(--brand-primary)] hover:underline">← Fix the file and upload again</a>
     @endif
 
 </x-layouts.app>

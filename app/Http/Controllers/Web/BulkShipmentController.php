@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Models\BulkShipmentBatch;
 use App\Models\ClientAccount;
 use App\Models\Hub;
 use App\Models\Outlet;
 use App\Models\ServiceType;
+use App\Models\Setting;
 use App\Services\BulkShipmentImportService;
 use App\Services\BulkShipmentTemplateService;
 use Illuminate\Http\RedirectResponse;
@@ -14,15 +16,20 @@ use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 /**
- * Bulk shipment creation from a CSV/Excel upload. Batch-level
- * settings — client account, origin outlet, service type — are set
- * once for the whole upload, not per row; everything shipment-
- * specific (receiver, destination, weight, description) comes from
- * the file itself, one row per shipment. Follows the same
- * verify-then-confirm shape as every other batch operation in this
- * app: nothing is created until the previewed rows are explicitly
- * confirmed, and results are always reported success/error
- * separately, never merged.
+ * Bulk shipment creation from a CSV/Excel upload, split into two
+ * real steps rather than one combined submission. Step 1 (shipper +
+ * service type details) creates a persisted batch with its own
+ * batch number; step 2 is the file upload against that batch, and
+ * can be repeated as many times as needed — a CSV with errors gets
+ * fixed and re-uploaded to the SAME batch, not re-entered from
+ * scratch. Origin isn't a form field at all: it's resolved from
+ * whichever hub/outlet the person creating the batch is themselves
+ * assigned to, the same way scanning locations already work — an
+ * outlet books a walk-in bulk batch under its own account, not by
+ * picking itself from a list. Only the two billing models that
+ * actually fit a bulk approach (Zoning and Weight, Origin to
+ * Destination) are offered; Fleet Billing doesn't apply per-shipment
+ * the way bulk upload needs.
  */
 class BulkShipmentController extends \App\Http\Controllers\Controller
 {
@@ -32,14 +39,26 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
     ) {
     }
 
+    /**
+     * The billing models this feature supports — Fleet Billing is
+     * deliberately excluded, since it bills a dedicated vehicle/
+     * contract, not a per-shipment rate the way bulk upload needs.
+     */
+    private const ALLOWED_BILLING_MODELS = ['standard_billing', 'origin_destination_billing'];
+
     public function create(): View
     {
+        $user = auth()->user();
+
+        $billingModels = collect(Setting::BILLING_MODELS)
+            ->only(self::ALLOWED_BILLING_MODELS)
+            ->intersectByKeys(array_flip(array_keys(Setting::current()->supportedBillingModels())));
+
         return view('shipments.bulk.create', [
             'clientAccounts' => ClientAccount::orderBy('account_name')->get(['id', 'account_name', 'account_number']),
-            'outlets' => Outlet::orderBy('name')->get(['id', 'name', 'hub_id']),
-            'hubs' => Hub::orderBy('name')->get(['id', 'name']),
-            'serviceTypes' => ServiceType::orderBy('name')->get(['id', 'name']),
-            'rowLimit' => BulkShipmentTemplateService::ROW_LIMIT,
+            'serviceTypes' => ServiceType::whereIn('billing_model', self::ALLOWED_BILLING_MODELS)->orderBy('name')->get(['id', 'name', 'billing_model']),
+            'billingModels' => $billingModels,
+            'originLabel' => $this->resolveOriginLabel($user),
         ]);
     }
 
@@ -66,51 +85,97 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
     }
 
     /**
-     * Parses and validates the upload, creating nothing yet. Valid
-     * and invalid rows are shown separately — never merged, same as
-     * every other batch operation in this app — and the validated,
-     * fully-resolved data for the valid rows is stashed server-side
-     * under a one-time token (too much data for 1000 rows to
-     * round-trip through hidden form fields) for store() to pick up
-     * once the person actually confirms.
+     * Step 1: creates the batch record and its number, then sends
+     * the person straight to step 2 (the upload page for this
+     * specific batch) — the whole point being that batch now exists
+     * independently of any one upload attempt.
      */
-    public function preview(Request $request): View|RedirectResponse
+    public function storeBatch(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+
         $data = $request->validate([
-            'client_account_id' => 'required|exists:client_accounts,id',
-            'origin_hub_id' => 'nullable|exists:hubs,id',
-            'origin_outlet_id' => 'nullable|exists:outlets,id',
+            'client_account_id' => 'nullable|exists:client_accounts,id',
+            'billing_model' => 'required|string|in:' . implode(',', self::ALLOWED_BILLING_MODELS),
             'service_type_id' => 'required|exists:service_types,id',
             'sender_name' => 'required|string|max:255',
             'sender_phone' => 'required|string|max:20',
-            'file' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+            'sender_address' => 'required|string|max:150',
+            'sender_email' => 'nullable|email|max:255',
         ]);
 
-        if (empty($data['origin_hub_id']) && empty($data['origin_outlet_id'])) {
-            return redirect()->route('shipments.bulk.create')->withErrors(['origin_hub_id' => 'Pick an origin hub or outlet for this batch.'])->withInput();
+        [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user);
+
+        if ($originError) {
+            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => $originError])->withInput();
         }
 
-        $account = ClientAccount::find($data['client_account_id']);
+        $account = ! empty($data['client_account_id']) ? ClientAccount::find($data['client_account_id']) : null;
+
+        $batch = BulkShipmentBatch::create([
+            'batch_number' => BulkShipmentBatch::generateBatchNumber(),
+            'client_account_id' => $account?->id,
+            'client_user_id' => $account?->client_user_id,
+            'billing_model' => $data['billing_model'],
+            'service_type_id' => $data['service_type_id'],
+            'sender_name' => $data['sender_name'],
+            'sender_phone' => $data['sender_phone'],
+            'sender_address' => $data['sender_address'],
+            'sender_email' => $data['sender_email'] ?? null,
+            'origin_hub_id' => $originHubId,
+            'origin_outlet_id' => $originOutletId,
+            'created_by_user_id' => $user->id,
+        ]);
+
+        return redirect()->route('shipments.bulk.upload', $batch);
+    }
+
+    /**
+     * Step 2: the upload page for one specific, already-created
+     * batch. Visiting this again (after a failed/partial previous
+     * attempt) is the normal way to correct and re-submit a CSV.
+     */
+    public function showUpload(BulkShipmentBatch $batch): View
+    {
+        return view('shipments.bulk.upload', ['batch' => $batch]);
+    }
+
+    /**
+     * Parses and validates the upload against this batch's own
+     * context, creating nothing yet. Valid and invalid rows are
+     * shown separately — never merged, same as every other batch
+     * operation in this app — and the validated, fully-resolved data
+     * for the valid rows is stashed server-side under a one-time
+     * token (too much data for 1000 rows to round-trip through
+     * hidden form fields) for store() to pick up once confirmed.
+     */
+    public function preview(Request $request, BulkShipmentBatch $batch): View|RedirectResponse
+    {
+        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv|max:10240']);
 
         $path = $request->file('file')->getRealPath();
         $rows = $this->import->parseFile($path);
 
         if (count($rows) === 0) {
-            return redirect()->route('shipments.bulk.create')->withErrors(['file' => 'No shipment rows found in this file.'])->withInput();
+            return redirect()->route('shipments.bulk.upload', $batch)->withErrors(['file' => 'No shipment rows found in this file.']);
         }
 
         if (count($rows) > BulkShipmentTemplateService::ROW_LIMIT) {
-            return redirect()->route('shipments.bulk.create')->withErrors(['file' => 'This file has ' . count($rows) . ' rows — the limit is ' . BulkShipmentTemplateService::ROW_LIMIT . ' per upload.'])->withInput();
+            return redirect()->route('shipments.bulk.upload', $batch)->withErrors(['file' => 'This file has ' . count($rows) . ' rows — the limit is ' . BulkShipmentTemplateService::ROW_LIMIT . ' per upload.']);
         }
 
+        $originHub = $batch->origin_hub_id ? Hub::find($batch->origin_hub_id) : null;
+
         $batchContext = [
-            'client_account_id' => $account->id,
-            'client_user_id' => $account->client_user_id,
-            'service_type_id' => $data['service_type_id'],
-            'origin_hub_id' => $data['origin_hub_id'] ?? null,
-            'origin_outlet_id' => $data['origin_outlet_id'] ?? null,
-            'sender_name' => $data['sender_name'],
-            'sender_phone' => $data['sender_phone'],
+            'client_account_id' => $batch->client_account_id,
+            'client_user_id' => $batch->client_user_id,
+            'service_type_id' => $batch->service_type_id,
+            'origin_hub_id' => $batch->origin_hub_id,
+            'origin_outlet_id' => $batch->origin_outlet_id,
+            'origin_address' => $batch->sender_address,
+            'origin_city_id' => $originHub?->city_id,
+            'sender_name' => $batch->sender_name,
+            'sender_phone' => $batch->sender_phone,
         ];
 
         $result = $this->import->validateRows($rows, $batchContext);
@@ -119,10 +184,10 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         \Illuminate\Support\Facades\Storage::disk('local')->put("bulk-imports/{$token}.json", json_encode($result['valid']));
 
         return view('shipments.bulk.preview', [
+            'batch' => $batch,
             'token' => $token,
             'validRows' => $result['valid'],
             'invalidRows' => $result['invalid'],
-            'account' => $account,
         ]);
     }
 
@@ -131,14 +196,14 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      * here — this endpoint never re-parses or re-validates the
      * upload itself, it only reads back what was already checked.
      */
-    public function store(Request $request): View
+    public function store(Request $request, BulkShipmentBatch $batch): View
     {
         $request->validate(['token' => 'required|string']);
 
         $path = "bulk-imports/{$request->input('token')}.json";
         $disk = \Illuminate\Support\Facades\Storage::disk('local');
 
-        abort_unless($disk->exists($path), 404, 'This batch has expired — please upload the file again.');
+        abort_unless($disk->exists($path), 404, 'This preview has expired — please upload the file again.');
 
         $validRows = json_decode($disk->get($path), true);
         $disk->delete($path);
@@ -146,8 +211,40 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         $result = $this->import->createShipments($validRows);
 
         return view('shipments.bulk.result', [
+            'batch' => $batch,
             'created' => $result['created'],
             'failed' => $result['failed'],
         ]);
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?int, 2: ?string} [hubId, outletId, errorMessage]
+     */
+    private function resolveOrigin($user): array
+    {
+        if ($user->hasOutletAccess()) {
+            $outlet = Outlet::find($user->outlet_id);
+
+            return [$outlet?->hub_id, $user->outlet_id, null];
+        }
+
+        if ($user->hasHubAccess()) {
+            return [$user->hub_id, null, null];
+        }
+
+        return [null, null, "Bulk upload needs a single origin — your account isn't assigned to a specific hub or outlet, so there's nothing to book this batch from."];
+    }
+
+    private function resolveOriginLabel($user): ?string
+    {
+        if ($user->hasOutletAccess()) {
+            return Outlet::find($user->outlet_id)?->name;
+        }
+
+        if ($user->hasHubAccess()) {
+            return Hub::find($user->hub_id)?->name;
+        }
+
+        return null;
     }
 }

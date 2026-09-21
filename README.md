@@ -10509,3 +10509,78 @@ resources/views/shipments/bulk/result.blade.php   (new)
 resources/views/components/layouts/app.blade.php   (Bulk Upload nav item)
 routes/web.php   (shipments.bulk.create/template/preview/store)
 ```
+
+## Increment 175 — Bulk Upload Corrections: Walk-In, Model-First Flow, Shipper Fields, Real Batch Numbers
+
+Four corrections to the bulk upload feature, each addressed directly.
+
+### Outlets can bulk-upload for walk-in customers
+
+Client account is no longer required — defaults to "Walk-in customer"
+(`client_account_id` null), mirroring exactly how the single-shipment
+form already handles cash customers. An outlet running its own batch
+for a walk-in doesn't need a registered account at all.
+
+### Billing model first, then service type — only two models offered
+
+New billing model dropdown offers just `standard_billing` ("Zoning
+and Weight") and `origin_destination_billing`; `fleet_billing` is
+deliberately excluded, since it bills a dedicated contract rather
+than a per-shipment rate the way bulk upload needs. Service type
+options filter live via JS, mirroring the exact pattern the existing
+single-shipment form already uses for the same relationship.
+
+### Shipper address/email replace origin hub/outlet fields
+
+Origin is no longer a form field at all — it's resolved automatically
+from whichever hub or outlet the person creating the batch is
+themselves assigned to (shown read-only on the form), the same way
+scanning locations already work throughout this app. In its place:
+free-text sender address and an optional sender email, alongside the
+sender name/phone from the previous round.
+
+### A real batch number, created in its own step
+
+New `bulk_shipment_batches` table and `BulkShipmentBatch` model.
+Step 1 (shipper + service details) now creates a persisted record
+with its own `BULK-YYMMDD-XXXXX` number and redirects straight to
+Step 2 (upload) for that batch. Step 2 is fully re-visitable — a CSV
+with errors gets fixed and re-uploaded to the exact same batch,
+without re-entering any of the shipper details. One known limitation
+worth stating plainly: re-uploading the same file after a partial
+success will attempt to create every row again, including ones that
+already succeeded — the expected workflow is removing already-
+successful rows before re-uploading just the fixed ones.
+
+### Caught before shipping
+
+Two real bugs found and fixed mid-build: the billing-model filter
+used `array_flip()` against the wrong data shape (`supportedBillingModels()`
+returns key→label pairs, not a flat list) — would have shown zero
+options in the dropdown every time. And `PricingEngine` needs
+`origin_city_id` specifically, not just the hub/outlet IDs, to
+actually price a shipment — this was missing from the batch context
+and has been added, resolved from the origin hub's own city.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+duplicate-route-checked, crash-pattern-scanned across every touched
+file. Full repo balance check: clean across 231 files. Verified
+against live MySQL: a walk-in batch's full origin-resolution chain
+(outlet → parent hub → hub's city) resolves correctly, the unique
+constraint on `batch_number` correctly rejects a duplicate, and the
+billing-model allow-list correctly excludes `fleet_billing`.
+
+### Files
+
+```
+database/migrations/2026_03_27_000001_create_bulk_shipment_batches_table.php
+app/Models/BulkShipmentBatch.php   (new)
+app/Http/Controllers/Web/BulkShipmentController.php   (rewritten for the two-step flow)
+resources/views/shipments/bulk/create.blade.php   (rewritten — Step 1)
+resources/views/shipments/bulk/upload.blade.php   (new — Step 2)
+resources/views/shipments/bulk/preview.blade.php   (batch-scoped)
+resources/views/shipments/bulk/result.blade.php   (batch-scoped)
+routes/web.php   (shipments.bulk.store-batch/upload/preview/store)
+```
