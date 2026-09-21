@@ -10377,3 +10377,54 @@ resources/views/shipments/label/classic-4x6.blade.php
 resources/views/shipments/label/compact-4x6.blade.php
 resources/views/shipments/label/modern-4x6.blade.php
 ```
+
+## Increment 173 — Bulk CSV Upload, Part 1: Extract ShipmentCreationService
+
+Per the plan discussed: batch-level settings (Client Account, Outlet/
+origin, Service Type) set once for the whole upload; per-row CSV data
+covers everything shipment-specific, including destination. Row
+limit: 1000. This increment lays the foundation the rest of that
+build sits on — the next parts (Excel template generation with
+cascading State→City dropdowns, the upload/preview/confirm flow)
+follow in subsequent increments given the overall scope.
+
+### `ShipmentCreationService` — the shared pipeline
+
+Pulled the full quote → price → resolve billing account → check
+suspension → resolve collection method → create sequence out of
+`ShipmentController::store()` into its own service, taking plain
+array data in and either a created `Shipment` or a `RuntimeException`
+out. This is the one place that logic now lives, so the web form,
+the coming bulk CSV import, and — per the stated goal — a future
+client portal all call the exact same tested implementation rather
+than three separately-maintained copies that could drift into
+different pricing behavior over time.
+
+`ShipmentController::store()` refactored to call it; verified
+line-by-line against the original logic it replaced (account number
+resolution, quote/pricing merge, billing profile resolution, account-
+suspension check, collection method) to confirm no behavioral change
+— `pricingEngine`/`pricingService`/`resolveCollectionMethod()` all
+stay on the controller too, since `storeFromQuote()` and other
+methods still use them directly for the separate quote-booking path,
+which this service doesn't touch.
+
+Also confirmed `phpoffice/phpspreadsheet` — needed for the Excel
+template with cascading dropdowns coming next — is already a locked
+transitive dependency of `maatwebsite/excel`, already in
+`composer.lock`. No new package to add.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned. Full
+repo balance check: clean across 124 PHP files. The extraction was
+verified by direct side-by-side comparison against the original
+`store()` code it replaced, confirming every step, condition, and
+error message is preserved exactly.
+
+### Files
+
+```
+app/Services/ShipmentCreationService.php   (new)
+app/Http/Controllers/Web/ShipmentController.php   (store() refactored to use it)
+```

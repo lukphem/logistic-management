@@ -28,6 +28,7 @@ class ShipmentController extends Controller
     public function __construct(
         private PricingEngine $pricingEngine,
         private ShipmentPricingService $pricingService,
+        private \App\Services\ShipmentCreationService $creationService,
     ) {
     }
 
@@ -484,77 +485,15 @@ class ShipmentController extends Controller
             return $this->storeFromQuote($request, $data);
         }
 
-        // A typed account number resolves directly to that specific
-        // Account and wins over whatever's in the client dropdown —
-        // same reasoning as Rate Checker/Quote generation: a client
-        // can have several accounts, each with its own special tariff/
-        // discount, and this is the only way to book against a
-        // NON-default one without switching to it first on the Client
-        // Hub.
         if ($request->filled('account_number')) {
-            $account = \App\Models\ClientAccount::where('account_number', $request->input('account_number'))->first();
-
-            if (! $account) {
-                return redirect()->route('shipments.create')->withErrors(['account_number' => "No client account found with number \"{$request->input('account_number')}\"."])->withInput();
-            }
-
-            $data['client_account_id'] = $account->id;
-            $data['client_user_id'] = $account->client_user_id;
+            $data['account_number'] = $request->input('account_number');
         }
 
         try {
-            $quote = $this->pricingEngine->quote($data);
-        } catch (PricingUnavailableException $e) {
-            // Explicit route, not back() - back() falls through to the
-            // site root when it can't resolve a previous URL (missing
-            // Referer header, session edge cases), and this app's root
-            // route redirects straight to the dashboard - silently
-            // swallowing this error message along the way. An explicit
-            // destination means the error is never lost regardless of
-            // why back() would have failed.
-            return redirect()->route('shipments.create')->withErrors(['service_type_id' => $e->getMessage()])->withInput();
+            $shipment = $this->creationService->createShipment($data);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('shipments.create')->withErrors(['shipment' => $e->getMessage()])->withInput();
         }
-
-        $data['base_amount'] = $quote['base_amount'];
-        $data['used_special_rate'] = $quote['used_special_rate'] ?? false;
-        // Same Fleet Billing surcharges merge as QuoteController/
-        // RateCheckerController - keeps this walk-in path priced
-        // identically to what Rate Checker would show for the same
-        // inputs, per this page's own guarantee.
-        $data['surcharges'] = array_merge($data['surcharges'] ?? [], $quote['surcharges'] ?? []);
-
-        $billingProfile = ClientBillingProfile::resolveForClientUser($data['client_user_id'] ?? null);
-        $pricing = $this->pricingService->priceShipment($data, $billingProfile);
-
-        // Same resolution PricingEngine/ShipmentPricingService already
-        // used to price this shipment (client_account_id if known,
-        // else that client's Default Account) - stamped onto the
-        // shipment itself so Shipment -> Account -> Business Manager
-        // is traceable later, for commission/performance reporting.
-        $data['client_account_id'] = $data['client_account_id']
-            ?? (! empty($data['client_user_id']) ? \App\Models\ClientAccount::where('client_user_id', $data['client_user_id'])->where('is_default', true)->value('id') : null);
-
-        // Checked against whichever account this shipment ultimately
-        // resolved to, not just the one explicitly typed in — a
-        // suspended account shouldn't be able to book through its own
-        // Default fallback either.
-        if ($data['client_account_id']) {
-            $resolvedAccount = \App\Models\ClientAccount::find($data['client_account_id']);
-
-            if ($resolvedAccount?->isSuspended()) {
-                return redirect()->route('shipments.create')->withErrors(['account_number' => "\"{$resolvedAccount->account_name}\" is suspended and can't book new shipments." . ($resolvedAccount->suspension_reason ? " Reason: {$resolvedAccount->suspension_reason}" : '')])->withInput();
-            }
-        }
-
-        $collectionMethod = $this->resolveCollectionMethod($data);
-
-        $shipment = Shipment::create([
-            ...$data,
-            'shipping_type' => $quote['shipping_type'],
-            'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
-            ...$pricing,
-            ...$collectionMethod,
-        ]);
 
         return redirect()->route('shipments.show', $shipment)->with('status', "Shipment {$shipment->tracking_number} created.");
     }
