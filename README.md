@@ -10682,3 +10682,59 @@ app/Http/Controllers/Api/ClientShipmentController.php   (cod_amount defaults to 
 app/Http/Controllers/Web/UserController.php   (unit_id required at region/global access)
 resources/views/users/form.blade.php   (Unit field visible at every access level, dynamic required/optional label)
 ```
+
+## Increment 178 — Bulk Batch Listing, Printable/Trackable Batch Numbers
+
+### Shipments now track which batch created them
+
+New `bulk_shipment_batch_id` on `shipments`, with relations both
+ways (`Shipment::bulkShipmentBatch()`, `BulkShipmentBatch::shipments()`).
+Without this a batch's own number was trackable as a record but had
+no way to show which shipments actually came from it.
+
+### Batch listing page
+
+New `shipments/bulk/index.blade.php` — every batch, newest first:
+batch number, account (or walk-in), service type, how many
+shipments actually came out of it, who created it, when. "New
+batch" button at the top. Sidebar's Bulk Upload link now points here
+instead of straight to the create form, matching how Shipments
+already works (list first, create from within it).
+
+### Batch numbers are printable and trackable
+
+New batch print document (`shipments/bulk/print.blade.php`), same
+styling as the manifest/trip/transfer documents: shipper details,
+then every shipment actually created under that batch in a table.
+`PrintDocumentController` now recognizes `BULK-` numbers from the
+general Print Documents page too, alongside the `MAN-`/`TRIP-`/
+`TRF-`/`DEL-` numbers already supported there. A quick "🖨️ Print
+batch" link is also on the upload page itself for fast access
+without leaving the flow.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+duplicate-route-checked, crash-pattern-scanned across every touched
+file. Full repo balance check: clean across 232 files. Verified
+against live MySQL: a real batch with an attached shipment resolves
+correctly through the relation and `withCount()`, the `BULK-` prefix
+lookup resolves the batch correctly, and the five-way number-prefix
+detection (`BULK-`/`TRF-`/`DEL-`/`MAN-`/`TRIP-`/plain tracking
+number) is confirmed correct across all cases.
+
+### Files
+
+```
+database/migrations/2026_03_28_000001_add_bulk_shipment_batch_id_to_shipments.php
+app/Models/Shipment.php   (bulk_shipment_batch_id, bulkShipmentBatch())
+app/Models/BulkShipmentBatch.php   (shipments())
+app/Http/Controllers/Web/BulkShipmentController.php   (index(), print(), batch_id wired into batch context)
+app/Http/Controllers/Web/PrintDocumentController.php   (BULK- number routing)
+resources/views/shipments/bulk/index.blade.php   (new)
+resources/views/shipments/bulk/print.blade.php   (new)
+resources/views/shipments/bulk/upload.blade.php   (Print batch link)
+resources/views/components/layouts/app.blade.php   (Bulk Upload nav -> index)
+resources/views/print-documents/search.blade.php   (helper text)
+routes/web.php   (shipments.bulk.index/print)
+```

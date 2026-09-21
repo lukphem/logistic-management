@@ -54,6 +54,16 @@ class PrintDocumentController extends \App\Http\Controllers\Controller
             );
         }
 
+        if (str_starts_with($number, 'BULK-')) {
+            $batch = \App\Models\BulkShipmentBatch::where('batch_number', $number)->first();
+
+            if (! $batch) {
+                return redirect()->route('print-documents.search')->withErrors(['number' => "No bulk batch found for \"{$number}\"."]);
+            }
+
+            return redirect()->route('shipments.bulk.print', $batch);
+        }
+
         $kind = $this->tracking->resolveKind($number);
 
         if ($kind === 'manifest') {

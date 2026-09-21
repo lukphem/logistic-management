@@ -48,6 +48,11 @@ class BulkShipmentBatch extends Model
         return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
+    public function shipments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Shipment::class);
+    }
+
     public function isWalkIn(): bool
     {
         return $this->client_account_id === null;

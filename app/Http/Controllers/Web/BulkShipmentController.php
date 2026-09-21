@@ -46,6 +46,21 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      */
     private const ALLOWED_BILLING_MODELS = ['standard_billing', 'origin_destination_billing'];
 
+    /**
+     * Every batch ever created, newest first — the record of who
+     * uploaded what, when, and how many shipments actually came out
+     * of it, with a way straight into starting a new one.
+     */
+    public function index(): View
+    {
+        $batches = BulkShipmentBatch::with(['clientAccount', 'serviceType', 'createdBy'])
+            ->withCount('shipments')
+            ->latest()
+            ->paginate(20);
+
+        return view('shipments.bulk.index', compact('batches'));
+    }
+
     public function create(): View
     {
         $user = auth()->user();
@@ -72,6 +87,22 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      * currently in the database at the moment of download, so a city
      * added five minutes ago is already there.
      */
+    /**
+     * The printable record of one batch — shipper details at the
+     * top, then every shipment actually created under it, same
+     * tabular shape as the manifest/trip documents. Looked up by the
+     * batch's own BULK- number the same way TRF-/DEL-/MAN-/TRIP-
+     * numbers already work from the general Print Documents page.
+     */
+    public function print(BulkShipmentBatch $batch): View
+    {
+        $batch->load(['clientAccount', 'serviceType', 'originHub', 'originOutlet', 'shipments' => fn ($q) => $q->with(['serviceType', 'destinationCity.state'])]);
+
+        $settings = Setting::current();
+
+        return view('shipments.bulk.print', compact('batch', 'settings'));
+    }
+
     public function downloadTemplate(): Response
     {
         $spreadsheet = $this->template->generate();
@@ -175,6 +206,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         $batchContext = [
             'client_account_id' => $batch->client_account_id,
             'client_user_id' => $batch->client_user_id,
+            'bulk_shipment_batch_id' => $batch->id,
             'service_type_id' => $batch->service_type_id,
             'origin_hub_id' => $batch->origin_hub_id,
             'origin_outlet_id' => $batch->origin_outlet_id,

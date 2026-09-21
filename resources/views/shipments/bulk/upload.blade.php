@@ -1,7 +1,10 @@
 <x-layouts.app :title="'Bulk Shipment Upload — Upload File'">
 
     <div class="mb-5">
-        <p class="text-2xl font-semibold text-ink-900">Bulk Shipment Upload — Step 2 of 2</p>
+        <div class="flex items-center justify-between">
+            <p class="text-2xl font-semibold text-ink-900">Bulk Shipment Upload — Step 2 of 2</p>
+            <a href="{{ route('shipments.bulk.print', $batch) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">🖨️ Print batch</a>
+        </div>
         <p class="mt-1 text-sm text-ink-500">
             Batch <span class="font-mono font-medium text-ink-900">{{ $batch->batch_number }}</span>
             — {{ $batch->isWalkIn() ? 'Walk-in customer' : $batch->clientAccount?->account_name }},

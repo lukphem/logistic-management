@@ -77,10 +77,12 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/shipments/preview-price', [ShipmentController::class, 'previewPrice'])->name('shipments.preview-price');
         Route::get('/shipments/account-billing-options', [ShipmentController::class, 'accountBillingOptions'])->name('shipments.account-billing-options');
         Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
+        Route::get('/shipments/bulk', [BulkShipmentController::class, 'index'])->name('shipments.bulk.index');
         Route::get('/shipments/bulk/create', [BulkShipmentController::class, 'create'])->name('shipments.bulk.create');
         Route::get('/shipments/bulk/template', [BulkShipmentController::class, 'downloadTemplate'])->name('shipments.bulk.template');
         Route::post('/shipments/bulk', [BulkShipmentController::class, 'storeBatch'])->name('shipments.bulk.store-batch');
         Route::get('/shipments/bulk/{batch}/upload', [BulkShipmentController::class, 'showUpload'])->name('shipments.bulk.upload');
+        Route::get('/shipments/bulk/{batch}/print', [BulkShipmentController::class, 'print'])->name('shipments.bulk.print');
         Route::post('/shipments/bulk/{batch}/preview', [BulkShipmentController::class, 'preview'])->name('shipments.bulk.preview');
         Route::post('/shipments/bulk/{batch}', [BulkShipmentController::class, 'store'])->name('shipments.bulk.store');
     });
