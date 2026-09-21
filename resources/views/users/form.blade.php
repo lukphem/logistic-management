@@ -119,7 +119,7 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="global" class="mt-1"
                                    @checked($currentScope === 'global')
-                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none'; document.getElementById('unit-field').style.display='none';">
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none'; syncUnitRequirement('global');">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Global</span>
                                 <span class="block text-xs text-ink-500">Sees and manages shipments across every hub.</span>
@@ -128,7 +128,7 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="region" class="mt-1"
                                    @checked($currentScope === 'region')
-                                   onchange="document.getElementById('region-field').style.display=''; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none'; document.getElementById('unit-field').style.display='none';">
+                                   onchange="document.getElementById('region-field').style.display=''; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display='none'; syncUnitRequirement('region');">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Region</span>
                                 <span class="block text-xs text-ink-500">Sees every hub within one region.</span>
@@ -137,7 +137,7 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="hub" class="mt-1"
                                    @checked($currentScope === 'hub')
-                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display=''; document.getElementById('outlet-field').style.display='none'; document.getElementById('unit-field').style.display='';">
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display=''; document.getElementById('outlet-field').style.display='none'; syncUnitRequirement('hub');">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Specific hub (station)</span>
                                 <span class="block text-xs text-ink-500">Restricted to one hub's shipments only.</span>
@@ -146,7 +146,7 @@
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-line p-3 has-[:checked]:border-[var(--brand-primary)] has-[:checked]:bg-[var(--brand-primary)]/5">
                             <input type="radio" name="access_scope" value="outlet" class="mt-1"
                                    @checked($currentScope === 'outlet')
-                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display=''; document.getElementById('unit-field').style.display='';">
+                                   onchange="document.getElementById('region-field').style.display='none'; document.getElementById('hub-field').style.display='none'; document.getElementById('outlet-field').style.display=''; syncUnitRequirement('outlet');">
                             <span>
                                 <span class="block text-sm font-medium text-ink-900">Specific outlet</span>
                                 <span class="block text-xs text-ink-500">Restricted to shipments physically at that outlet.</span>
@@ -181,8 +181,12 @@
                         </select>
                     </div>
 
-                    <div id="unit-field" class="mt-4" style="{{ in_array($currentScope, ['hub', 'outlet']) ? '' : 'display:none' }}">
-                        <label class="mb-1 block text-sm font-medium text-ink-900">Unit (optional)</label>
+                    <div id="unit-field" class="mt-4">
+                        <label class="mb-1 block text-sm font-medium text-ink-900">
+                            Unit
+                            <span id="unit-required-note" class="font-normal text-ink-500" style="{{ in_array($currentScope, ['region', 'global']) ? '' : 'display:none' }}">— required at region/global access, as this user's default location</span>
+                            <span id="unit-optional-note" class="font-normal text-ink-500" style="{{ in_array($currentScope, ['region', 'global']) ? 'display:none' : '' }}">(optional)</span>
+                        </label>
                         <select name="unit_id" class="w-full max-w-xs rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)]">
                             <option value="">No unit</option>
                             @foreach ($units->groupBy('hub_id') as $hubUnits)
@@ -193,7 +197,7 @@
                                 </optgroup>
                             @endforeach
                         </select>
-                        <p class="mt-1 text-xs text-ink-500">Which team within the hub — never changes what shipments they can see.</p>
+                        <p class="mt-1 text-xs text-ink-500">Which team within the hub — never changes what shipments they can see. Also doubles as this user's own default location for scanning, bulk upload, and other location-aware actions — every user needs one noted, whatever their access level.</p>
                     </div>
 
                     @php
@@ -375,5 +379,15 @@
             </div>
         @endif
     </div>
+
+    <script>
+        function syncUnitRequirement(scope) {
+            const requiredNote = document.getElementById('unit-required-note');
+            const optionalNote = document.getElementById('unit-optional-note');
+            const needsUnit = scope === 'region' || scope === 'global';
+            requiredNote.style.display = needsUnit ? '' : 'none';
+            optionalNote.style.display = needsUnit ? 'none' : '';
+        }
+    </script>
 
 </x-layouts.app>

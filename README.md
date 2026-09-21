@@ -10625,3 +10625,60 @@ correctly returns nothing.
 app/Http/Controllers/Web/BulkShipmentController.php   (resolveOrigin() rebuilt for region/global, new resolveOriginOptions())
 resources/views/shipments/bulk/create.blade.php   (conditional origin dropdown vs locked label)
 ```
+
+## Increment 177 — Fix cod_amount Crash + Every User Now Needs a Home Location
+
+### Bug: cod_amount NOT NULL violation
+
+`shipments.cod_amount` is `NOT NULL DEFAULT 0.00`, but
+`BulkShipmentImportService` was explicitly setting `null` for
+non-COD rows — an explicit `null` overrides the column's own DB
+default and fails the constraint, which is exactly the error
+reported. Fixed to default to `0` instead.
+
+While checking for the same bug pattern elsewhere, found and fixed
+it in two more places: `Api\ShipmentController` and
+`Api\ClientShipmentController` both spread validated request data
+(where `cod_amount` is `nullable`) straight into `Shipment::create()`
+with no fallback — any API-submitted shipment omitting `cod_amount`
+would have hit the identical crash. Both now normalize it to `0`
+the same way.
+
+### Every user now needs a home location, whatever their access level
+
+Previously only hub/outlet-scoped users were required to have a
+location assigned — region/global-scoped users could be saved with
+none at all, which is exactly what caused the Bulk Upload error from
+last round ("your account isn't assigned to a specific hub or
+outlet"). Since `hub_id`/`outlet_id` are intentionally cleared for
+region/global scope by this form's own design, `unit_id` is now
+required as their fallback: every user, at every access level, ends
+up with a derivable default location (unit → hub) for scanning, bulk
+upload, and anywhere else a location-aware action needs one.
+
+Fixed a real UI gap found while building this: the Unit field on the
+user form was previously hidden entirely for region/global scope —
+meaning the new requirement would have been impossible to satisfy
+without also fixing this. Now shown for all four access levels, with
+a label that dynamically switches between "required" and "optional"
+as the access-level selection changes.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned, crash-
+pattern-scanned across every touched file. Full repo balance check:
+clean across 128 files. Reproduced the exact reported error against
+a real MySQL table (`null` fails with the identical message, `0`
+succeeds), and verified a global-scope user's unit assignment
+correctly resolves a full default location (unit → hub) against
+live data.
+
+### Files
+
+```
+app/Services/BulkShipmentImportService.php   (cod_amount defaults to 0)
+app/Http/Controllers/Api/ShipmentController.php   (cod_amount defaults to 0)
+app/Http/Controllers/Api/ClientShipmentController.php   (cod_amount defaults to 0)
+app/Http/Controllers/Web/UserController.php   (unit_id required at region/global access)
+resources/views/users/form.blade.php   (Unit field visible at every access level, dynamic required/optional label)
+```

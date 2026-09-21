@@ -129,6 +129,13 @@ class ClientShipmentController extends Controller
             'shipping_type' => $quote['shipping_type'],
             'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
             ...$pricing,
+            // cod_amount is a not-null column with its own DB default
+            // (0.00) - but that default only applies when the column
+            // is left out of the insert entirely. An explicit null
+            // (which 'nullable' validation allows through whenever
+            // the field isn't submitted) overrides it and fails the
+            // NOT NULL constraint instead, so it's normalized here.
+            'cod_amount' => $data['cod_amount'] ?? 0,
         ]);
 
         return response()->json($shipment, 201);

@@ -202,6 +202,22 @@ class UserController extends Controller
             'staff_short_code' => 'nullable|string|size:3|unique:users,staff_short_code' . ($ignoreUserId ? ",{$ignoreUserId}" : ''),
         ]);
 
+        $validator->after(function ($validator) use ($request) {
+            // Every user needs a "home" location noted, regardless of
+            // how broad their access is — a region/global-scope user
+            // still needs a unit assigned (the only one of the three
+            // that coexists with that scope, since hub_id/outlet_id
+            // are intentionally zeroed out for them below) so their
+            // default location for scanning, bulk upload, and every
+            // other location-aware action is always known, not just
+            // for hub/outlet-scoped staff who already require one via
+            // access_scope itself.
+            $scope = $request->input('access_scope');
+            if (in_array($scope, ['region', 'global'], true) && empty($request->input('unit_id'))) {
+                $validator->errors()->add('unit_id', 'Every user needs a home unit assigned, even at region/global access — this is their default location for scanning and other location-aware actions.');
+            }
+        });
+
         $validator->validate();
         $data = $validator->validated();
 

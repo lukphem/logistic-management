@@ -149,7 +149,7 @@ class BulkShipmentImportService
                     'width_cm' => is_numeric($row['width_cm'] ?? null) ? (float) $row['width_cm'] : null,
                     'height_cm' => is_numeric($row['height_cm'] ?? null) ? (float) $row['height_cm'] : null,
                     'is_cod' => $isCod,
-                    'cod_amount' => $isCod && is_numeric($row['cod_amount'] ?? null) ? (float) $row['cod_amount'] : null,
+                    'cod_amount' => $isCod && is_numeric($row['cod_amount'] ?? null) ? (float) $row['cod_amount'] : 0,
                     'special_instructions' => $specialInstructions ?: null,
                 ],
             ];
