@@ -10428,3 +10428,84 @@ error message is preserved exactly.
 app/Services/ShipmentCreationService.php   (new)
 app/Http/Controllers/Web/ShipmentController.php   (store() refactored to use it)
 ```
+
+## Increment 174 — Bulk CSV Upload, Part 2: Full Upload → Preview → Confirm Flow
+
+Completes the bulk shipment upload feature, building on Increment
+173's `ShipmentCreationService`.
+
+### `BulkShipmentTemplateService` — the downloadable template
+
+Generates a fresh `.xlsx` on every download (never a cached file),
+built from whatever states/cities currently exist in the database.
+Destination State and City columns are real dropdowns, cascading the
+standard Excel way: every state gets its own hidden named range of
+just its cities, and the City column's data validation formula looks
+up the right one with `INDIRECT()` based on that row's own State
+cell — pick "Lagos," the City dropdown narrows to only Lagos towns.
+A newly added city shows up automatically next time the template is
+downloaded, no code change needed.
+
+### `BulkShipmentImportService` — parse, validate, create
+
+Reads the uploaded file (`.xlsx`/`.xls`/`.csv`, auto-detected) into
+plain rows, tolerant of headers being lightly re-typed. Validates
+every row against this app's own rules — required fields, the
+150/100/500-character limits Increment 172 set, a destination city
+that actually resolves against the selected state — before anything
+is created. Every shipment it does create goes through the same
+`ShipmentCreationService` the web form uses, so a bulk-created
+shipment is priced identically to one entered by hand, and one row's
+pricing failure doesn't block the rest of the batch.
+
+### `BulkShipmentController` — upload, preview, confirm
+
+Batch-level settings (client account, origin hub/outlet, service
+type, sender name/phone) are set once on the upload form; everything
+shipment-specific comes from the file. Preview validates and creates
+nothing — valid and invalid rows shown separately, matching the same
+verify-then-confirm shape and success/error separation used
+everywhere else in this app. The validated rows are stashed
+server-side under a one-time token between preview and confirm
+(too much data for 1,000 rows to round-trip through hidden form
+fields), and store() only ever creates the rows preview() already
+approved — it never re-parses or re-validates. Row limit: 1,000.
+
+### Caught before shipping
+
+The result page originally linked to a created shipment by its
+tracking number, but `Shipment` doesn't override its route key
+(binds by `id`) — that would have been a broken link on every single
+result. Fixed to pass the shipment's actual `id` through.
+
+Also confirmed, mid-build, that `setCellValueByColumnAndRow()` —
+initially used while writing the lookup sheet — is deprecated (and
+at risk of being fully removed) in the installed PhpSpreadsheet
+version; replaced with the safe `setCellValue([$col, $row], $value)`
+array-coordinate form before it shipped.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+duplicate-route-checked, crash-pattern-scanned across every touched
+and new file. Full repo balance check: clean across 130 PHP files.
+Verified the destination city/state resolution against live MySQL
+data (exact match resolves, a mismatched state/city pair correctly
+resolves to nothing). Simulated the full row-validation logic across
+6 cases covering every rule (missing fields, bad phone format,
+over-limit address, invalid quantity, mismatched state/city) — all
+correct — and confirmed the phone validation matches the app's
+existing `PHONE_RULE` exactly.
+
+### Files
+
+```
+app/Services/BulkShipmentTemplateService.php   (new)
+app/Services/BulkShipmentImportService.php   (new)
+app/Http/Controllers/Web/BulkShipmentController.php   (new)
+resources/views/shipments/bulk/create.blade.php   (new)
+resources/views/shipments/bulk/preview.blade.php   (new)
+resources/views/shipments/bulk/result.blade.php   (new)
+resources/views/components/layouts/app.blade.php   (Bulk Upload nav item)
+routes/web.php   (shipments.bulk.create/template/preview/store)
+```

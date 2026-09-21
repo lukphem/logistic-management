@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\Auth\LoginController;
 use App\Http\Controllers\Web\AdditionalServiceController;
+use App\Http\Controllers\Web\BulkShipmentController;
 use App\Http\Controllers\Web\CityController;
 use App\Http\Controllers\Web\ClientController;
 use App\Http\Controllers\Web\CountryController;
@@ -76,6 +77,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/shipments/preview-price', [ShipmentController::class, 'previewPrice'])->name('shipments.preview-price');
         Route::get('/shipments/account-billing-options', [ShipmentController::class, 'accountBillingOptions'])->name('shipments.account-billing-options');
         Route::get('/quotes/{quoteNumber}', [QuoteController::class, 'show'])->name('quotes.show');
+        Route::get('/shipments/bulk/create', [BulkShipmentController::class, 'create'])->name('shipments.bulk.create');
+        Route::get('/shipments/bulk/template', [BulkShipmentController::class, 'downloadTemplate'])->name('shipments.bulk.template');
+        Route::post('/shipments/bulk/preview', [BulkShipmentController::class, 'preview'])->name('shipments.bulk.preview');
+        Route::post('/shipments/bulk', [BulkShipmentController::class, 'store'])->name('shipments.bulk.store');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
     Route::get('/shipments/{shipment}/label', [ShipmentController::class, 'label'])->name('shipments.label');

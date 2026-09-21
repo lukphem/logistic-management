@@ -48,6 +48,7 @@
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard', 'permission' => null],
                         ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
+                        ['label' => 'Bulk Upload', 'route' => 'shipments.bulk.create', 'icon' => 'box', 'permission' => 'shipments:create'],
                         ['label' => 'Tracking', 'route' => 'staff-tracking.search', 'icon' => 'search', 'permission' => null],
                         ['label' => 'Print Documents', 'route' => 'print-documents.search', 'icon' => 'box', 'permission' => 'manifests:read'],
                         ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
