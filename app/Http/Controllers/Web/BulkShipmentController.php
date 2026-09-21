@@ -54,11 +54,15 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             ->only(self::ALLOWED_BILLING_MODELS)
             ->intersectByKeys(array_flip(array_keys(Setting::current()->supportedBillingModels())));
 
+        [$hubs, $outlets, $originLabel] = $this->resolveOriginOptions($user);
+
         return view('shipments.bulk.create', [
             'clientAccounts' => ClientAccount::orderBy('account_name')->get(['id', 'account_name', 'account_number']),
             'serviceTypes' => ServiceType::whereIn('billing_model', self::ALLOWED_BILLING_MODELS)->orderBy('name')->get(['id', 'name', 'billing_model']),
             'billingModels' => $billingModels,
-            'originLabel' => $this->resolveOriginLabel($user),
+            'originLabel' => $originLabel,
+            'originHubs' => $hubs,
+            'originOutlets' => $outlets,
         ]);
     }
 
@@ -102,9 +106,11 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'sender_phone' => 'required|string|max:20',
             'sender_address' => 'required|string|max:150',
             'sender_email' => 'nullable|email|max:255',
+            'origin_hub_id' => 'nullable|exists:hubs,id',
+            'origin_outlet_id' => 'nullable|exists:outlets,id',
         ]);
 
-        [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user);
+        [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user, $data['origin_hub_id'] ?? null, $data['origin_outlet_id'] ?? null);
 
         if ($originError) {
             return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => $originError])->withInput();
@@ -220,7 +226,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
     /**
      * @return array{0: ?int, 1: ?int, 2: ?string} [hubId, outletId, errorMessage]
      */
-    private function resolveOrigin($user): array
+    private function resolveOrigin($user, ?int $requestedHubId, ?int $requestedOutletId): array
     {
         if ($user->hasOutletAccess()) {
             $outlet = Outlet::find($user->outlet_id);
@@ -232,19 +238,80 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             return [$user->hub_id, null, null];
         }
 
+        // Global/regional staff aren't pinned to one location, so
+        // they're the only ones who get an actual choice — the same
+        // "free to pick, but only within their own region" rule
+        // scanning locations already follow, not something new to
+        // bulk upload specifically.
+        if ($user->hasRegionAccess()) {
+            if ($requestedOutletId) {
+                $outlet = Outlet::find($requestedOutletId);
+                if (! $outlet || $outlet->hub?->region_id !== $user->region_id) {
+                    return [null, null, "That outlet isn't in your region."];
+                }
+
+                return [$outlet->hub_id, $requestedOutletId, null];
+            }
+
+            if ($requestedHubId) {
+                $hub = Hub::find($requestedHubId);
+                if (! $hub || $hub->region_id !== $user->region_id) {
+                    return [null, null, "That hub isn't in your region."];
+                }
+
+                return [$requestedHubId, null, null];
+            }
+
+            return [null, null, 'Pick an origin hub or outlet for this batch.'];
+        }
+
+        if ($user->hasGlobalAccess()) {
+            if (! $requestedHubId && ! $requestedOutletId) {
+                return [null, null, 'Pick an origin hub or outlet for this batch.'];
+            }
+
+            if ($requestedOutletId) {
+                $outlet = Outlet::find($requestedOutletId);
+
+                return [$outlet?->hub_id, $requestedOutletId, null];
+            }
+
+            return [$requestedHubId, null, null];
+        }
+
         return [null, null, "Bulk upload needs a single origin — your account isn't assigned to a specific hub or outlet, so there's nothing to book this batch from."];
     }
 
-    private function resolveOriginLabel($user): ?string
+    /**
+     * Global staff pick freely from every hub/outlet. Regional staff
+     * pick freely, but only within their own region. Hub- and
+     * outlet-scoped staff aren't offered a choice at all — their own
+     * single location is shown as a fixed label instead, same as
+     * everywhere else this pattern is used across the app.
+     *
+     * @return array{0: \Illuminate\Support\Collection, 1: \Illuminate\Support\Collection, 2: ?string} [hubs, outlets, lockedLabel]
+     */
+    private function resolveOriginOptions($user): array
     {
+        if ($user->hasGlobalAccess()) {
+            return [Hub::orderBy('name')->get(['id', 'name']), Outlet::orderBy('name')->get(['id', 'name', 'hub_id']), null];
+        }
+
+        if ($user->hasRegionAccess()) {
+            $hubs = Hub::where('region_id', $user->region_id)->orderBy('name')->get(['id', 'name']);
+            $outlets = Outlet::whereIn('hub_id', $hubs->pluck('id'))->orderBy('name')->get(['id', 'name', 'hub_id']);
+
+            return [$hubs, $outlets, null];
+        }
+
         if ($user->hasOutletAccess()) {
-            return Outlet::find($user->outlet_id)?->name;
+            return [collect(), collect(), Outlet::find($user->outlet_id)?->name];
         }
 
         if ($user->hasHubAccess()) {
-            return Hub::find($user->hub_id)?->name;
+            return [collect(), collect(), Hub::find($user->hub_id)?->name];
         }
 
-        return null;
+        return [collect(), collect(), null];
     }
 }

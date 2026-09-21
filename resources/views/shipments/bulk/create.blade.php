@@ -26,13 +26,35 @@
                 <span class="text-ink-500">Origin:</span> <span class="font-medium text-ink-900">{{ $originLabel }}</span>
                 <span class="text-ink-500"> — this batch books from your own assigned location.</span>
             </div>
+        @elseif ($originHubs->isNotEmpty() || $originOutlets->isNotEmpty())
+            <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin hub</label>
+                    <select name="origin_hub_id" id="origin-hub-select" form="bulk-batch-form" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        <option value="">— None —</option>
+                        @foreach ($originHubs as $hub)
+                            <option value="{{ $hub->id }}" @selected(old('origin_hub_id') == $hub->id)>{{ $hub->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Or origin outlet</label>
+                    <select name="origin_outlet_id" id="origin-outlet-select" form="bulk-batch-form" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        <option value="">— None —</option>
+                        @foreach ($originOutlets as $outlet)
+                            <option value="{{ $outlet->id }}" @selected(old('origin_outlet_id') == $outlet->id)>{{ $outlet->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <p class="col-span-full text-xs text-ink-500">Pick a hub, or an outlet if this batch is going out from one specifically — not both.</p>
+            </div>
         @else
             <div class="mb-5 rounded-lg border border-status-exception/30 bg-status-exception/5 p-3 text-sm text-status-exception">
                 Your account isn't assigned to a specific hub or outlet — bulk upload needs a single origin to book from.
             </div>
         @endif
 
-        <form method="POST" action="{{ route('shipments.bulk.store-batch') }}" class="space-y-4">
+        <form id="bulk-batch-form" method="POST" action="{{ route('shipments.bulk.store-batch') }}" class="space-y-4">
             @csrf
 
             <div>
@@ -120,6 +142,20 @@
 
         billingModelSelect.addEventListener('change', syncServiceTypeOptions);
         if (billingModelSelect.value) syncServiceTypeOptions();
+
+        // Only present for global/regional staff who get an actual
+        // origin choice - hub and outlet are mutually exclusive, same
+        // pattern used everywhere else this pairing appears.
+        const originHubSelect = document.getElementById('origin-hub-select');
+        const originOutletSelect = document.getElementById('origin-outlet-select');
+        if (originHubSelect && originOutletSelect) {
+            originHubSelect.addEventListener('change', function () {
+                if (this.value) originOutletSelect.value = '';
+            });
+            originOutletSelect.addEventListener('change', function () {
+                if (this.value) originHubSelect.value = '';
+            });
+        }
     </script>
 
 </x-layouts.app>

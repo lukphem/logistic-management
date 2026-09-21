@@ -10584,3 +10584,44 @@ resources/views/shipments/bulk/preview.blade.php   (batch-scoped)
 resources/views/shipments/bulk/result.blade.php   (batch-scoped)
 routes/web.php   (shipments.bulk.store-batch/upload/preview/store)
 ```
+
+## Increment 176 — Bulk Upload: Origin Choice for Global/Regional Staff
+
+Fixes a gap from the previous round: Bulk Upload's origin resolution
+only handled hub/outlet-scoped users (locked to their own location)
+and flatly rejected everyone else. Global and regional staff — who
+aren't pinned to one location — now get the same free-choice origin
+picker every other part of this app already gives them (scanning
+locations, and now Bulk Upload too), rather than being told there's
+nothing to book from.
+
+### The rule, applied consistently now
+
+- **Outlet-scoped**: locked to their own outlet, no choice shown
+- **Hub-scoped**: locked to their own hub, no choice shown
+- **Region-scoped**: free to pick any hub/outlet, but only within
+  their own region — picking one outside it is rejected
+- **Global-scoped**: free to pick any hub/outlet in the system
+
+For locked users, the origin appears as a read-only label; for
+region/global users, real Hub/Outlet dropdowns appear instead
+(mutually exclusive, same JS pattern used elsewhere), and a selection
+is required before the batch can be created.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+crash-pattern-scanned across every touched file. Full repo balance
+check: clean across 131 files. Simulated the origin-resolution logic
+across all 7 access-scope combinations (outlet, hub, region within/
+outside their own region, global with/without a selection) — all
+correct. Verified the region-matching query against live MySQL data:
+a hub in the same region matches, a hub in a different region
+correctly returns nothing.
+
+### Files
+
+```
+app/Http/Controllers/Web/BulkShipmentController.php   (resolveOrigin() rebuilt for region/global, new resolveOriginOptions())
+resources/views/shipments/bulk/create.blade.php   (conditional origin dropdown vs locked label)
+```
