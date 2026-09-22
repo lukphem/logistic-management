@@ -53,6 +53,22 @@ class BulkShipmentBatch extends Model
         return $this->hasMany(Shipment::class);
     }
 
+    public function rows(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BulkShipmentBatchRow::class);
+    }
+
+    /**
+     * Once a batch has any real, created shipments, uploading is
+     * over for it — only printing is offered from here on. Checking
+     * shipments directly (rather than a separate status flag) means
+     * this can never drift out of sync with what actually happened.
+     */
+    public function hasCreatedShipments(): bool
+    {
+        return $this->shipments()->exists();
+    }
+
     public function isWalkIn(): bool
     {
         return $this->client_account_id === null;

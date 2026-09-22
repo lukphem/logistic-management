@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Models\BulkShipmentBatch;
+use App\Models\BulkShipmentBatchRow;
 use App\Models\ClientAccount;
 use App\Models\Hub;
 use App\Models\Outlet;
@@ -234,25 +235,33 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
 
     /**
      * Step 2: the upload page for one specific, already-created
-     * batch. Visiting this again (after a failed/partial previous
-     * attempt) is the normal way to correct and re-submit a CSV.
+     * batch. Once the batch has any real shipments, uploading is
+     * over — sent straight to the print view instead, since printing
+     * is the only thing left to do with a batch at that point.
      */
-    public function showUpload(BulkShipmentBatch $batch): View
+    public function showUpload(BulkShipmentBatch $batch): View|RedirectResponse
     {
-        return view('shipments.bulk.upload', ['batch' => $batch]);
+        if ($batch->hasCreatedShipments()) {
+            return redirect()->route('shipments.bulk.print', $batch);
+        }
+
+        return view('shipments.bulk.upload', ['batch' => $batch, 'pendingCount' => $batch->rows()->count()]);
     }
 
     /**
      * Parses and validates the upload against this batch's own
-     * context, creating nothing yet. Valid and invalid rows are
-     * shown separately — never merged, same as every other batch
-     * operation in this app — and the validated, fully-resolved data
-     * for the valid rows is stashed server-side under a one-time
-     * token (too much data for 1000 rows to round-trip through
-     * hidden form fields) for store() to pick up once confirmed.
+     * context, creating nothing yet — the rows are persisted onto
+     * the batch (accumulating with anything already pending from an
+     * earlier upload, not replacing it) and the person is sent to
+     * review() to see everything currently pending, valid and
+     * invalid together, before anything is actually created.
      */
-    public function preview(Request $request, BulkShipmentBatch $batch): View|RedirectResponse
+    public function preview(Request $request, BulkShipmentBatch $batch): RedirectResponse
     {
+        if ($batch->hasCreatedShipments()) {
+            return redirect()->route('shipments.bulk.print', $batch);
+        }
+
         $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv|max:10240']);
 
         $path = $request->file('file')->getRealPath();
@@ -282,34 +291,67 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         ];
 
         $result = $this->import->validateRows($rows, $batchContext);
+        $this->import->persistRows($batch, $result);
 
-        $token = \Illuminate\Support\Str::random(32);
-        \Illuminate\Support\Facades\Storage::disk('local')->put("bulk-imports/{$token}.json", json_encode($result['valid']));
+        return redirect()->route('shipments.bulk.review', $batch);
+    }
 
-        return view('shipments.bulk.preview', [
+    /**
+     * Every row currently pending on this batch — across however
+     * many uploads produced them — valid and invalid shown
+     * separately. Nothing here has been created yet; this is purely
+     * review, with a delete available per row (fixing one bad row
+     * without needing to fix and re-upload the whole file) and, so
+     * long as the batch has no shipments yet, a way back to upload
+     * more.
+     */
+    public function review(BulkShipmentBatch $batch): View
+    {
+        $rows = $batch->rows()->orderBy('source_row_number')->get();
+
+        return view('shipments.bulk.review', [
             'batch' => $batch,
-            'token' => $token,
-            'validRows' => $result['valid'],
-            'invalidRows' => $result['invalid'],
+            'validRows' => $rows->where('status', 'valid'),
+            'invalidRows' => $rows->where('status', 'invalid'),
         ]);
     }
 
     /**
-     * Only the rows preview() already validated are ever created
-     * here — this endpoint never re-parses or re-validates the
-     * upload itself, it only reads back what was already checked.
+     * Removes one pending row — the "delete in case of errors" path,
+     * for a single bad row rather than needing to fix and re-upload
+     * the whole file for one mistake. Left available even once the
+     * batch has shipments, since a row that failed at create time
+     * (a genuinely unpriceable route, say) still needs to be
+     * cleaned up or corrected — only new file uploads are cut off
+     * once a batch has real shipments, not managing what's already
+     * pending.
      */
-    public function store(Request $request, BulkShipmentBatch $batch): View
+    public function destroyRow(BulkShipmentBatch $batch, BulkShipmentBatchRow $row): RedirectResponse
     {
-        $request->validate(['token' => 'required|string']);
+        abort_unless($row->bulk_shipment_batch_id === $batch->id, 404);
 
-        $path = "bulk-imports/{$request->input('token')}.json";
-        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        $row->delete();
 
-        abort_unless($disk->exists($path), 404, 'This preview has expired — please upload the file again.');
+        return redirect()->route('shipments.bulk.review', $batch)->with('status', 'Row removed.');
+    }
 
-        $validRows = json_decode($disk->get($path), true);
-        $disk->delete($path);
+    /**
+     * Creates shipments from every row currently sitting as 'valid'
+     * on this batch — not from a token, not from whatever the most
+     * recent upload happened to contain, but from the batch's actual
+     * current pending state, however many uploads and deletions
+     * built up to it. A row that succeeds is removed as it goes; one
+     * that fails (a genuinely unpriceable route, say) is left in
+     * place for review rather than silently lost. Left available
+     * even once the batch already has shipments, since this is what
+     * lets a leftover failed row be retried after being fixed —
+     * only new uploads are cut off at that point.
+     */
+    public function store(BulkShipmentBatch $batch): View|RedirectResponse
+    {
+        $validRows = $batch->rows()->where('status', 'valid')->orderBy('source_row_number')->get();
+
+        abort_if($validRows->isEmpty(), 422, 'No valid rows to create — upload a file with at least one valid row first.');
 
         $result = $this->import->createShipments($validRows);
 

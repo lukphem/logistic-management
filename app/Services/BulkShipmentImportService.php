@@ -169,26 +169,62 @@ class BulkShipmentImportService
     }
 
     /**
-     * Only ever called with rows validateRows() already approved.
-     * Each row is created independently through the same
-     * ShipmentCreationService the web form uses, so one row's pricing
-     * failure (a genuinely unpriceable route, say) doesn't block the
-     * rest of the batch — same per-row success/error separation as
-     * every scan-confirmation flow already in this app.
+     * Persists a validateRows() result onto a batch as real rows —
+     * this is what makes rows survive past the request that uploaded
+     * them, so a second upload adds to what's already pending rather
+     * than replacing it, and any individual row can be reviewed and
+     * deleted before the batch is ever confirmed.
+     */
+    public function persistRows(\App\Models\BulkShipmentBatch $batch, array $validationResult): void
+    {
+        foreach ($validationResult['valid'] as $entry) {
+            $batch->rows()->create([
+                'source_row_number' => $entry['row'],
+                'status' => 'valid',
+                'receiver_name' => $entry['data']['receiver_name'],
+                'row_data' => $entry['data'],
+                'display_data' => $entry['display'],
+            ]);
+        }
+
+        foreach ($validationResult['invalid'] as $entry) {
+            $batch->rows()->create([
+                'source_row_number' => $entry['row'],
+                'status' => 'invalid',
+                'receiver_name' => $entry['receiver_name'],
+                'errors' => $entry['errors'],
+            ]);
+        }
+    }
+
+    /**
+     * Only ever called with rows already sitting as 'valid' pending
+     * rows on the batch. Each row is created independently through
+     * the same ShipmentCreationService the web form uses, so one
+     * row's pricing failure (a genuinely unpriceable route, say)
+     * doesn't block the rest of the batch — same per-row success/
+     * error separation as every scan-confirmation flow already in
+     * this app. A row that succeeds is deleted immediately after —
+     * it's a real shipment now, not a pending row anymore; a row
+     * that fails is left in place so it still shows up for review
+     * (and, if the person chooses, deletion) rather than silently
+     * vanishing.
      *
+     * @param \Illuminate\Support\Collection<int, \App\Models\BulkShipmentBatchRow> $validRows
      * @return array{created: array, failed: array}
      */
-    public function createShipments(array $validRows): array
+    public function createShipments(\Illuminate\Support\Collection $validRows): array
     {
         $created = [];
         $failed = [];
 
-        foreach ($validRows as $entry) {
+        foreach ($validRows as $row) {
             try {
-                $shipment = $this->creationService->createShipment($entry['data']);
-                $created[] = ['row' => $entry['row'], 'id' => $shipment->id, 'tracking_number' => $shipment->tracking_number, 'receiver_name' => $shipment->receiver_name];
+                $shipment = $this->creationService->createShipment($row->row_data);
+                $created[] = ['row' => $row->source_row_number, 'id' => $shipment->id, 'tracking_number' => $shipment->tracking_number, 'receiver_name' => $shipment->receiver_name];
+                $row->delete();
             } catch (\RuntimeException $e) {
-                $failed[] = ['row' => $entry['row'], 'receiver_name' => $entry['data']['receiver_name'] ?? null, 'error' => $e->getMessage()];
+                $failed[] = ['row' => $row->source_row_number, 'receiver_name' => $row->receiver_name, 'error' => $e->getMessage()];
             }
         }
 

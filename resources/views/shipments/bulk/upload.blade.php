@@ -8,9 +8,16 @@
         <p class="mt-1 text-sm text-ink-500">
             Batch <span class="font-mono font-medium text-ink-900">{{ $batch->batch_number }}</span>
             — {{ $batch->isWalkIn() ? 'Walk-in customer' : $batch->clientAccount?->account_name }},
-            {{ $batch->serviceType?->name }}. If a previous upload had errors, fix the file and upload it again here — the batch stays the same.
+            {{ $batch->serviceType?->name }}. Every file you upload here adds to this batch — nothing is created until you confirm on the review screen, where you can also delete individual rows.
         </p>
     </div>
+
+    @if ($pendingCount > 0)
+        <div class="mb-5 max-w-2xl rounded-lg border border-line bg-surface-50 p-3 text-sm">
+            <span class="text-ink-700">{{ $pendingCount }} row(s) already pending on this batch.</span>
+            <a href="{{ route('shipments.bulk.review', $batch) }}" class="ml-2 font-medium text-[var(--brand-primary)] hover:underline">Review pending rows</a>
+        </div>
+    @endif
 
     @if ($errors->any())
         <div class="mb-5 max-w-2xl rounded-xl border border-status-exception/30 bg-status-exception/5 p-4 text-sm text-status-exception">
@@ -41,7 +48,7 @@
             </div>
 
             <button type="submit" class="w-full rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
-                Preview upload
+                Upload and review
             </button>
         </form>
     </div>

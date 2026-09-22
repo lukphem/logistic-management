@@ -10793,3 +10793,66 @@ app/Services/BulkShipmentImportService.php   (display metadata, eager-loaded cit
 resources/views/shipments/bulk/preview.blade.php   (Weight/State-Town/Email/COD columns)
 resources/views/shipments/bulk/print.blade.php   (removed — no longer used)
 ```
+
+## Increment 180 — Bulk Upload: Persisted Rows, Accumulate/Delete, Lock After Creation
+
+The third correction — rows now survive past the request that
+uploaded them, uploads accumulate onto a batch instead of replacing
+each other, and once a batch has real shipments, uploading is over
+for it (printing only).
+
+### New `bulk_shipment_batch_rows` table
+
+Previously a preview's validated rows lived only in a temporary
+token file, replaced whole on every re-upload. Now every row an
+upload produces — valid or invalid — is its own persisted record
+tied to the batch. Uploading a second file adds to what's already
+pending rather than starting over.
+
+### Review, delete, retry
+
+New review page shows everything currently pending on a batch, valid
+and invalid split apart as always, each with its own delete button —
+fixing one bad row no longer means re-uploading the whole file.
+`store()` now creates from whatever's actually pending on the batch
+at confirm time, not a one-shot token from the most recent upload.
+
+### Locked once real shipments exist — but only for new uploads
+
+`BulkShipmentBatch::hasCreatedShipments()` is the single source of
+truth. Once true, `showUpload()`/`preview()` redirect straight to the
+print view — no more file uploads. Caught a real design flaw while
+building this: an earlier pass also gated the review/delete/store
+actions the same way, which would have permanently locked out any
+row that failed at creation time (a genuinely unpriceable route, say)
+the moment even one shipment in the batch succeeded — directly
+against "delete in case of errors." Fixed: only new uploads are cut
+off once shipments exist; reviewing, deleting, and retrying whatever
+didn't yet succeed stays available.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned,
+duplicate-route-checked, crash-pattern-scanned across every touched
+file. Full repo balance check: clean across 234 files. Verified the
+complete lifecycle against live MySQL: persisted a real batch with
+two valid and one invalid row, simulated one row succeeding (a real
+shipment created, that one row removed), and confirmed the batch
+correctly reports as having shipments while the still-pending valid
+row and the invalid row both remain untouched and available for
+review or deletion.
+
+### Files
+
+```
+database/migrations/2026_03_29_000001_create_bulk_shipment_batch_rows_table.php
+app/Models/BulkShipmentBatchRow.php   (new)
+app/Models/BulkShipmentBatch.php   (rows(), hasCreatedShipments())
+app/Services/BulkShipmentImportService.php   (persistRows(), createShipments() consumes real rows)
+app/Http/Controllers/Web/BulkShipmentController.php   (review(), destroyRow(), rebuilt preview()/store())
+resources/views/shipments/bulk/review.blade.php   (new)
+resources/views/shipments/bulk/upload.blade.php   (pending count, accumulate messaging)
+resources/views/shipments/bulk/index.blade.php   (state-aware action links)
+resources/views/shipments/bulk/preview.blade.php   (removed — replaced by review.blade.php)
+routes/web.php   (shipments.bulk.review, shipments.bulk.rows.destroy)
+```

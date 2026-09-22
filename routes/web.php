@@ -82,8 +82,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/shipments/bulk/template', [BulkShipmentController::class, 'downloadTemplate'])->name('shipments.bulk.template');
         Route::post('/shipments/bulk', [BulkShipmentController::class, 'storeBatch'])->name('shipments.bulk.store-batch');
         Route::get('/shipments/bulk/{batch}/upload', [BulkShipmentController::class, 'showUpload'])->name('shipments.bulk.upload');
+        Route::get('/shipments/bulk/{batch}/review', [BulkShipmentController::class, 'review'])->name('shipments.bulk.review');
         Route::get('/shipments/bulk/{batch}/print', [BulkShipmentController::class, 'print'])->name('shipments.bulk.print');
         Route::post('/shipments/bulk/{batch}/preview', [BulkShipmentController::class, 'preview'])->name('shipments.bulk.preview');
+        Route::delete('/shipments/bulk/{batch}/rows/{row}', [BulkShipmentController::class, 'destroyRow'])->name('shipments.bulk.rows.destroy');
         Route::post('/shipments/bulk/{batch}', [BulkShipmentController::class, 'store'])->name('shipments.bulk.store');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');

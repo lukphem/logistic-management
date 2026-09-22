@@ -28,7 +28,7 @@
                     @foreach ($batches as $batch)
                         <tr class="border-b border-line last:border-0">
                             <td class="p-3">
-                                <a href="{{ route('shipments.bulk.upload', $batch) }}" class="font-mono text-[var(--brand-primary)] hover:underline">{{ $batch->batch_number }}</a>
+                                <a href="{{ route($batch->shipments_count > 0 ? 'shipments.bulk.print' : 'shipments.bulk.upload', $batch) }}" @if ($batch->shipments_count > 0) target="_blank" @endif class="font-mono text-[var(--brand-primary)] hover:underline">{{ $batch->batch_number }}</a>
                             </td>
                             <td class="p-3 text-ink-700">{{ $batch->isWalkIn() ? 'Walk-in customer' : $batch->clientAccount?->account_name }}</td>
                             <td class="p-3 text-ink-700">{{ $batch->serviceType?->name ?? '—' }}</td>
@@ -36,9 +36,10 @@
                             <td class="p-3 text-ink-700">{{ $batch->createdBy?->name ?? '—' }}</td>
                             <td class="p-3 text-ink-500">{{ $batch->created_at->format('d M Y, H:i') }}</td>
                             <td class="p-3 text-right">
-                                <a href="{{ route('shipments.bulk.upload', $batch) }}" class="text-xs font-medium text-ink-500 hover:text-ink-900">Upload more</a>
                                 @if ($batch->shipments_count > 0)
-                                    <a href="{{ route('shipments.bulk.print', $batch) }}" target="_blank" class="ml-3 text-xs font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print</a>
+                                    <a href="{{ route('shipments.bulk.print', $batch) }}" target="_blank" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">🖨️ Print</a>
+                                @else
+                                    <a href="{{ route('shipments.bulk.upload', $batch) }}" class="text-xs font-medium text-ink-500 hover:text-ink-900">Upload</a>
                                 @endif
                             </td>
                         </tr>
