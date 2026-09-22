@@ -10738,3 +10738,58 @@ resources/views/components/layouts/app.blade.php   (Bulk Upload nav -> index)
 resources/views/print-documents/search.blade.php   (helper text)
 routes/web.php   (shipments.bulk.index/print)
 ```
+
+## Increment 179 — Batch Prints Real Labels; Preview Shows Weight/Destination/Email/COD
+
+Two of the three requested corrections. The third (locking uploads
+once shipments exist, with add-more/delete before that point) is a
+larger workflow change addressed separately given its scope.
+
+### Batch printing now prints every shipment's actual label
+
+Replaced the tabular batch summary document with real label
+printing — the exact same label a single shipment would produce,
+one after another for every shipment in the batch. Rather than
+duplicating the six label templates' markup (real risk of the batch
+version drifting from what printing one shipment normally produces),
+each shipment's label is rendered through the exact same
+`shipments.label.{design}-{size}` view already used for single-
+shipment printing, then the resulting pages are extracted and
+combined into one print job with `DOMDocument`. Zero changes to the
+six existing templates — this reuses them completely as-is.
+
+Caught and fixed a real bug before shipping: the combined print
+job's auto-fit script (which shrinks font size to guarantee content
+never overflows the physical label) was initially hardcoded to the
+4×6 size's dimensions — would have silently done nothing for a 2×1
+batch, since a 2×1 label's content would never exceed a 4×6-sized
+threshold. Fixed by extracting the actual `<script>` block from the
+real rendered template instead of hardcoding a value, so it always
+matches whichever size and design is actually in use.
+
+### Preview table: Weight, destination state/town, email, COD amount
+
+The "Ready to create" table now shows four more columns per row.
+Destination state/town resolves the same city→state chain already
+used for import validation, stashed as display-only metadata
+(`BulkShipmentImportService` doesn't need city/state *names* to
+create the shipment, only the resolved `destination_city_id` —
+kept the display fields separate from what's actually passed
+through). Also fixed a latent N+1 query on the city lookup while in
+there — now eager-loads `state` instead of lazy-loading it once per
+row.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned, crash-
+pattern-scanned across every touched file. Full repo balance check:
+clean across 128 files.
+
+### Files
+
+```
+app/Http/Controllers/Web/BulkShipmentController.php   (print() rebuilt to render/combine real labels)
+app/Services/BulkShipmentImportService.php   (display metadata, eager-loaded city state)
+resources/views/shipments/bulk/preview.blade.php   (Weight/State-Town/Email/COD columns)
+resources/views/shipments/bulk/print.blade.php   (removed — no longer used)
+```

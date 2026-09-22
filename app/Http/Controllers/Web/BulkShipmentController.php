@@ -88,19 +88,84 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      * added five minutes ago is already there.
      */
     /**
-     * The printable record of one batch — shipper details at the
-     * top, then every shipment actually created under it, same
-     * tabular shape as the manifest/trip documents. Looked up by the
-     * batch's own BULK- number the same way TRF-/DEL-/MAN-/TRIP-
-     * numbers already work from the general Print Documents page.
+     * Prints every shipment actually created under this batch as its
+     * own real label — not a summary document, the exact same label
+     * a single shipment would print, one after another for the whole
+     * batch. Reuses the six existing label templates completely
+     * unchanged (rendering each shipment's label exactly as its own
+     * label() route would, then combining the resulting pages into
+     * one print job) rather than duplicating their markup, so a
+     * batch's labels can never drift from what printing one shipment
+     * normally produces.
      */
-    public function print(BulkShipmentBatch $batch): View
+    public function print(Request $request, BulkShipmentBatch $batch): Response
     {
-        $batch->load(['clientAccount', 'serviceType', 'originHub', 'originOutlet', 'shipments' => fn ($q) => $q->with(['serviceType', 'destinationCity.state'])]);
+        $batch->load(['shipments' => fn ($q) => $q->with(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientAccount'])]);
 
         $settings = Setting::current();
+        $design = in_array($settings->label_design, ['classic', 'modern', 'compact'], true) ? $settings->label_design : 'classic';
+        $printSize = in_array($request->query('size'), ['4x6', '2x1'], true) ? $request->query('size') : $settings->waybill_thermal_size;
 
-        return view('shipments.bulk.print', compact('batch', 'settings'));
+        if ($batch->shipments->isEmpty()) {
+            abort(404, 'No shipments have been created under this batch yet.');
+        }
+
+        $styleBlock = null;
+        $scriptBlock = null;
+        $pageBlocks = [];
+
+        foreach ($batch->shipments as $shipment) {
+            $totalPieces = max((int) ($shipment->quantity ?? 1), 1);
+            $pieces = [];
+            for ($i = 1; $i <= $totalPieces; $i++) {
+                $pieceCode = $totalPieces > 1 ? "{$shipment->tracking_number}-{$i}/{$totalPieces}" : $shipment->tracking_number;
+                $codeSvg = null;
+                if ($settings->waybill_show_qr) {
+                    $codeSvg = $settings->label_barcode_type === 'barcode'
+                        ? (new \Picqer\Barcode\BarcodeGeneratorSVG())->getBarcode($pieceCode, \Picqer\Barcode\BarcodeGeneratorSVG::TYPE_CODE_128)
+                        : \SimpleSoftwareIO\QrCode\Facades\QrCode::size(160)->generate($pieceCode);
+                }
+                $pieces[] = ['number' => $i, 'total' => $totalPieces, 'code' => $pieceCode, 'codeSvg' => $codeSvg];
+            }
+
+            $clientLogoUrl = $shipment->clientAccount?->logo_url;
+            $html = view("shipments.label.{$design}-{$printSize}", compact('shipment', 'settings', 'clientLogoUrl', 'printSize', 'pieces'))->render();
+
+            $dom = new \DOMDocument();
+            @$dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+            $xpath = new \DOMXPath($dom);
+
+            // The auto-fit script's own max-height and shrink-floor
+            // values differ by size (4×6 vs 2×1) and slightly by
+            // design (compact's 4×6 is a touch taller) — pulling the
+            // real <script> block straight out of the actual
+            // rendered template, the same way the <style> block is,
+            // keeps this exactly in sync rather than risking a
+            // hardcoded value silently wrong for whichever size
+            // wasn't being tested.
+            if ($styleBlock === null) {
+                $styleNode = $xpath->query('//style')->item(0);
+                $styleBlock = $styleNode ? $dom->saveHTML($styleNode) : '';
+
+                $scriptNode = $xpath->query('//script')->item(0);
+                $scriptBlock = $scriptNode ? $dom->saveHTML($scriptNode) : '';
+            }
+
+            foreach ($xpath->query("//div[contains(concat(' ', normalize-space(@class), ' '), ' page ')]") as $pageNode) {
+                $pageBlocks[] = $dom->saveHTML($pageNode);
+            }
+        }
+
+        $combined = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels — ' . $batch->batch_number . '</title>'
+            . $styleBlock
+            . '<style>.toolbar{display:flex;align-items:center;gap:12px;padding:10px;background:#f2f2f2;border-bottom:2px solid #ccc;}.print-btn{padding:8px 16px;font-size:13px;border:1px solid #111;background:#111;color:#fff;border-radius:4px;cursor:pointer;}@media print{.toolbar{display:none!important;}}</style>'
+            . '</head><body>'
+            . '<div class="toolbar"><button class="print-btn" onclick="window.print()">Print all ' . count($pageBlocks) . ' label(s)</button></div>'
+            . implode('', $pageBlocks)
+            . $scriptBlock
+            . '</body></html>';
+
+        return response($combined);
     }
 
     public function downloadTemplate(): Response

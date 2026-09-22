@@ -44,8 +44,12 @@
                             <th class="p-2.5">Row</th>
                             <th class="p-2.5">Receiver</th>
                             <th class="p-2.5">Phone</th>
+                            <th class="p-2.5">Email</th>
                             <th class="p-2.5">Destination</th>
+                            <th class="p-2.5">State/Town</th>
                             <th class="p-2.5">Pieces</th>
+                            <th class="p-2.5">Weight</th>
+                            <th class="p-2.5">COD Amount</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -54,8 +58,12 @@
                                 <td class="p-2.5 font-mono">{{ $row['row'] }}</td>
                                 <td class="p-2.5">{{ $row['data']['receiver_name'] }}</td>
                                 <td class="p-2.5">{{ $row['data']['receiver_phone'] }}</td>
+                                <td class="p-2.5">{{ $row['data']['receiver_email'] ?? '—' }}</td>
                                 <td class="p-2.5">{{ $row['data']['destination_address'] }}</td>
+                                <td class="p-2.5">{{ $row['display']['destination_city_name'] }}, {{ $row['display']['destination_state_name'] }}</td>
                                 <td class="p-2.5">{{ $row['data']['quantity'] }}</td>
+                                <td class="p-2.5">{{ $row['data']['weight_kg'] ? $row['data']['weight_kg'] . ' kg' : '—' }}</td>
+                                <td class="p-2.5">{{ $row['data']['is_cod'] ? number_format($row['data']['cod_amount'], 2) : '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

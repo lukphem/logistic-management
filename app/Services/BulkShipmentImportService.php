@@ -112,7 +112,7 @@ class BulkShipmentImportService
             if ($stateName === '' || $cityName === '') {
                 $errors[] = 'Destination state and city are both required.';
             } else {
-                $city = City::whereHas('state', fn ($q) => $q->where('name', $stateName))->where('name', $cityName)->first();
+                $city = City::with('state')->whereHas('state', fn ($q) => $q->where('name', $stateName))->where('name', $cityName)->first();
                 if (! $city) {
                     $errors[] = "\"{$cityName}\" in \"{$stateName}\" doesn't match a city in the system — pick from the dropdown provided in the template.";
                 }
@@ -133,6 +133,16 @@ class BulkShipmentImportService
 
             $valid[] = [
                 'row' => $rowNumber,
+                // Display-only fields the preview table needs but
+                // ShipmentCreationService has no use for (it only
+                // needs the resolved destination_city_id) — kept
+                // separate from 'data' rather than adding noise to
+                // what actually gets passed through to create the
+                // shipment.
+                'display' => [
+                    'destination_city_name' => $city->name,
+                    'destination_state_name' => $city->state->name,
+                ],
                 'data' => [
                     ...$batchContext,
                     'receiver_name' => $receiverName,
