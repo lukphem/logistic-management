@@ -11002,3 +11002,32 @@ app/Http/Controllers/Web/BulkShipmentController.php   (states passed to create()
 resources/views/shipments/bulk/create.blade.php   (Origin State/Town cascading dropdown)
 resources/views/shipments/bulk/show.blade.php   (Pieces replaces Origin column, Destination and top Origin show state/town)
 ```
+
+## Increment 184 — Batch Detail Table Matches the Review Table's Column Structure
+
+Confirmed the review page's "Ready to create" table already matched
+the informative order asked for — Row, Receiver, Phone, Email,
+Destination, State/Town, Pieces, Weight, COD Amount — no change
+needed there. Rebuilt the batch detail page's shipments table (the
+one at `/shipments/bulk/{batch}`) to use the exact same column set
+and order, so a batch reads the same way whether it's still pending
+(Review) or already created (the detail page): Shipment No in place
+of Row (the natural identifier once a shipment is real), then
+Receiver, Phone, Email, Destination (the actual address, split out
+from state/town rather than combined), State/Town, Pieces, Weight,
+COD Amount. Dropped the previous Description/Service Type columns
+in favor of matching the review table exactly, per the request.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned. Full repo balance check:
+clean across 129 files. Verified every field the new table needs
+against live MySQL data (tracking number, receiver name/phone/email,
+destination address, quantity, weight, COD status and amount) — all
+nine resolve correctly on a real shipment row.
+
+### Files
+
+```
+resources/views/shipments/bulk/show.blade.php   (table rebuilt to match review.blade.php's column structure)
+```

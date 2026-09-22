@@ -58,11 +58,12 @@
                         <th class="p-3">Shipment no</th>
                         <th class="p-3">Receiver</th>
                         <th class="p-3">Phone</th>
-                        <th class="p-3">Pieces</th>
+                        <th class="p-3">Email</th>
                         <th class="p-3">Destination</th>
-                        <th class="p-3">Description</th>
+                        <th class="p-3">State/Town</th>
+                        <th class="p-3">Pieces</th>
                         <th class="p-3">Weight</th>
-                        <th class="p-3">Service type</th>
+                        <th class="p-3">COD Amount</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,11 +74,12 @@
                             </td>
                             <td class="p-3 text-ink-700">{{ $shipment->receiver_name }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->receiver_phone }}</td>
-                            <td class="p-3 text-ink-700">{{ $shipment->quantity ?? 1 }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->receiver_email ?? '—' }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->destination_address }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->destinationCity?->name }}{{ $shipment->destinationCity?->state ? ', ' . $shipment->destinationCity->state->name : '' }}</td>
-                            <td class="p-3 text-ink-700">{{ $shipment->package_description }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->quantity ?? 1 }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->weight_kg ? $shipment->weight_kg . ' kg' : '—' }}</td>
-                            <td class="p-3 text-ink-700">{{ $shipment->serviceType?->name ?? '—' }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->is_cod ? number_format($shipment->cod_amount, 2) : '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
