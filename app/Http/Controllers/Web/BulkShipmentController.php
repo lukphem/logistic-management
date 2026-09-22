@@ -99,6 +99,32 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      * batch's labels can never drift from what printing one shipment
      * normally produces.
      */
+    /**
+     * The detail page for one batch — everything about it in one
+     * place rather than scattered across upload/review/print: sender
+     * and service details, when it was generated, how many shipments
+     * it actually produced, and every one of those shipments as its
+     * own row (paginated, since a batch can run to hundreds).
+     * Printing is offered as an action here rather than being the
+     * click-through destination itself, so seeing what's in the
+     * batch and printing it are two separate, deliberate steps.
+     */
+    public function show(BulkShipmentBatch $batch): View
+    {
+        $batch->load(['clientAccount', 'serviceType', 'originHub', 'originOutlet']);
+
+        $shipments = $batch->shipments()
+            ->with(['serviceType', 'originCity', 'destinationCity'])
+            ->orderBy('created_at')
+            ->paginate(25);
+
+        return view('shipments.bulk.show', [
+            'batch' => $batch,
+            'shipments' => $shipments,
+            'pendingCount' => $batch->rows()->count(),
+        ]);
+    }
+
     public function print(Request $request, BulkShipmentBatch $batch): Response
     {
         $batch->load(['shipments' => fn ($q) => $q->with(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientAccount'])]);

@@ -87,6 +87,12 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/shipments/bulk/{batch}/preview', [BulkShipmentController::class, 'preview'])->name('shipments.bulk.preview');
         Route::delete('/shipments/bulk/{batch}/rows/{row}', [BulkShipmentController::class, 'destroyRow'])->name('shipments.bulk.rows.destroy');
         Route::post('/shipments/bulk/{batch}', [BulkShipmentController::class, 'store'])->name('shipments.bulk.store');
+        // Registered last among the /shipments/bulk/... routes (after
+        // every literal path like /create and /template) purely to
+        // avoid the exact route-shadowing risk fixed earlier this
+        // session — {batch} would otherwise capture "create" as a
+        // batch value.
+        Route::get('/shipments/bulk/{batch}', [BulkShipmentController::class, 'show'])->name('shipments.bulk.show');
     });
     Route::get('/shipments/{shipment}', [ShipmentController::class, 'show'])->name('shipments.show');
     Route::get('/shipments/{shipment}/label', [ShipmentController::class, 'label'])->name('shipments.label');

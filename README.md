@@ -10856,3 +10856,52 @@ resources/views/shipments/bulk/index.blade.php   (state-aware action links)
 resources/views/shipments/bulk/preview.blade.php   (removed — replaced by review.blade.php)
 routes/web.php   (shipments.bulk.review, shipments.bulk.rows.destroy)
 ```
+
+## Increment 181 — Batch Detail Page (per the reference design)
+
+New `show()` page — what clicking a batch now actually opens,
+matching the reference layout: batch number and creation date up
+top, an action button (Print, or Upload/Review depending on state),
+a summary panel (account, service type, origin, sender, total
+shipment count), and every shipment in the batch as its own row
+(tracking number, receiver, phone, origin, destination, description,
+weight, service type), paginated at 25 per page. Printing is offered
+as an action here rather than being the click-through destination
+itself — seeing what's in a batch and printing it are now two
+separate steps.
+
+### "Upload more" fully removed once a batch has shipments
+
+The new detail page never shows an upload action once
+`hasCreatedShipments()` is true — print only, per the explicit ask.
+While auditing every bulk view for the same rule, found and fixed a
+real gap: the result page (shown immediately after a batch's first
+successful creation, so the batch very likely already has shipments
+by the time it renders) unconditionally offered a "re-upload" link
+whenever any row had failed — misleading, since the upload page is
+unreachable once locked anyway, and pointing at the wrong place
+regardless (failed rows live in Review, where they can be retried or
+deleted, not the upload form). Fixed to link to Review instead. The
+review and index pages were already correctly gated from the
+previous round.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned, crash-
+pattern-scanned across every touched file. Full repo balance check:
+clean across 132 files. Confirmed the new route (`GET /shipments/
+bulk/{batch}`) doesn't shadow or get shadowed by any of the other
+`/shipments/bulk/...` routes by simulating resolution order across
+all seven. Verified the detail page's data needs against live MySQL:
+created a real batch with two shipments, confirmed the total count
+and every per-row field the table needs resolve correctly.
+
+### Files
+
+```
+app/Http/Controllers/Web/BulkShipmentController.php   (show())
+resources/views/shipments/bulk/show.blade.php   (new)
+resources/views/shipments/bulk/index.blade.php   (batch link -> show())
+resources/views/shipments/bulk/result.blade.php   (failed-rows link -> review, not upload)
+routes/web.php   (shipments.bulk.show)
+```

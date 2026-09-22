@@ -60,8 +60,14 @@
     @endif
 
     @if (count($failed) > 0)
-        <a href="{{ route('shipments.bulk.upload', $batch) }}" class="mr-4 text-sm font-medium text-[var(--brand-primary)] hover:underline">Fix the failed rows and re-upload to this batch</a>
+        {{-- Failed rows stay pending on the batch either way — Review
+             is where they're actually retried or deleted, not the
+             upload form, which is unreachable anyway once the batch
+             has shipments (as it does here, having just created
+             some). --}}
+        <a href="{{ route('shipments.bulk.review', $batch) }}" class="mr-4 text-sm font-medium text-[var(--brand-primary)] hover:underline">Review the failed rows</a>
     @endif
+    <a href="{{ route('shipments.bulk.show', $batch) }}" class="mr-4 text-sm font-medium text-[var(--brand-primary)] hover:underline">View batch</a>
     <a href="{{ route('shipments.bulk.create') }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Start a new batch</a>
 
 </x-layouts.app>
