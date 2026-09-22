@@ -11031,3 +11031,35 @@ nine resolve correctly on a real shipment row.
 ```
 resources/views/shipments/bulk/show.blade.php   (table rebuilt to match review.blade.php's column structure)
 ```
+
+## Increment 185 — Fix: "No Valid Rows" No Longer Shows a Raw Error Page
+
+Fixes the reported crash. `store()` previously used a hard
+`abort_if()`, throwing Laravel's raw 422 exception page for what's
+actually a routine, recoverable situation — most likely here a
+double form submission (a double-click, or the browser resubmitting
+after a back navigation), where the first submission had already
+consumed every valid pending row before the second one ran. Nothing
+was actually broken; there was just nothing left to process by the
+time the second request landed.
+
+Now redirects back to the batch's own detail page with a plain
+explanation ("No pending rows to create — they may already have been
+processed, or none have been uploaded yet.") instead of crashing.
+Added flash-message display to the batch detail page, which didn't
+show one before — without it, this message (and any future one)
+would have been silently lost on redirect.
+
+### Verified
+
+Balance-checked, duplicate-checked, crash-pattern-scanned. Full repo
+balance check: clean across 129 files. Confirmed the redirect target
+route (`shipments.bulk.show`) exists and accepts the batch parameter
+correctly.
+
+### Files
+
+```
+app/Http/Controllers/Web/BulkShipmentController.php   (store() redirects gracefully instead of aborting)
+resources/views/shipments/bulk/show.blade.php   (flash message display added)
+```

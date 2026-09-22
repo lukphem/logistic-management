@@ -389,7 +389,17 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
     {
         $validRows = $batch->rows()->where('status', 'valid')->orderBy('source_row_number')->get();
 
-        abort_if($validRows->isEmpty(), 422, 'No valid rows to create — upload a file with at least one valid row first.');
+        // A hard abort() here shows Laravel's raw exception page for
+        // what's actually a routine, recoverable situation - most
+        // commonly the form being submitted twice (a double-click, or
+        // the browser resubmitting after a back navigation), where
+        // the first submission already consumed every valid row.
+        // Sent back to the batch itself with a plain explanation
+        // instead, since there's nothing wrong to fix, just nothing
+        // left pending right now.
+        if ($validRows->isEmpty()) {
+            return redirect()->route('shipments.bulk.show', $batch)->with('status', 'No pending rows to create — they may already have been processed, or none have been uploaded yet.');
+        }
 
         $result = $this->import->createShipments($validRows);
 

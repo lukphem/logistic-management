@@ -1,5 +1,9 @@
 <x-layouts.app :title="'Batch ' . $batch->batch_number">
 
+    @if (session('status'))
+        <div class="mb-5 rounded-lg border border-line bg-surface-50 p-3 text-sm text-ink-700">{{ session('status') }}</div>
+    @endif
+
     <div class="mb-6 flex items-start justify-between">
         <div>
             <p class="text-2xl font-semibold text-ink-900">Bulk Upload Batch no: <span class="font-mono">{{ $batch->batch_number }}</span></p>
