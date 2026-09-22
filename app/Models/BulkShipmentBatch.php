@@ -20,7 +20,7 @@ class BulkShipmentBatch extends Model
     protected $fillable = [
         'batch_number', 'client_account_id', 'client_user_id', 'billing_model', 'service_type_id',
         'sender_name', 'sender_phone', 'sender_address', 'sender_email',
-        'origin_hub_id', 'origin_outlet_id', 'created_by_user_id',
+        'origin_city_id', 'origin_hub_id', 'origin_outlet_id', 'created_by_user_id',
     ];
 
     public function clientAccount(): BelongsTo
@@ -31,6 +31,11 @@ class BulkShipmentBatch extends Model
     public function serviceType(): BelongsTo
     {
         return $this->belongsTo(ServiceType::class);
+    }
+
+    public function originCity(): BelongsTo
+    {
+        return $this->belongsTo(City::class, 'origin_city_id');
     }
 
     public function originHub(): BelongsTo

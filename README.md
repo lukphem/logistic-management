@@ -10953,3 +10953,52 @@ than missed.
 resources/views/components/layouts/app.blade.php   (back button in the shared header)
 resources/views/components/icon.blade.php   (arrow-left icon added)
 ```
+
+## Increment 183 — Explicit Origin State/Town for Bulk Upload; State/Town Formatting on the Batch Page
+
+### Origin is now its own explicit choice, not assumed from the booking hub
+
+Previously a batch's origin city for pricing was silently derived
+from whichever hub it was booked through — but the booking hub is
+just where staff happened to book from, not necessarily where the
+shipments are actually being picked up. Any user can be arranging a
+remote pickup while booking through their own hub. Step 1 now has
+its own Origin State/Town selection (cascading dropdown, same
+pattern as the CSV template's destination fields), and this — not
+the hub's own city — is what's actually used as the shipments' real
+origin and for pricing.
+
+New `origin_city_id` on `bulk_shipment_batches`, kept deliberately
+separate from `origin_hub_id`/`origin_outlet_id` (which still record
+which facility processed the batch, for tracking purposes — just no
+longer used to infer the geographic origin).
+
+### Batch detail page: Pieces replaces Origin as a column; Destination shows state/town
+
+Origin was redundant as a per-row column — every shipment in a batch
+shares the same origin, so the column just repeated the same value
+down the whole table. Replaced with Pieces (quantity), which
+actually varies per row. Destination now shows state/town together
+(e.g. "Ikeja, Lagos") instead of just the town alone. The batch
+summary panel's own Origin field at the top of the page gets the
+same state/town treatment, now that there's a real origin city to
+show there instead of just the booking hub's name.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned, crash-
+pattern-scanned across every touched file. Full repo balance check:
+clean across 232 files. Verified against live MySQL with the exact
+scenario described: a batch booked through one hub, with an explicit
+origin city in a genuinely different location, confirmed the origin
+resolves to the real pickup location, not the booking hub's own city.
+
+### Files
+
+```
+database/migrations/2026_03_30_000001_add_origin_city_id_to_bulk_shipment_batches.php
+app/Models/BulkShipmentBatch.php   (origin_city_id, originCity())
+app/Http/Controllers/Web/BulkShipmentController.php   (states passed to create(), origin_city_id validated/stored, preview() uses the batch's own origin city)
+resources/views/shipments/bulk/create.blade.php   (Origin State/Town cascading dropdown)
+resources/views/shipments/bulk/show.blade.php   (Pieces replaces Origin column, Destination and top Origin show state/town)
+```

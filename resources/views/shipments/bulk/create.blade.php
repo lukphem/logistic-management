@@ -87,6 +87,30 @@
                        class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
             </div>
 
+            {{-- The booking hub/outlet isn't necessarily where these
+                 shipments are actually being picked up from — anyone
+                 can be arranging a remote pickup while booking
+                 through their own hub — so origin state/town is its
+                 own explicit choice, used as the real origin instead
+                 of just assuming the hub's own city. --}}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin state</label>
+                    <select id="origin-state-select" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        <option value="">— Select —</option>
+                        @foreach ($states as $state)
+                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-ink-900">Origin town</label>
+                    <select name="origin_city_id" id="origin-city-select" required class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                        <option value="">— Select a state first —</option>
+                    </select>
+                </div>
+            </div>
+
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Sender email <span class="text-ink-400">(optional)</span></label>
                 <input type="email" name="sender_email" value="{{ old('sender_email') }}"
@@ -156,6 +180,34 @@
                 if (this.value) originHubSelect.value = '';
             });
         }
+
+        // Origin state -> town, cascading client-side from the
+        // states/cities already loaded for this form — no AJAX round
+        // trip needed for a single pair of dropdowns like the bulk
+        // template's per-row version needs.
+        const citiesByState = @json($states->mapWithKeys(fn ($state) => [$state->id => $state->cities->map(fn ($city) => ['id' => $city->id, 'name' => $city->name])]));
+        const originStateSelect = document.getElementById('origin-state-select');
+        const originCitySelect = document.getElementById('origin-city-select');
+
+        function syncOriginCityOptions() {
+            const stateId = originStateSelect.value;
+            originCitySelect.innerHTML = '';
+
+            if (!stateId) {
+                originCitySelect.innerHTML = '<option value="">— Select a state first —</option>';
+                return;
+            }
+
+            originCitySelect.innerHTML = '<option value="">— Select —</option>';
+            (citiesByState[stateId] || []).forEach(function (city) {
+                const opt = document.createElement('option');
+                opt.value = city.id;
+                opt.textContent = city.name;
+                originCitySelect.appendChild(opt);
+            });
+        }
+
+        originStateSelect.addEventListener('change', syncOriginCityOptions);
     </script>
 
 </x-layouts.app>

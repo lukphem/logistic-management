@@ -31,7 +31,7 @@
             </div>
             <div>
                 <p class="text-xs uppercase tracking-wide text-ink-500">Origin</p>
-                <p class="mt-0.5 text-sm font-medium text-ink-900">{{ $batch->originHub?->name ?? $batch->originOutlet?->name ?? '—' }}</p>
+                <p class="mt-0.5 text-sm font-medium text-ink-900">{{ $batch->originCity?->name }}{{ $batch->originCity?->state ? ', ' . $batch->originCity->state->name : '' }}</p>
             </div>
             <div>
                 <p class="text-xs uppercase tracking-wide text-ink-500">Sender</p>
@@ -58,7 +58,7 @@
                         <th class="p-3">Shipment no</th>
                         <th class="p-3">Receiver</th>
                         <th class="p-3">Phone</th>
-                        <th class="p-3">Origin</th>
+                        <th class="p-3">Pieces</th>
                         <th class="p-3">Destination</th>
                         <th class="p-3">Description</th>
                         <th class="p-3">Weight</th>
@@ -73,8 +73,8 @@
                             </td>
                             <td class="p-3 text-ink-700">{{ $shipment->receiver_name }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->receiver_phone }}</td>
-                            <td class="p-3 text-ink-700">{{ $shipment->originCity?->name ?? '—' }}</td>
-                            <td class="p-3 text-ink-700">{{ $shipment->destinationCity?->name ?? '—' }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->quantity ?? 1 }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->destinationCity?->name }}{{ $shipment->destinationCity?->state ? ', ' . $shipment->destinationCity->state->name : '' }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->package_description }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->weight_kg ? $shipment->weight_kg . ' kg' : '—' }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->serviceType?->name ?? '—' }}</td>

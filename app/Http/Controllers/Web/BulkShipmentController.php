@@ -79,6 +79,14 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'originLabel' => $originLabel,
             'originHubs' => $hubs,
             'originOutlets' => $outlets,
+            // The booking hub/outlet isn't necessarily where a batch's
+            // shipments actually get picked up from — any user can be
+            // arranging a remote pickup while booking through their
+            // own hub — so origin state/town is its own explicit
+            // choice here, states each carrying their own cities for
+            // the same cascading dropdown pattern the bulk template
+            // already uses.
+            'states' => \App\Models\State::with('cities')->orderBy('name')->get(),
         ]);
     }
 
@@ -111,10 +119,10 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
      */
     public function show(BulkShipmentBatch $batch): View
     {
-        $batch->load(['clientAccount', 'serviceType', 'originHub', 'originOutlet']);
+        $batch->load(['clientAccount', 'serviceType', 'originHub', 'originOutlet', 'originCity.state']);
 
         $shipments = $batch->shipments()
-            ->with(['serviceType', 'originCity', 'destinationCity'])
+            ->with(['serviceType', 'originCity.state', 'destinationCity.state'])
             ->orderBy('created_at')
             ->paginate(25);
 
@@ -229,6 +237,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'sender_phone' => 'required|string|max:20',
             'sender_address' => 'required|string|max:150',
             'sender_email' => 'nullable|email|max:255',
+            'origin_city_id' => 'required|exists:cities,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'origin_outlet_id' => 'nullable|exists:outlets,id',
         ]);
@@ -251,6 +260,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'sender_phone' => $data['sender_phone'],
             'sender_address' => $data['sender_address'],
             'sender_email' => $data['sender_email'] ?? null,
+            'origin_city_id' => $data['origin_city_id'],
             'origin_hub_id' => $originHubId,
             'origin_outlet_id' => $originOutletId,
             'created_by_user_id' => $user->id,
@@ -301,8 +311,6 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             return redirect()->route('shipments.bulk.upload', $batch)->withErrors(['file' => 'This file has ' . count($rows) . ' rows — the limit is ' . BulkShipmentTemplateService::ROW_LIMIT . ' per upload.']);
         }
 
-        $originHub = $batch->origin_hub_id ? Hub::find($batch->origin_hub_id) : null;
-
         $batchContext = [
             'client_account_id' => $batch->client_account_id,
             'client_user_id' => $batch->client_user_id,
@@ -311,7 +319,11 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_hub_id' => $batch->origin_hub_id,
             'origin_outlet_id' => $batch->origin_outlet_id,
             'origin_address' => $batch->sender_address,
-            'origin_city_id' => $originHub?->city_id,
+            // The batch's own explicit origin city — not the booking
+            // hub's — since the hub is just where this was booked
+            // from, not necessarily where the shipments are actually
+            // being picked up.
+            'origin_city_id' => $batch->origin_city_id,
             'sender_name' => $batch->sender_name,
             'sender_phone' => $batch->sender_phone,
         ];
