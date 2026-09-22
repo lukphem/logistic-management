@@ -17,6 +17,7 @@
         'route' => '<circle cx="5" cy="6" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8v3a4 4 0 0 0 4 4h6a4 4 0 0 1 4 4" stroke-dasharray="2.5 3"/>',
         'package' => '<path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/><path d="m7 5.5 9 5"/>',
         'menu' => '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        'arrow-left' => '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
         'close' => '<path d="M6 6l12 12M18 6 6 18"/>',
         'user' => '<path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/>',
         'document' => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h6"/>',

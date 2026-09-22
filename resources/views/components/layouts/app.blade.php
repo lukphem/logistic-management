@@ -383,6 +383,15 @@
                     <button id="sidebar-open" type="button" class="text-ink-500 hover:text-ink-900 md:hidden">
                         <x-icon name="menu" class="h-5 w-5" />
                     </button>
+                    {{-- One universal back control rather than a
+                         per-page destination to maintain — browser
+                         history already knows where the person came
+                         from, so this works correctly everywhere this
+                         layout is used without needing to be added
+                         to each page individually. --}}
+                    <button type="button" onclick="history.back()" title="Back" class="text-ink-500 hover:text-ink-900">
+                        <x-icon name="arrow-left" class="h-5 w-5" />
+                    </button>
                     <div>
                         @if ($setupsActive)
                             <p class="text-xs font-medium text-ink-500">Setups</p>

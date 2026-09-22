@@ -10905,3 +10905,51 @@ resources/views/shipments/bulk/index.blade.php   (batch link -> show())
 resources/views/shipments/bulk/result.blade.php   (failed-rows link -> review, not upload)
 routes/web.php   (shipments.bulk.show)
 ```
+
+## Increment 182 — Universal Back Navigation
+
+Added a "← Back" control to the shared app layout's header, next to
+the page title — one edit, applied automatically to every page that
+uses `<x-layouts.app>` (75 of the app's 114 view files; the rest are
+print/label documents, error pages, and the public tracking portal,
+each intentionally on their own separate layout).
+
+Uses `history.back()` rather than a per-page destination — browser
+history already knows where the person came from, so this works
+correctly everywhere without needing a "back to X" link maintained
+on each individual page as new ones get added.
+
+### Caught before shipping
+
+Initially referenced an `arrow-left` icon that didn't exist in the
+shared icon component — would have silently rendered an empty,
+invisible-but-still-clickable button rather than crashing (the
+component falls back to an empty string for an unrecognized name).
+Added the missing icon definition (standard left-arrow path,
+matching the existing icon set's style) rather than picking a
+different, already-defined icon that don't fit as well.
+
+### Not covered — flagging rather than assuming
+
+The public tracking portal (`tracking/search`, `tracking/show`,
+`tracking/multi`, `tracking/batch`) has no shared layout wrapper of
+its own — each is a fully standalone page. Adding back navigation
+there would mean editing each of the four individually. Left out of
+this round since the request was read as being about the staff
+application; happy to add it to the tracking portal too if wanted.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned. Full repo balance check:
+clean across 129 files. Confirmed 75 of 114 view files use the
+shared layout (and therefore now have this automatically), and
+listed every file that doesn't, to confirm the omissions are
+deliberate (print documents, error pages, public tracking) rather
+than missed.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (back button in the shared header)
+resources/views/components/icon.blade.php   (arrow-left icon added)
+```
