@@ -11063,3 +11063,51 @@ correctly.
 app/Http/Controllers/Web/BulkShipmentController.php   (store() redirects gracefully instead of aborting)
 resources/views/shipments/bulk/show.blade.php   (flash message display added)
 ```
+
+## Increment 186 — "Shipping" Menu: Consolidating Create/Bulk/History (UPS/FedEx/DHL Pattern)
+
+### The standard this follows
+
+Major carriers (UPS, FedEx, DHL) all group shipment creation the
+same way: one "Shipping" entry point, with single-shipment creation,
+batch/bulk creation, and shipment history as sub-items underneath it
+— rather than scattering the two ways to create a shipment and the
+record of what they produced as separate, unrelated top-level menu
+items, which is what this app had.
+
+### What changed
+
+New "Shipping" collapsible menu group (same pattern already used for
+Operations/Payments/Setups — a `<details>`/`<summary>` section,
+auto-expanded when any of its own pages are active), replacing the
+previous flat "Shipments" and "Bulk Upload" sidebar items. Three
+sub-items:
+
+- **Create Shipment** — the single-shipment form
+- **Bulk Upload** — batch creation (unchanged destination, just
+  relocated)
+- **Shipment History** — the existing shipment list/index, which
+  already shows every shipment regardless of how it was created
+  (single or bulk both produce ordinary `Shipment` records) — this
+  is the "common history page" by construction, no changes needed to
+  make it show both.
+
+The group is marked active (auto-expanded, highlighted) not just on
+its own three routes but also when viewing/editing an individual
+shipment or anywhere inside the bulk-upload flow (batch detail,
+review, upload), so the sidebar correctly reflects "you're in
+Shipping" throughout that whole area, not just on the three landing
+pages.
+
+### Verified
+
+Balance-checked, crash-pattern-scanned. Full repo balance check:
+clean across 129 files. Confirmed all three route names in the new
+menu (`shipments.create`, `shipments.bulk.index`, `shipments.index`)
+match real, already-existing routes.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (Shipping menu group)
+```

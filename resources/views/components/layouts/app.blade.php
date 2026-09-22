@@ -47,11 +47,23 @@
                 @php
                     $navItems = [
                         ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'dashboard', 'permission' => null],
-                        ['label' => 'Shipments', 'route' => 'shipments.index', 'icon' => 'box', 'permission' => null],
-                        ['label' => 'Bulk Upload', 'route' => 'shipments.bulk.index', 'icon' => 'box', 'permission' => 'shipments:create'],
                         ['label' => 'Tracking', 'route' => 'staff-tracking.search', 'icon' => 'search', 'permission' => null],
                         ['label' => 'Print Documents', 'route' => 'print-documents.search', 'icon' => 'box', 'permission' => 'manifests:read'],
                         ['label' => 'Rate Checker', 'route' => 'rate-checker.index', 'icon' => 'search', 'permission' => 'billing:read'],
+                    ];
+
+                    // Shipping — the one place both ways of creating a
+                    // shipment live, plus the unified record of every
+                    // shipment either one has ever produced. Matches
+                    // how UPS/FedEx/DHL group this: a single "Shipping"
+                    // entry point with Create/Batch/History underneath,
+                    // rather than the create paths and the history of
+                    // what they produced being scattered as separate,
+                    // unrelated top-level items.
+                    $shippingItems = [
+                        ['label' => 'Create Shipment', 'route' => 'shipments.create', 'icon' => 'box', 'permission' => 'shipments:create'],
+                        ['label' => 'Bulk Upload', 'route' => 'shipments.bulk.index', 'icon' => 'box', 'permission' => 'shipments:create'],
+                        ['label' => 'Shipment History', 'route' => 'shipments.index', 'icon' => 'list-check', 'permission' => null],
                     ];
 
                     // Payments — Reconciliation (what's outstanding right
@@ -170,6 +182,13 @@
                     );
                     $paymentsActive = collect($paymentItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
 
+                    $visibleShippingItems = collect($shippingItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $shippingActive = collect($shippingItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'))
+                        || request()->routeIs('shipments.show') || request()->routeIs('shipments.edit') || request()->routeIs('shipments.update')
+                        || request()->routeIs('shipments.bulk.*') || request()->routeIs('quotes.*');
+
                     $visibleScanItems = collect($scanItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
@@ -209,6 +228,28 @@
                         {{ $item['label'] }}
                     </a>
                 @endforeach
+
+                @if ($visibleShippingItems->isNotEmpty())
+                    <details class="group/shipping" @if($shippingActive) open @endif>
+                        <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
+                            <x-icon name="box" class="h-[18px] w-[18px] shrink-0" />
+                            <span class="flex-1">Shipping</span>
+                            <x-icon name="chevron" class="h-4 w-4 shrink-0 transition-transform group-open/shipping:rotate-180" />
+                        </summary>
+
+                        <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                            @foreach ($visibleShippingItems as $item)
+                                @php $active = request()->routeIs($item['route'] . '*'); @endphp
+                                <a href="{{ route($item['route']) }}"
+                                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                                          {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />
+                                    {{ $item['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
 
                 @if ($visiblePaymentItems->isNotEmpty())
                     <details class="group/payments" @if($paymentsActive) open @endif>
