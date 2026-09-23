@@ -45,7 +45,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $classification->districts_count }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('onforwarding-classifications.edit', $classification) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('onforwarding-classifications.destroy', $classification) }}" class="inline" onsubmit="return confirm('Remove this classification? Cities/districts using it will simply become unclassified.')">
+                            <form method="POST" action="{{ route('onforwarding-classifications.destroy', $classification) }}" class="inline" data-confirm="Remove this classification? Cities/districts using it will simply become unclassified.">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

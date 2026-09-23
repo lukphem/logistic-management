@@ -48,7 +48,7 @@
                         </td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('vehicle-types.edit', $vehicleType) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('vehicle-types.destroy', $vehicleType) }}" class="inline" onsubmit="return confirm('Remove this vehicle type?')">
+                            <form method="POST" action="{{ route('vehicle-types.destroy', $vehicleType) }}" class="inline" data-confirm="Remove this vehicle type?">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

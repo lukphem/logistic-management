@@ -383,7 +383,8 @@
             confirmBtn.addEventListener('click', function () {
                 const count = pending.size;
                 if (count === 0) return;
-                if (! confirm(`Confirm ${typeLabel.toLowerCase()} for ${count} shipment${count === 1 ? '' : 's'}?`)) {
+                window.confirmDialog(`Confirm ${typeLabel.toLowerCase()} for ${count} shipment${count === 1 ? '' : 's'}?`).then(function (ok) {
+                if (! ok) {
                     return;
                 }
 
@@ -456,6 +457,7 @@
                         confirmBtn.disabled = false;
                         confirmBtn.textContent = 'Confirm';
                     });
+                });
             });
 
             refreshEnabled();

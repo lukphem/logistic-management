@@ -47,7 +47,7 @@
                 afterward with the picker in the table below if any need to differ from the rule.
             </p>
 
-            <form method="POST" action="{{ route('zone-mappings.apply-domestic-rule') }}" onsubmit="return confirm('This overwrites the zone on every domestic pair, including any already set manually. Continue?')">
+            <form method="POST" action="{{ route('zone-mappings.apply-domestic-rule') }}" data-confirm="This overwrites the zone on every domestic pair, including any already set manually. Continue?">
                 @csrf
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="flex items-center justify-between gap-3 rounded-lg border border-line p-3">
@@ -214,7 +214,7 @@
                 — yours to name however makes sense, standard geography or otherwise.
             </p>
 
-            <form method="POST" action="{{ route('zone-mappings.apply-international-rule') }}" onsubmit="return confirm('This overwrites the zone on every country, including any already set manually. Continue?')">
+            <form method="POST" action="{{ route('zone-mappings.apply-international-rule') }}" data-confirm="This overwrites the zone on every country, including any already set manually. Continue?">
                 @csrf
                 <div class="mb-4">
                     <span class="mb-2 block text-sm font-medium text-ink-900">Grouping method</span>
@@ -372,7 +372,7 @@
                     ones. Neither side is fixed as Nigeria here, unlike the International rule.
                 </p>
 
-                <form method="POST" action="{{ route('zone-mappings.third-party.apply-rule') }}" onsubmit="return confirm('This overwrites the zone on every cross-trade route, including any already set manually. Continue?')">
+                <form method="POST" action="{{ route('zone-mappings.third-party.apply-rule') }}" data-confirm="This overwrites the zone on every cross-trade route, including any already set manually. Continue?">
                     @csrf
                     <div class="mb-4">
                         <span class="mb-2 block text-sm font-medium text-ink-900">Grouping method</span>
@@ -508,7 +508,7 @@
                                 </form>
                             </td>
                             <td class="px-5 py-3 text-right">
-                                <form method="POST" action="{{ route('zone-mappings.third-party.destroy', $mapping) }}" onsubmit="return confirm('Remove this route?')">
+                                <form method="POST" action="{{ route('zone-mappings.third-party.destroy', $mapping) }}" data-confirm="Remove this route?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                 </form>

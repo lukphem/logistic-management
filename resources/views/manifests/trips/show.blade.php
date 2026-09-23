@@ -30,7 +30,7 @@
             @else
                 <span class="inline-flex items-center rounded-full bg-ink-100 px-3 py-1 text-sm font-medium text-ink-700">Draft</span>
                 <a href="{{ route('manifests.create', $trip) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">+ Add destination</a>
-                <form method="POST" action="{{ route('manifest-trips.dispatch', $trip) }}" class="inline" onsubmit="return confirm('Dispatch this trip? All manifests inside it will lock and every shipment will be scanned in transit.');">
+                <form method="POST" action="{{ route('manifest-trips.dispatch', $trip) }}" class="inline" data-confirm="Dispatch this trip? All manifests inside it will lock and every shipment will be scanned in transit.">
                     @csrf
                     <button type="submit" class="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">Dispatch trip</button>
                 </form>

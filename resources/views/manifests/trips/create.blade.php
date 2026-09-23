@@ -295,9 +295,10 @@
                 const message = count > 0
                     ? `Create this trip with ${count} shipment${count === 1 ? '' : 's'} manifested to ${destinationLabel}?`
                     : 'Create this trip with no shipments manifested yet? You can add them to the first manifest afterward.';
-                if (! confirm(message)) {
-                    e.preventDefault();
-                }
+                e.preventDefault();
+                window.confirmDialog(message).then(function (ok) {
+                    if (ok) form.submit();
+                });
             });
 
             // Keyboard-wedge handheld scanners type the code then send

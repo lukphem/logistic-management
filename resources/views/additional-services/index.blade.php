@@ -49,7 +49,7 @@
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('additional-services.edit', $service) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">{{ $service->kind === 'acknowledgement' ? 'Configure' : 'Edit' }}</a>
                             @unless ($service->isProtected())
-                                <form method="POST" action="{{ route('additional-services.destroy', $service) }}" class="inline" onsubmit="return confirm('Remove this service and all its options?')">
+                                <form method="POST" action="{{ route('additional-services.destroy', $service) }}" class="inline" data-confirm="Remove this service and all its options?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                 </form>

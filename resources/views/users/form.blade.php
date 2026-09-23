@@ -343,7 +343,7 @@
                                 @endif
                             @endforeach
 
-                            <form method="POST" action="{{ route('users.destroy', $user) }}" onsubmit="return confirm('Permanently delete this account? This cannot be undone.')" class="pt-2">
+                            <form method="POST" action="{{ route('users.destroy', $user) }}" data-confirm="Permanently delete this account? This cannot be undone." class="pt-2">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="w-full text-sm font-medium text-ink-500 hover:text-status-exception hover:underline">
                                     Delete permanently

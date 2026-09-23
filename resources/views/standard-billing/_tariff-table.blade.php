@@ -49,7 +49,7 @@
                                 </td>
                                 <td class="px-5 py-3 text-right" rowspan="{{ $rowCount }}">
                                     <a href="{{ route('standard-billing.edit', $tariff) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                                    <form method="POST" action="{{ route('standard-billing.destroy', $tariff) }}" class="inline" onsubmit="return confirm('Remove this tariff and all its zone prices?')">
+                                    <form method="POST" action="{{ route('standard-billing.destroy', $tariff) }}" class="inline" data-confirm="Remove this tariff and all its zone prices?">
                                         @csrf @method('DELETE')
                                         <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                     </form>
@@ -77,7 +77,7 @@
                             </td>
                             <td class="px-5 py-3 text-right">
                                 <a href="{{ route('standard-billing.edit', $tariff) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                                <form method="POST" action="{{ route('standard-billing.destroy', $tariff) }}" class="inline" onsubmit="return confirm('Remove this tariff and all its zone prices?')">
+                                <form method="POST" action="{{ route('standard-billing.destroy', $tariff) }}" class="inline" data-confirm="Remove this tariff and all its zone prices?">
                                     @csrf @method('DELETE')
                                     <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                                 </form>

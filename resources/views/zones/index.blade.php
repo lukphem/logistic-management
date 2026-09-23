@@ -47,7 +47,7 @@
                         </td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('zones.edit', $zone) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('zones.destroy', $zone) }}" class="inline" onsubmit="return confirm('Remove this zone?')">
+                            <form method="POST" action="{{ route('zones.destroy', $zone) }}" class="inline" data-confirm="Remove this zone?">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

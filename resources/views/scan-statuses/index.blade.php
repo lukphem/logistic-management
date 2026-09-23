@@ -62,7 +62,7 @@
                             <input form="{{ $formId }}" type="hidden" name="_token" value="{{ csrf_token() }}">
                             <input form="{{ $formId }}" type="hidden" name="_method" value="PUT">
                             <button form="{{ $formId }}" type="submit" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Save</button>
-                            <form method="POST" action="{{ route('scan-statuses.destroy', $status) }}" class="inline" onsubmit="return confirm('Remove &quot;{{ $status->label }}&quot;? This only works if no shipment or scan history uses it.');">
+                            <form method="POST" action="{{ route('scan-statuses.destroy', $status) }}" class="inline" data-confirm="Remove &quot;{{ $status->label }}&quot;? This only works if no shipment or scan history uses it.">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>

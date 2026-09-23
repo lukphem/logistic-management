@@ -34,7 +34,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $unit->hub->name }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('units.edit', $unit) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('units.destroy', $unit) }}" class="inline" onsubmit="return confirm('Remove this unit? Staff assigned to it will simply become unassigned.')">
+                            <form method="POST" action="{{ route('units.destroy', $unit) }}" class="inline" data-confirm="Remove this unit? Staff assigned to it will simply become unassigned.">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

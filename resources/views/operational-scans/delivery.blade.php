@@ -309,51 +309,51 @@
             confirmBtn.addEventListener('click', function () {
                 const count = pending.size;
                 const receiverName = receiverInput.value.trim();
-                if (! confirm(`Confirm ${count} waybill${count === 1 ? '' : 's'} delivered to ${receiverName}?`)) {
-                    return;
-                }
+                window.confirmDialog(`Confirm ${count} waybill${count === 1 ? '' : 's'} delivered to ${receiverName}?`).then(function (ok) {
+                    if (! ok) return;
 
-                confirmBtn.disabled = true;
-                confirmBtn.textContent = 'Confirming…';
+                    confirmBtn.disabled = true;
+                    confirmBtn.textContent = 'Confirming…';
 
-                Promise.all([
-                    signatureDataUrl ? uploadEvidence('signature', signatureDataUrl) : Promise.resolve(null),
-                    readPhotoAsDataUrl().then(dataUrl => dataUrl ? uploadEvidence('photo', dataUrl) : null),
-                ]).then(function (paths) {
-                    const location = currentLocation();
-                    return fetch(@json(route('operational-scans.delivery.store')), {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
-                        body: JSON.stringify({
-                            shipment_ids: Array.from(pending.values()).map(s => s.id),
-                            receiver_name: receiverName,
-                            signature_path: paths[0],
-                            photo_path: paths[1],
-                            hub_id: location.hub_id,
-                            outlet_id: location.outlet_id,
-                        }),
-                    });
-                })
-                    .then(r => r.json())
-                    .then(function (data) {
-                        (data.results || []).forEach(function (result) {
-                            logResult(result.success, (result.success ? '✓ ' : '✗ ') + result.tracking_number + (result.success ? ' delivered to ' + receiverName : ' — ' + result.message));
+                    Promise.all([
+                        signatureDataUrl ? uploadEvidence('signature', signatureDataUrl) : Promise.resolve(null),
+                        readPhotoAsDataUrl().then(dataUrl => dataUrl ? uploadEvidence('photo', dataUrl) : null),
+                    ]).then(function (paths) {
+                        const location = currentLocation();
+                        return fetch(@json(route('operational-scans.delivery.store')), {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': @json(csrf_token()) },
+                            body: JSON.stringify({
+                                shipment_ids: Array.from(pending.values()).map(s => s.id),
+                                receiver_name: receiverName,
+                                signature_path: paths[0],
+                                photo_path: paths[1],
+                                hub_id: location.hub_id,
+                                outlet_id: location.outlet_id,
+                            }),
                         });
-                        pending.clear();
-                        renderPending();
-                        receiverInput.value = '';
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        hasDrawn = false;
-                        signatureDataUrl = null;
-                        document.getElementById('photo-input').value = '';
                     })
-                    .catch(function () {
-                        logResult(false, 'Something went wrong submitting this batch — try again.');
-                    })
-                    .finally(function () {
-                        confirmBtn.disabled = false;
-                        confirmBtn.textContent = 'Confirm delivery';
-                    });
+                        .then(r => r.json())
+                        .then(function (data) {
+                            (data.results || []).forEach(function (result) {
+                                logResult(result.success, (result.success ? '✓ ' : '✗ ') + result.tracking_number + (result.success ? ' delivered to ' + receiverName : ' — ' + result.message));
+                            });
+                            pending.clear();
+                            renderPending();
+                            receiverInput.value = '';
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            hasDrawn = false;
+                            signatureDataUrl = null;
+                            document.getElementById('photo-input').value = '';
+                        })
+                        .catch(function () {
+                            logResult(false, 'Something went wrong submitting this batch — try again.');
+                        })
+                        .finally(function () {
+                            confirmBtn.disabled = false;
+                            confirmBtn.textContent = 'Confirm delivery';
+                        });
+                });
             });
         })();
     </script>

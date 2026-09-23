@@ -32,7 +32,7 @@
                             <p class="font-mono text-sm font-medium text-ink-900">{{ $manifestShipment->shipment->tracking_number }}</p>
                             <p class="text-xs text-ink-500">{{ $manifestShipment->shipment->receiver_name }}</p>
                         </div>
-                        <form method="POST" action="{{ route('manifests.remove-shipment', [$manifest, $manifestShipment->shipment_id]) }}" onsubmit="return confirm('Remove {{ $manifestShipment->shipment->tracking_number }} from this manifest?');">
+                        <form method="POST" action="{{ route('manifests.remove-shipment', [$manifest, $manifestShipment->shipment_id]) }}" data-confirm="Remove {{ $manifestShipment->shipment->tracking_number }} from this manifest?">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>

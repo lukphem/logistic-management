@@ -169,7 +169,7 @@
                 <div class="rounded-xl border border-status-exception/30 bg-status-exception/5 p-5">
                     <p class="mb-1 text-sm font-semibold text-status-exception">Danger zone</p>
                     <p class="mb-3 text-xs text-ink-500">Permanently removes {{ $user->name }} — every account, tariff, discount, and document. Blocked if they have any shipment history, so it never silently disconnects past shipments from their client record.</p>
-                    <form method="POST" action="{{ route('clients.destroy', $user) }}" onsubmit="return confirm('Permanently remove {{ $user->name }}? This cannot be undone.');">
+                    <form method="POST" action="{{ route('clients.destroy', $user) }}" data-confirm="Permanently remove {{ $user->name }}? This cannot be undone.">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="rounded-md border border-status-exception px-3 py-1.5 text-xs font-semibold text-status-exception transition hover:bg-status-exception/10">Delete client</button>
@@ -219,7 +219,7 @@
                                 <button type="button" onclick="document.getElementById('account-details-{{ $acct->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Account Details</button>
                                 <span class="mx-1 text-ink-500">·</span>
                                 @if ($acct->isSuspended())
-                                    <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="inline" onsubmit="return confirm('Reactivate this account?');">
+                                    <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="inline" data-confirm="Reactivate this account?">
                                         @csrf
                                         @method('PUT')
                                         <input type="hidden" name="status" value="active">
@@ -239,7 +239,7 @@
                                         <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Switch to this</button>
                                     </form>
                                     <span class="mx-1 text-ink-500">·</span>
-                                    <form method="POST" action="{{ route('clients.accounts.destroy', [$user, $acct]) }}" class="inline" onsubmit="return confirm('Remove this account? This cannot be undone.');">
+                                    <form method="POST" action="{{ route('clients.accounts.destroy', [$user, $acct]) }}" class="inline" data-confirm="Remove this account? This cannot be undone.">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
@@ -254,7 +254,7 @@
                         @endif
                         <tr id="suspend-account-{{ $acct->id }}" class="hidden border-b border-line last:border-0 bg-surface-50">
                             <td colspan="5" class="p-4">
-                                <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="flex items-end gap-3" onsubmit="return confirm('Suspend this account? It will no longer be able to book new shipments.');">
+                                <form method="POST" action="{{ route('clients.accounts.status.update', [$user, $acct]) }}" class="flex items-end gap-3" data-confirm="Suspend this account? It will no longer be able to book new shipments.">
                                     @csrf
                                     @method('PUT')
                                     <input type="hidden" name="status" value="suspended">
@@ -918,7 +918,7 @@
                                             <button type="submit" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Save</button>
                                         </form>
                                         @if (isset($discounts[$serviceType->id]))
-                                            <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discounts[$serviceType->id]]) }}" onsubmit="return confirm('Remove this discount?');" class="inline">
+                                            <form method="POST" action="{{ route('clients.discounts.destroy', [$user, $discounts[$serviceType->id]]) }}" data-confirm="Remove this discount?" class="inline">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Clear</button>
@@ -978,7 +978,7 @@
                                                     </td>
                                                     <td class="px-5 py-3 text-right" rowspan="{{ $rowCount }}">
                                                         <button type="button" onclick="document.getElementById('edit-standard-{{ $tariff->id }}').classList.toggle('hidden')" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
-                                                        <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" class="inline" onsubmit="return confirm('Remove this special rate?');">
+                                                        <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" class="inline" data-confirm="Remove this special rate?">
                                                             @csrf
                                                             @method('DELETE')
                                                             <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
@@ -997,7 +997,7 @@
                                                 </td>
                                                 <td class="px-5 py-3 text-right">
                                                     <button type="button" onclick="document.getElementById('edit-standard-{{ $tariff->id }}').classList.toggle('hidden')" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
-                                                    <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" class="inline" onsubmit="return confirm('Remove this special rate?');">
+                                                    <form method="POST" action="{{ route('clients.special-tariffs.destroy', [$user, $tariff]) }}" class="inline" data-confirm="Remove this special rate?">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
@@ -1204,7 +1204,7 @@
                                             </td>
                                             <td class="px-5 py-3 text-right">
                                                 <button type="button" onclick="document.getElementById('edit-od-{{ $tariff->id }}').classList.toggle('hidden')" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
-                                                <form method="POST" action="{{ route('clients.od-tariffs.destroy', [$user, $tariff]) }}" class="inline" onsubmit="return confirm('Remove this special rate?');">
+                                                <form method="POST" action="{{ route('clients.od-tariffs.destroy', [$user, $tariff]) }}" class="inline" data-confirm="Remove this special rate?">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
@@ -1469,7 +1469,7 @@
                                             </td>
                                             <td class="px-5 py-3 text-right">
                                                 <button type="button" onclick="document.getElementById('edit-fleet-{{ $tariff->id }}').classList.toggle('hidden')" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
-                                                <form method="POST" action="{{ route('clients.fleet-tariffs.destroy', [$user, $tariff]) }}" class="inline" onsubmit="return confirm('Remove this special rate?');">
+                                                <form method="POST" action="{{ route('clients.fleet-tariffs.destroy', [$user, $tariff]) }}" class="inline" data-confirm="Remove this special rate?">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="ml-3 text-sm font-medium text-status-exception hover:underline">Remove</button>
@@ -1772,7 +1772,7 @@
                     @foreach ($departments as $department)
                         <li class="flex items-center justify-between py-2 text-sm">
                             <span class="text-ink-900">{{ $department->name }}</span>
-                            <form method="POST" action="{{ route('clients.departments.destroy', [$user, $department]) }}" onsubmit="return confirm('Remove this department?');">
+                            <form method="POST" action="{{ route('clients.departments.destroy', [$user, $department]) }}" data-confirm="Remove this department?">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
@@ -1823,7 +1823,7 @@
                                 <td class="py-2 text-ink-500">{{ $subUser->clientProfile?->department?->name ?? '—' }}</td>
                                 <td class="py-2 text-right">
                                     <button type="button" onclick="document.getElementById('edit-subuser-{{ $subUser->id }}').classList.toggle('hidden')" class="text-xs font-medium text-[var(--brand-primary)] hover:underline">Edit</button>
-                                    <form method="POST" action="{{ route('clients.sub-users.destroy', [$user, $subUser]) }}" class="inline" onsubmit="return confirm('Remove this user?');">
+                                    <form method="POST" action="{{ route('clients.sub-users.destroy', [$user, $subUser]) }}" class="inline" data-confirm="Remove this user?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="ml-3 text-xs font-medium text-status-exception hover:underline">Remove</button>
@@ -1915,7 +1915,7 @@
                                 <td class="py-2"><a href="{{ $document->url }}" target="_blank" class="text-[var(--brand-primary)] hover:underline">{{ $document->original_filename }}</a></td>
                                 <td class="py-2 text-ink-500">{{ $document->created_at->format('j M Y') }}</td>
                                 <td class="py-2 text-right">
-                                    <form method="POST" action="{{ route('clients.documents.destroy', [$user, $document]) }}" onsubmit="return confirm('Remove this document?');">
+                                    <form method="POST" action="{{ route('clients.documents.destroy', [$user, $document]) }}" data-confirm="Remove this document?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Remove</button>
@@ -1989,7 +1989,7 @@
                             <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">API Key</span><code class="font-mono text-xs text-ink-900">{{ $apiClient->api_key }}</code></div>
                             <div class="flex justify-between border-b border-line py-1.5"><span class="text-ink-500">Status</span><span class="text-ink-900">{{ $apiClient->is_active ? 'Active' : 'Inactive' }}</span></div>
                         </div>
-                        <form method="POST" action="{{ route('clients.api-access.generate', [$user, $account]) }}" class="mb-4" onsubmit="return confirm('Regenerate the {{ $modeLabel }} key? The existing key/secret stop working immediately.');">
+                        <form method="POST" action="{{ route('clients.api-access.generate', [$user, $account]) }}" class="mb-4" data-confirm="Regenerate the {{ $modeLabel }} key? The existing key/secret stop working immediately.">
                             @csrf
                             <input type="hidden" name="mode" value="{{ $mode }}">
                             <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Regenerate key/secret</button>

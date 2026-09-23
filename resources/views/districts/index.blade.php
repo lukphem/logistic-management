@@ -56,7 +56,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $district->onforwardingClassification?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('districts.edit', $district) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('districts.destroy', $district) }}" class="inline" onsubmit="return confirm('Remove this district/area?')">
+                            <form method="POST" action="{{ route('districts.destroy', $district) }}" class="inline" data-confirm="Remove this district/area?">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

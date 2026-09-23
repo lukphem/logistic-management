@@ -46,7 +46,7 @@
                         </td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('service-types.edit', $serviceType) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('service-types.destroy', $serviceType) }}" class="inline" onsubmit="return confirm('Remove this service type? Shipments already using it keep their record, but it will no longer be selectable.')">
+                            <form method="POST" action="{{ route('service-types.destroy', $serviceType) }}" class="inline" data-confirm="Remove this service type? Shipments already using it keep their record, but it will no longer be selectable.">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

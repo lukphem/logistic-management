@@ -476,5 +476,61 @@
             backdrop?.addEventListener('click', closeSidebar);
         })();
     </script>
+
+    {{-- A styled confirmation modal, shared by every page through
+         this one layout, replacing the browser's plain confirm().
+         Two ways to use it:
+         1. Add data-confirm="message" to any form tag — its normal
+            submission is intercepted, the modal shows that message,
+            and the form actually submits, bypassing this listener
+            entirely, only if the person confirms.
+         2. Call window.confirmDialog("message").then(ok => ...) from
+            any script for a non-form action (an AJAX call, a
+            multi-step JS flow) — resolves true/false. --}}
+    <div id="confirm-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+        <div class="w-full max-w-sm rounded-xl bg-surface-0 p-5 shadow-xl">
+            <p id="confirm-modal-message" class="text-sm text-ink-900"></p>
+            <div class="mt-5 flex justify-end gap-2">
+                <button type="button" id="confirm-modal-cancel" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Cancel</button>
+                <button type="button" id="confirm-modal-confirm" class="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">Confirm</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        (function () {
+            const modal = document.getElementById('confirm-modal');
+            const messageEl = document.getElementById('confirm-modal-message');
+            const cancelBtn = document.getElementById('confirm-modal-cancel');
+            const confirmBtn = document.getElementById('confirm-modal-confirm');
+            let pendingResolve = null;
+
+            function openModal(message) {
+                messageEl.textContent = message;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                return new Promise(resolve => { pendingResolve = resolve; });
+            }
+
+            function closeModal(result) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                pendingResolve?.(result);
+                pendingResolve = null;
+            }
+
+            cancelBtn.addEventListener('click', () => closeModal(false));
+            confirmBtn.addEventListener('click', () => closeModal(true));
+            modal.addEventListener('click', e => { if (e.target === modal) closeModal(false); });
+
+            window.confirmDialog = openModal;
+
+            document.addEventListener('submit', function (e) {
+                const form = e.target;
+                if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
+                e.preventDefault();
+                openModal(form.dataset.confirm).then(ok => { if (ok) form.submit(); });
+            });
+        })();
+    </script>
 </body>
 </html>

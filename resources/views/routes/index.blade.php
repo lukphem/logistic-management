@@ -40,7 +40,7 @@
                         <td class="px-5 py-3 text-ink-500">{{ $route->districts_count }}</td>
                         <td class="px-5 py-3 text-right">
                             <a href="{{ route('routes.edit', $route) }}" class="text-sm font-medium text-[var(--brand-primary)] hover:underline">Edit</a>
-                            <form method="POST" action="{{ route('routes.destroy', $route) }}" class="inline" onsubmit="return confirm('Remove this route? Its cities/districts will simply become unassigned.')">
+                            <form method="POST" action="{{ route('routes.destroy', $route) }}" class="inline" data-confirm="Remove this route? Its cities/districts will simply become unassigned.">
                                 @csrf @method('DELETE')
                                 <button type="submit" class="ml-3 text-sm font-medium text-status-exception transition-colors hover:text-status-exception/70">Remove</button>
                             </form>

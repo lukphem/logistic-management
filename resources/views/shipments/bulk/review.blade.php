@@ -32,7 +32,7 @@
                                 <td class="p-2.5">{{ $row->receiver_name ?? '—' }}</td>
                                 <td class="p-2.5 text-status-exception">{{ implode(' ', $row->errors ?? []) }}</td>
                                 <td class="p-2.5 text-right">
-                                    <form method="POST" action="{{ route('shipments.bulk.rows.destroy', [$batch, $row]) }}" onsubmit="return confirm('Remove this row?');">
+                                    <form method="POST" action="{{ route('shipments.bulk.rows.destroy', [$batch, $row]) }}" data-confirm="Remove this row?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Delete</button>
@@ -78,7 +78,7 @@
                                 <td class="p-2.5">{{ $row->row_data['weight_kg'] ? $row->row_data['weight_kg'] . ' kg' : '—' }}</td>
                                 <td class="p-2.5">{{ $row->row_data['is_cod'] ? number_format($row->row_data['cod_amount'], 2) : '—' }}</td>
                                 <td class="p-2.5 text-right">
-                                    <form method="POST" action="{{ route('shipments.bulk.rows.destroy', [$batch, $row]) }}" onsubmit="return confirm('Remove this row?');">
+                                    <form method="POST" action="{{ route('shipments.bulk.rows.destroy', [$batch, $row]) }}" data-confirm="Remove this row?">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="text-xs font-medium text-status-exception hover:underline">Delete</button>

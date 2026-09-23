@@ -11431,3 +11431,70 @@ app/Models/Shipment.php   (hasCollectedPayment())
 app/Http/Controllers/Web/ShipmentController.php   (destroy() blocks on collected payment)
 resources/views/shipments/show.blade.php   (Cancel button reflects payment state up front)
 ```
+
+## Increment 193 — Styled Confirmation Modal, Replacing the Browser's Plain confirm()
+
+New shared modal in the app layout, available on every page that
+uses it — one design, matching the rest of the app, instead of the
+browser's plain, unstyled `confirm()` dialog. Two ways to use it:
+
+- **`data-confirm="message"` on any `<form>`** — its normal
+  submission is intercepted, the modal shows that message, and the
+  form actually submits (bypassing the listener entirely, since
+  `form.submit()` doesn't fire a `submit` event) only if confirmed.
+  This covers the vast majority of cases — every "Remove this X?" /
+  "Cancel this shipment?" style confirmation across the app is
+  exactly this pattern.
+- **`window.confirmDialog('message').then(ok => ...)`** for anything
+  that isn't a plain form submission — a dynamic message computed at
+  the moment of the click, or a confirmation gating an AJAX call
+  rather than a page navigation.
+
+### Converted every confirm() in the app — 48 total, across 31 files
+
+45 followed the exact same `onsubmit="return confirm('...')"` shape
+and were converted mechanically to `data-confirm="..."` (script-
+generated, then every single transformation reviewed before
+applying, since blade interpolations and escaped characters needed
+to survive the move from a JS string to an HTML attribute intact).
+The remaining 3 were embedded in larger JS flows — a delivery-scan
+batch confirmation, an operational-scan batch confirmation, and a
+trip-creation submit handler with a dynamically-built message — each
+converted individually to `window.confirmDialog(...).then(...)`.
+
+### Two false-positive balance-check failures worth noting, not bugs
+
+The automated balance checker flagged `app.blade.php` and
+`operational-scans/delivery.blade.php` — both verified by hand
+(stripping blade comments, counting script-block braces/parens
+directly) to be genuinely balanced. The checker has a known
+limitation with multi-line `{{-- --}}` comments and certain
+template-literal edge cases; simplified one comment's wording to
+remove an ambiguous quoted word, but the two remaining flags are
+confirmed false positives, not real issues.
+
+### Verified
+
+Full repo PHP balance check: clean across 129 files (view-only
+changes this round). Balance-checked all 28 mechanically-converted
+files as a batch — clean. Manually verified the 3 JS-restructured
+files' script blocks are balanced. Confirmed zero native `confirm()`
+calls remain anywhere in the app (the only remaining match is the
+layout's own doc comment naming it). Spot-checked the trickiest
+conversions directly — an HTML-entity-escaped message and a
+Blade-interpolated tracking number both render correctly as valid
+HTML with the new attribute.
+
+### Files
+
+```
+resources/views/components/layouts/app.blade.php   (shared modal + data-confirm/window.confirmDialog)
+resources/views/operational-scans/delivery.blade.php   (window.confirmDialog)
+resources/views/operational-scans/index.blade.php   (window.confirmDialog)
+resources/views/manifests/trips/create.blade.php   (window.confirmDialog)
++ 28 files mechanically converted to data-confirm: additional-services, cities, clients, countries,
+  country-regions, districts, fleet-billing, hubs, manifests (edit + trip show), onforwarding-classifications,
+  origin-destination-billing, outlets, regions, roles, routes, scan-statuses, service-types, shipments
+  (bulk review + show), standard-billing, states, territories, units, users, vehicle-types,
+  zone-mappings, zones
+```
