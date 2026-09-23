@@ -67,6 +67,19 @@ class ScanService
             throw new \RuntimeException("{$shipment->tracking_number} is already in the company's custody — it's already been picked up or dropped off, so this can't be done again.");
         }
 
+        // A shipment booked for Paystack collection but not yet
+        // actually paid for shouldn't be allowed into the company's
+        // possession at all — taking physical custody of something
+        // that's never been paid for is exactly the risk this closes,
+        // on top of the printing/tracking restrictions already in
+        // place for the same unpaid state. Scoped to first-touch
+        // specifically: a shipment already in custody isn't re-gated
+        // by this on every later scan, only at the point custody
+        // would first begin.
+        if ($newStatus?->is_first_touch && $shipment->isPaymentPending()) {
+            throw new \RuntimeException("{$shipment->tracking_number} is awaiting Paystack payment and can't be picked up or dropped off until it's confirmed paid.");
+        }
+
         $hubId = $data['hub_id'] ?? null;
         $outletId = $data['outlet_id'] ?? null;
 

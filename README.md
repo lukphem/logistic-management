@@ -11303,3 +11303,36 @@ app/Http/Controllers/Api/ShipmentController.php   (stores transit_days)
 app/Http/Controllers/Api/ClientShipmentController.php   (stores transit_days)
 resources/views/tracking/show.blade.php   (payment-pending branch, masked tracking number)
 ```
+
+## Increment 190 — Unpaid Paystack Shipments Can't Enter Company Possession
+
+Closes the remaining gap from the previous round: printing and
+tracking were already blocked for an unpaid Paystack shipment, but
+staff could still physically scan it as Picked Up or Dropped Off —
+taking the company into custody of something never actually paid
+for. New guard in `ScanService::recordScan()`, right alongside the
+existing first-touch checks: a shipment awaiting Paystack payment
+can't be picked up or dropped off until it's confirmed paid.
+
+Scoped specifically to first-touch (Pickup/Drop-off), not every scan
+— a shipment already in custody isn't re-gated by this on later
+scans, only at the point custody would first begin. Since this lives
+in the one shared `ScanService`, it applies automatically everywhere
+a scan can originate — the staff web app, the mobile rider app, and
+the dedicated delivery-scan flow — no per-controller changes needed.
+
+### Verified
+
+Balance-checked, duplicate-checked. Full repo balance check: clean
+across 129 files. Confirmed all three scan entry points
+(`RiderController`, `OperationalScanController`,
+`DeliveryScanController`) funnel through this one method. Simulated
+the block condition across 3 cases and verified against live MySQL
+data — blocked while pending, correctly unblocked the moment
+`payment_status` flips to `paid`.
+
+### Files
+
+```
+app/Services/ScanService.php   (first-touch scan blocked for a payment-pending shipment)
+```
