@@ -20,7 +20,7 @@ class Shipment extends Model
         'collection_method', 'cash_collected_at', 'cash_settlement_id',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_unit_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
-        'sla_breached', 'promised_delivery_at', 'delivered_at',
+        'sla_breached', 'promised_delivery_at', 'transit_days', 'delivered_at',
     ];
 
     protected $casts = [
@@ -266,6 +266,20 @@ class Shipment extends Model
     public function bulkShipmentBatch(): BelongsTo
     {
         return $this->belongsTo(\App\Models\BulkShipmentBatch::class);
+    }
+
+    /**
+     * A shipment marked for Paystack collection but not yet actually
+     * paid for — printed documents (waybill, label) carry a real,
+     * usable tracking number, so handing one out before payment is
+     * confirmed would let someone walk away with proof of a shipment
+     * they never actually paid for. Cash and credit/deferred
+     * shipments are never gated by this — only "pay after booking"
+     * via Paystack has a real gap between booking and payment.
+     */
+    public function isPaymentPending(): bool
+    {
+        return $this->collection_method === 'paystack' && $this->payment_status !== 'paid';
     }
 
     public function currentOutlet(): BelongsTo

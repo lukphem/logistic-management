@@ -89,7 +89,8 @@ class ShipmentCreationService
         return Shipment::create([
             ...$data,
             'shipping_type' => $quote['shipping_type'],
-            'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
+            'promised_delivery_at' => null,
+            'transit_days' => $quote['transit_days'] ?? null,
             ...$pricing,
             ...$collectionMethod,
         ]);

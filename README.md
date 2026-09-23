@@ -11234,3 +11234,72 @@ resources/views/shipments/create.blade.php   (Deferred option added, required/hi
 resources/views/shipments/bulk/create.blade.php   (Deferred option added, matching JS logic)
 app/Http/Controllers/Web/BulkShipmentController.php   (payment_method validation allows deferred, required-for-non-credit check, no longer null'd for credit)
 ```
+
+## Increment 189 — Paystack Fraud Prevention + SLA Starts at Actual Possession
+
+Two separate requests, delivered together.
+
+### Unpaid Paystack shipments can't be printed or fully tracked
+
+New `Shipment::isPaymentPending()` — true only for a shipment marked
+for Paystack collection that hasn't actually been confirmed paid yet
+(cash and credit/deferred shipments are never affected). Blocks:
+
+- **Single-shipment waybill and label printing** — outright refused
+  with a clear message until payment is confirmed
+- **Bulk batch label printing** — filtered per-shipment (a batch's
+  shipments can end up on separate Paystack transactions with
+  different payment states even though they share one payment
+  method), with a note on the print toolbar showing how many were
+  skipped as still pending
+- **Public tracking lookup** — shows only "Payment pending" with a
+  partially masked tracking number (e.g. `LM26••••••••RT`), never
+  the full timeline or details a real, in-progress shipment would
+  show. Deliberately left the **internal staff tracking page**
+  unmasked — staff still need full details to actually chase the
+  payment down; this is specifically about what an external lookup
+  can reveal.
+
+### SLA now starts at the first Pickup or Drop-off scan, not at booking
+
+A shipment that's only been booked and never actually picked up or
+dropped off is still entirely outside the company's possession — the
+promised delivery date used to be calculated the moment it was
+booked, which was never accurate. New `transit_days` column on
+`shipments` preserves what the quote actually promised (previously
+computed into a delivery date immediately and then discarded); all
+four shipment-creation paths (web form, bulk import, both API
+controllers, and the quote-booking flow) now store this instead of
+calculating `promised_delivery_at` right away. `ScanService::recordScan()`
+calculates it for real the moment the shipment genuinely enters
+custody — the exact same "first touch, coming from booked" condition
+already used to gate which scans are even allowed first, so it fires
+exactly once per shipment.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every touched file. Full repo balance check: clean across 234 files.
+Confirmed against live MySQL: a shipment's `payment_status` flipping
+to `paid` correctly flips `isPaymentPending()` from blocking to
+allowed; a booked shipment correctly shows no promised delivery date
+at all (transit_days preserved) until a real pickup scan sets it,
+calculated from the actual scan time rather than the original
+booking time. Simulated the first-touch SLA-start condition across 4
+cases, all correct. Confirmed the not-yet-built SLA-breach scheduled
+job (noted in an existing code comment) has no live logic that this
+change could affect.
+
+### Files
+
+```
+database/migrations/2026_04_01_000001_add_transit_days_to_shipments.php
+app/Models/Shipment.php   (isPaymentPending(), transit_days fillable)
+app/Http/Controllers/Web/ShipmentController.php   (waybill/label printing guard, storeFromQuote() stores transit_days)
+app/Http/Controllers/Web/BulkShipmentController.php   (per-shipment payment-pending filter on batch printing)
+app/Services/ShipmentCreationService.php   (stores transit_days instead of computing promised_delivery_at)
+app/Services/ScanService.php   (promised_delivery_at set at first-touch scan)
+app/Http/Controllers/Api/ShipmentController.php   (stores transit_days)
+app/Http/Controllers/Api/ClientShipmentController.php   (stores transit_days)
+resources/views/tracking/show.blade.php   (payment-pending branch, masked tracking number)
+```

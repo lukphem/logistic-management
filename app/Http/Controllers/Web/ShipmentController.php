@@ -162,6 +162,7 @@ class ShipmentController extends Controller
     public function label(Request $request, Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+        abort_if($shipment->isPaymentPending(), 403, 'This shipment is awaiting Paystack payment and cannot be printed until it\'s confirmed paid.');
 
         $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientAccount']);
         $settings = Setting::current();
@@ -226,6 +227,7 @@ class ShipmentController extends Controller
     public function waybillDocument(Shipment $shipment): View
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+        abort_if($shipment->isPaymentPending(), 403, 'This shipment is awaiting Paystack payment and cannot be printed until it\'s confirmed paid.');
 
         $shipment->load(['serviceType', 'originCity', 'destinationCity', 'originHub', 'destinationHub', 'clientUser', 'clientAccount']);
         $settings = Setting::current();
@@ -609,7 +611,8 @@ class ShipmentController extends Controller
             'insurance_amount' => $result['insurance_amount'] ?? 0,
             'vat_amount' => $result['vat_amount'] ?? 0,
             'total_amount' => $result['total_amount'] ?? 0,
-            'promised_delivery_at' => ($result['transit_days'] ?? null) ? now()->addDays($result['transit_days']) : null,
+            'promised_delivery_at' => null,
+            'transit_days' => $result['transit_days'] ?? null,
             ...$this->resolveCollectionMethod($data),
         ]);
 

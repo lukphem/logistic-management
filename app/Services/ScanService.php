@@ -97,6 +97,19 @@ class ScanService
             'delivered_at' => $data['status'] === 'delivered' ? now() : $shipment->delivered_at,
         ];
 
+        // The SLA clock starts here, not at booking — a shipment
+        // that's only been booked and never actually picked up or
+        // dropped off is still outside the company's possession
+        // entirely, so a promised delivery date calculated from the
+        // moment of booking was never really accurate. This is the
+        // exact same "first touch, coming from booked" condition
+        // already checked above to gate which scans are even allowed
+        // first, so it fires exactly once per shipment, the first
+        // time it genuinely enters custody.
+        if ($newStatus?->is_first_touch && $shipment->current_status === 'booked' && $shipment->transit_days) {
+            $shipmentUpdate['promised_delivery_at'] = now()->addDays($shipment->transit_days);
+        }
+
         if ($hubId) {
             $shipmentUpdate['current_hub_id'] = $hubId;
             $shipmentUpdate['current_outlet_id'] = $outletId; // null clears it when scanning at the hub itself

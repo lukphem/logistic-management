@@ -151,11 +151,24 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             abort(404, 'No shipments have been created under this batch yet.');
         }
 
+        // A shipment awaiting Paystack payment doesn't get a printed
+        // label until it's confirmed paid — same rule as printing a
+        // single shipment, just applied per-row here since a batch's
+        // shipments can end up with different payment statuses even
+        // though they share one payment_method (each is its own
+        // Paystack transaction).
+        $printableShipments = $batch->shipments->reject->isPaymentPending();
+        $pendingCount = $batch->shipments->count() - $printableShipments->count();
+
+        if ($printableShipments->isEmpty()) {
+            abort(403, 'Every shipment in this batch is still awaiting Paystack payment — nothing to print yet.');
+        }
+
         $styleBlock = null;
         $scriptBlock = null;
         $pageBlocks = [];
 
-        foreach ($batch->shipments as $shipment) {
+        foreach ($printableShipments as $shipment) {
             $totalPieces = max((int) ($shipment->quantity ?? 1), 1);
             $pieces = [];
             for ($i = 1; $i <= $totalPieces; $i++) {
@@ -197,11 +210,13 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             }
         }
 
+        $pendingNote = $pendingCount > 0 ? " <span style=\"margin-left:8px;color:#b45309;font-size:12px;\">{$pendingCount} shipment(s) skipped — still awaiting payment</span>" : '';
+
         $combined = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Labels — ' . $batch->batch_number . '</title>'
             . $styleBlock
             . '<style>.toolbar{display:flex;align-items:center;gap:12px;padding:10px;background:#f2f2f2;border-bottom:2px solid #ccc;}.print-btn{padding:8px 16px;font-size:13px;border:1px solid #111;background:#111;color:#fff;border-radius:4px;cursor:pointer;}@media print{.toolbar{display:none!important;}}</style>'
             . '</head><body>'
-            . '<div class="toolbar"><button class="print-btn" onclick="window.print()">Print all ' . count($pageBlocks) . ' label(s)</button></div>'
+            . '<div class="toolbar"><button class="print-btn" onclick="window.print()">Print all ' . count($pageBlocks) . ' label(s)</button>' . $pendingNote . '</div>'
             . implode('', $pageBlocks)
             . $scriptBlock
             . '</body></html>';

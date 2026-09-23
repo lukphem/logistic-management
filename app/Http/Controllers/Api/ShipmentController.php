@@ -65,7 +65,8 @@ class ShipmentController extends Controller
         $shipment = Shipment::create([
             ...$data,
             'shipping_type' => $quote['shipping_type'],
-            'promised_delivery_at' => $quote['transit_days'] ? now()->addDays($quote['transit_days']) : null,
+            'promised_delivery_at' => null,
+            'transit_days' => $quote['transit_days'] ?? null,
             ...$pricing,
             // cod_amount is a not-null column with its own DB default
             // (0.00) - but that default only applies when the column

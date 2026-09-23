@@ -37,6 +37,19 @@
                 <p class="mt-1 text-sm text-ink-500">We couldn't find anything for tracking number <span class="font-mono">{{ $trackingNumber }}</span>. Double-check the number and try again.</p>
                 <a href="{{ route('tracking.search') }}" class="mt-4 inline-block rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Try again</a>
             </div>
+        @elseif ($shipment->isPaymentPending())
+            {{-- Deliberately doesn't reveal the shipment's real
+                 details or full tracking number here — a shipment
+                 booked for online payment that hasn't actually been
+                 paid for yet shouldn't be traceable as if it were a
+                 real, in-progress shipment; that's exactly the kind
+                 of "proof" someone could otherwise walk away with
+                 without ever paying. --}}
+            <div class="rounded-xl border border-line bg-white shadow-sm p-8 text-center">
+                <p class="text-lg font-semibold text-ink-900">Payment pending</p>
+                <p class="mt-1 text-sm text-ink-500">This shipment (<span class="font-mono">{{ substr($trackingNumber, 0, 4) }}{{ str_repeat('•', max(strlen($trackingNumber) - 6, 3)) }}{{ substr($trackingNumber, -2) }}</span>) is awaiting online payment and hasn't started moving yet.</p>
+                <a href="{{ route('tracking.search') }}" class="mt-4 inline-block rounded-md bg-[var(--brand-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">Track another shipment</a>
+            </div>
         @else
             <div class="rounded-xl border border-line bg-white shadow-sm p-6">
                 <div class="flex items-start justify-between gap-3">
