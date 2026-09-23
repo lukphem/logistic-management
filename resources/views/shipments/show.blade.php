@@ -56,6 +56,15 @@
                     <a href="{{ route('shipments.edit', $shipment) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Edit</a>
                 @endif
             @endcan
+            @can('shipments:delete')
+                @if ($shipment->current_status === 'booked')
+                    <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" onsubmit="return confirm('Cancel {{ $shipment->tracking_number }}? This only works before it\'s been picked up or dropped off.');">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
+                    </form>
+                @endif
+            @endcan
             <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />
         </div>
     </div>

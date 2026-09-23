@@ -11336,3 +11336,53 @@ data — blocked while pending, correctly unblocked the moment
 ```
 app/Services/ScanService.php   (first-touch scan blocked for a payment-pending shipment)
 ```
+
+## Increment 191 — Shipment Cancellation (Never Hard-Delete)
+
+Implements the design discussed: cancelling a shipment is a status
+transition, not a `DELETE` — a tracking number, once issued, stays
+resolvable ("Cancelled," not a confusing "not found"), the record
+stays available for audit/reporting, and a mistaken cancellation can
+still be reversed where a hard delete never could be.
+
+### Only cancellable while still `booked`, never touched
+
+`ShipmentController::destroy()` only allows the transition while
+`current_status` is still exactly `booked` — the same "never
+actually entered the company's possession" boundary used everywhere
+else in this app. Anything with real scan history, payment
+collected, or manifest/batch involvement has operational and
+financial weight a cancel action shouldn't be able to erase, and is
+blocked with a clear message instead.
+
+### Reused existing infrastructure end-to-end, nothing new needed
+
+- **`shipments:delete` permission** already existed (auto-generated
+  by the existing modules × actions seeder loop) and was already
+  correctly scoped by default — Ops Manager has it via the
+  whole-module grant, Hub Staff doesn't, matching the "reserve this
+  for supervisors, not front-line booking staff" reasoning discussed.
+- **The `cancelled` scan status** already existed, already marked
+  `is_terminal`, so the existing `ScanService::recordScan()` guard
+  automatically refuses any further scan on a cancelled shipment —
+  no new code needed there at all.
+
+New "Cancel Shipment" button on the shipment page, shown only when
+both the permission and the `booked` condition are met.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, crash-
+pattern-scanned. Full repo balance check: clean across 129 files.
+Verified the `booked` → `cancelled` transition against live MySQL.
+Confirmed the pre-existing `shipments:delete` permission's default
+role scoping matches the intended supervisor-only access without any
+seeder changes needed.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (destroy())
+resources/views/shipments/show.blade.php   (Cancel Shipment button)
+routes/web.php   (shipments.destroy)
+```

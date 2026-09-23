@@ -266,6 +266,32 @@ class ShipmentController extends Controller
         return view('shipments.edit', compact('shipment'));
     }
 
+    /**
+     * Cancels, never hard-deletes — a tracking number, once issued,
+     * needs to stay resolvable ("Cancelled," not a confusing "not
+     * found"), the booking/cancellation pattern is itself useful
+     * data, and a wrong cancellation can be undone where a hard
+     * delete never could be. Only allowed while a shipment is still
+     * exactly 'booked' — the same boundary used everywhere else in
+     * this app for "never actually entered the company's
+     * possession" — since anything with real scan history, payment
+     * collected, or manifest/batch involvement has operational and
+     * financial weight that a delete action shouldn't be able to
+     * erase.
+     */
+    public function destroy(Shipment $shipment): RedirectResponse
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        if ($shipment->current_status !== 'booked') {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment can't be cancelled — it's already been picked up, dropped off, or otherwise processed."]);
+        }
+
+        $shipment->update(['current_status' => 'cancelled']);
+
+        return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled.");
+    }
+
     public function update(Request $request, Shipment $shipment): RedirectResponse
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");

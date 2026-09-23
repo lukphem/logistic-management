@@ -159,6 +159,14 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::put('/shipments/{shipment}', [ShipmentController::class, 'update'])->name('shipments.update');
     });
 
+    // Cancelling, not deleting - a separate, more sensitive
+    // permission than shipments:update, per the same "reserve this
+    // for supervisors, not front-line booking staff" reasoning
+    // documented on the controller action itself.
+    Route::middleware('can:shipments:delete')->group(function () {
+        Route::delete('/shipments/{shipment}', [ShipmentController::class, 'destroy'])->name('shipments.destroy');
+    });
+
     // System setup — gated to whoever holds settings:update (Super Admin, Finance-read only sees nothing here).
     Route::middleware('can:settings:update')->group(function () {
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');
