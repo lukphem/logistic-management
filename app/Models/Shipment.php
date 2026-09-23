@@ -282,6 +282,22 @@ class Shipment extends Model
         return $this->collection_method === 'paystack' && $this->payment_status !== 'paid';
     }
 
+    /**
+     * True once real money has actually changed hands for this
+     * shipment — cash physically collected, or a Paystack payment
+     * already confirmed. Distinct from isPaymentPending() (which is
+     * about a Paystack payment still outstanding): this is the
+     * opposite situation, payment already in — used to stop a
+     * cancellation from silently erasing the fact that the company
+     * is holding money for a shipment that no longer exists, until
+     * that payment is actually reversed through a proper refund.
+     */
+    public function hasCollectedPayment(): bool
+    {
+        return $this->cash_collected_at !== null
+            || ($this->collection_method === 'paystack' && $this->payment_status === 'paid');
+    }
+
     public function currentOutlet(): BelongsTo
     {
         return $this->belongsTo(Outlet::class, 'current_outlet_id');

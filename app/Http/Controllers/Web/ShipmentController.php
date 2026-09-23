@@ -287,6 +287,15 @@ class ShipmentController extends Controller
             return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment can't be cancelled — it's already been picked up, dropped off, or otherwise processed."]);
         }
 
+        // Cancelling a shipment that's already been paid for would
+        // silently erase the fact that the company is holding real
+        // money for something that no longer exists — that has to be
+        // resolved as an actual refund first, through the normal
+        // finance process, not quietly forgotten by a status change.
+        if ($shipment->hasCollectedPayment()) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment has already been paid for and can't be cancelled directly — the payment needs to be refunded first through the normal finance process."]);
+        }
+
         $shipment->update(['current_status' => 'cancelled']);
 
         return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled.");

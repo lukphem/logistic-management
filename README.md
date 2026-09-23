@@ -11386,3 +11386,48 @@ app/Http/Controllers/Web/ShipmentController.php   (destroy())
 resources/views/shipments/show.blade.php   (Cancel Shipment button)
 routes/web.php   (shipments.destroy)
 ```
+
+## Increment 192 — Cancellation Blocked Once Payment Is Actually Collected
+
+Closes a real gap in the previous round: `destroy()` only checked
+whether a shipment had been physically touched (`booked` status),
+not whether it had already been paid for. A walk-in shipment with
+cash already collected, or a Paystack payment already confirmed —
+both still `booked`, since payment can happen before pickup — could
+have been cancelled with no acknowledgment that real money was
+sitting collected for something that would no longer exist.
+
+New `Shipment::hasCollectedPayment()` — true once cash has actually
+been collected, or a Paystack payment has actually been confirmed
+paid (distinct from `isPaymentPending()`, which is about the
+opposite situation — payment still outstanding). `destroy()` now
+blocks cancellation outright once this is true, with a clear message
+pointing at the real fix: the payment needs to be refunded through
+the normal finance process first, not silently erased by a status
+change. No refund mechanism exists yet anywhere in this app (cash
+settlement or Paystack) — building one is a separate, substantial
+feature of its own; this is the safe, conservative default until
+that exists, matching how most financial systems require reversing
+a payment before voiding what it paid for.
+
+The Cancel Shipment button itself now reflects this up front —
+shown as a disabled, explained state rather than a button that's
+guaranteed to fail once clicked.
+
+### Verified
+
+Balance-checked, duplicate-checked, crash-pattern-scanned. Full repo
+balance check: clean across 129 files. Simulated
+`hasCollectedPayment()` across 5 scenarios (cash collected, Paystack
+paid, Paystack still pending, nothing collected, and the edge case of
+a chosen-but-not-yet-collected cash method) — all correct. Verified
+against live MySQL: a booked shipment with cash actually collected is
+correctly flagged as blocked.
+
+### Files
+
+```
+app/Models/Shipment.php   (hasCollectedPayment())
+app/Http/Controllers/Web/ShipmentController.php   (destroy() blocks on collected payment)
+resources/views/shipments/show.blade.php   (Cancel button reflects payment state up front)
+```

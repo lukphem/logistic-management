@@ -58,11 +58,15 @@
             @endcan
             @can('shipments:delete')
                 @if ($shipment->current_status === 'booked')
-                    <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" onsubmit="return confirm('Cancel {{ $shipment->tracking_number }}? This only works before it\'s been picked up or dropped off.');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
-                    </form>
+                    @if ($shipment->hasCollectedPayment())
+                        <span class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-400" title="Already paid for — refund through finance first, then cancel.">Cancel Shipment</span>
+                    @else
+                        <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" onsubmit="return confirm('Cancel {{ $shipment->tracking_number }}? This only works before it\'s been picked up or dropped off.');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
+                        </form>
+                    @endif
                 @endif
             @endcan
             <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />
