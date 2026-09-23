@@ -73,7 +73,7 @@ class ShipmentCreationService
             }
         }
 
-        $collectionMethod = $this->resolveCollectionMethod($data);
+        $collectionMethod = $this->resolveCollectionMethod($data, $resolvedAccount ?? null);
 
         return Shipment::create([
             ...$data,
@@ -84,8 +84,19 @@ class ShipmentCreationService
         ]);
     }
 
-    private function resolveCollectionMethod(array $data): array
+    /**
+     * A credit account is invoiced later, not paid at booking — this
+     * is enforced here, once, for both the web form and bulk import,
+     * rather than trusted to whichever form happened to hide the
+     * option client-side. Whatever payment_method the caller sent is
+     * simply ignored for a credit account, deferred regardless.
+     */
+    private function resolveCollectionMethod(array $data, ?ClientAccount $account): array
     {
+        if ($account?->isCreditAccount()) {
+            return [];
+        }
+
         if (($data['payment_method'] ?? null) === 'cash') {
             return ['collection_method' => 'cash', 'cash_collected_at' => now()];
         }

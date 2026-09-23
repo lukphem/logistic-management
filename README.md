@@ -11111,3 +11111,68 @@ match real, already-existing routes.
 ```
 resources/views/components/layouts/app.blade.php   (Shipping menu group)
 ```
+
+## Increment 187 — Payment Collection for Bulk Upload; Credit Accounts Always Deferred
+
+### The real gap found while investigating
+
+A credit account is meant to be invoiced later, never paid at
+booking — but the single-shipment form never actually enforced
+this. Its payment-method section (Cash/Paystack) was shown
+regardless of which account was selected, meaning a credit account's
+shipment *could* have a payment method attached to it by accident,
+which doesn't make sense once that account gets invoiced separately.
+Bulk upload had no payment collection step at all — every batch was
+effectively always deferred, even a walk-in customer paying cash for
+a whole batch on the spot.
+
+### Enforced once, centrally, for both flows
+
+`ShipmentCreationService::resolveCollectionMethod()` — the one place
+both the web form and bulk import already funnel through — now takes
+the resolved `ClientAccount` and ignores any submitted
+`payment_method` outright when it's a credit account, deferred
+regardless of what was sent. This is deliberately server-side and
+central rather than trusted to whichever form happened to hide the
+option client-side, so it can't be bypassed by a form that forgot
+the check, or a request that skips the UI's JS entirely.
+
+### Single-shipment form: the payment section now actually hides for credit accounts
+
+`accountBillingOptions()` now reports `is_credit_account`; the form's
+existing account-lookup JS hides the whole payment-method section
+(and clears any stray selection) the moment a credit account is
+resolved, showing it again for a walk-in or a non-credit account.
+
+### Bulk upload: a real payment step, for accounts that need one
+
+New `payment_method` on `bulk_shipment_batches`, collected in Step 1
+— hidden the moment a credit account is picked (same JS pattern,
+mirrored from the single form), shown by default for "Walk-in
+customer" and any non-credit account. Same cash/paystack gating the
+single form already respects (cash needs an outlet that actually
+accepts it, paystack needs the company setting on). Carried through
+`preview()`'s batch context so every shipment the batch produces
+gets marked paid the same way a single walk-in shipment would be.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every touched file. Full repo balance check: clean across 233 files.
+Simulated `resolveCollectionMethod()` across 6 cases, including the
+security-relevant one — a payment method submitted for a credit
+account is always ignored, even if the client-side hide were somehow
+bypassed. Verified `isCreditAccount()`'s resolution against live
+MySQL data for both a credit and a non-credit account.
+
+### Files
+
+```
+database/migrations/2026_03_31_000001_add_payment_method_to_bulk_shipment_batches.php
+app/Models/BulkShipmentBatch.php   (payment_method)
+app/Services/ShipmentCreationService.php   (resolveCollectionMethod() ignores payment_method for credit accounts)
+app/Http/Controllers/Web/ShipmentController.php   (accountBillingOptions() reports is_credit_account)
+app/Http/Controllers/Web/BulkShipmentController.php   (payment_method collected/validated/passed through)
+resources/views/shipments/create.blade.php   (payment section hides for credit accounts)
+resources/views/shipments/bulk/create.blade.php   (new payment method section, same hide behavior)
+```

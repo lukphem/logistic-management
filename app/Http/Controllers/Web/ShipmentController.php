@@ -386,6 +386,10 @@ class ShipmentController extends Controller
             'cod_enabled' => (bool) $account->cod_enabled,
             'is_pickup_chargeable' => (bool) $account->is_pickup_chargeable,
             'pickup_charge' => $account->pickup_charge,
+            // A credit account is invoiced later, not paid at booking
+            // — the payment-method section only makes sense for a
+            // walk-in or a non-credit account actually paying now.
+            'is_credit_account' => $account->isCreditAccount(),
         ]);
     }
 

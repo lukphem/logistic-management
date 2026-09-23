@@ -73,7 +73,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         [$hubs, $outlets, $originLabel] = $this->resolveOriginOptions($user);
 
         return view('shipments.bulk.create', [
-            'clientAccounts' => ClientAccount::orderBy('account_name')->get(['id', 'account_name', 'account_number']),
+            'clientAccounts' => ClientAccount::orderBy('account_name')->get(['id', 'account_name', 'account_number', 'payment_type']),
             'serviceTypes' => ServiceType::whereIn('billing_model', self::ALLOWED_BILLING_MODELS)->orderBy('name')->get(['id', 'name', 'billing_model']),
             'billingModels' => $billingModels,
             'originLabel' => $originLabel,
@@ -87,6 +87,12 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             // the same cascading dropdown pattern the bulk template
             // already uses.
             'states' => \App\Models\State::with('cities')->orderBy('name')->get(),
+            // Same gating the single-shipment form already uses —
+            // cash needs an outlet that actually accepts it (or no
+            // specific outlet at all), paystack needs the company-
+            // wide setting on.
+            'canCollectCash' => ! $user->outlet_id || (Outlet::find($user->outlet_id)?->can_collect_cash ?? true),
+            'paystackEnabled' => Setting::current()->paystack_enabled,
         ]);
     }
 
@@ -240,6 +246,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => 'required|exists:cities,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'origin_outlet_id' => 'nullable|exists:outlets,id',
+            'payment_method' => 'nullable|string|in:cash,paystack',
         ]);
 
         [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user, $data['origin_hub_id'] ?? null, $data['origin_outlet_id'] ?? null);
@@ -263,6 +270,12 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => $data['origin_city_id'],
             'origin_hub_id' => $originHubId,
             'origin_outlet_id' => $originOutletId,
+            // A credit account is invoiced later regardless of what
+            // was submitted here — the real enforcement is central,
+            // in ShipmentCreationService, but there's no reason for
+            // the batch's own record to carry a payment method that
+            // will never actually be used.
+            'payment_method' => $account?->isCreditAccount() ? null : ($data['payment_method'] ?? null),
             'created_by_user_id' => $user->id,
         ]);
 
@@ -326,6 +339,11 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => $batch->origin_city_id,
             'sender_name' => $batch->sender_name,
             'sender_phone' => $batch->sender_phone,
+            // Ignored entirely for a credit account regardless (see
+            // ShipmentCreationService::resolveCollectionMethod), but
+            // for a walk-in/non-credit account this is what actually
+            // marks every shipment the batch produces as paid now.
+            'payment_method' => $batch->payment_method,
         ];
 
         $result = $this->import->validateRows($rows, $batchContext);

@@ -59,10 +59,10 @@
 
             <div>
                 <label class="mb-1 block text-sm font-medium text-ink-900">Client account</label>
-                <select name="client_account_id" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                    <option value="">Walk-in customer</option>
+                <select name="client_account_id" id="client-account-select" class="w-full rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                    <option value="" data-payment-type="">Walk-in customer</option>
                     @foreach ($clientAccounts as $account)
-                        <option value="{{ $account->id }}" @selected(old('client_account_id') == $account->id)>{{ $account->account_name }} ({{ $account->account_number }})</option>
+                        <option value="{{ $account->id }}" data-payment-type="{{ $account->payment_type }}" @selected(old('client_account_id') == $account->id)>{{ $account->account_name }} ({{ $account->account_number }})</option>
                     @endforeach
                 </select>
                 <p class="mt-1 text-xs text-ink-500">Leave as "Walk-in customer" for a cash batch not billed to any registered account.</p>
@@ -139,6 +139,26 @@
                 <p class="mt-1 text-xs text-ink-500">Applies to every shipment in this batch.</p>
             </div>
 
+            @if ($canCollectCash || $paystackEnabled)
+                <div id="payment-method-section" class="rounded-lg border border-dashed border-line p-4">
+                    <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Payment method <span class="normal-case text-ink-400">(for a walk-in or non-credit account paying now — leave unselected for a credit account, invoiced later)</span></p>
+                    <div class="flex flex-wrap gap-6">
+                        @if ($canCollectCash)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="cash" @checked(old('payment_method') === 'cash') class="border-line">
+                                Cash — collected now
+                            </label>
+                        @endif
+                        @if ($paystackEnabled)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="paystack" @checked(old('payment_method') === 'paystack') class="border-line">
+                                Paystack — pay after booking
+                            </label>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <button type="submit" class="w-full rounded-md bg-[var(--brand-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90">
                 Create batch &amp; continue to upload
             </button>
@@ -208,6 +228,27 @@
         }
 
         originStateSelect.addEventListener('change', syncOriginCityOptions);
+
+        // A credit account is invoiced later, not paid at booking —
+        // same rule, same reasoning as the single-shipment form.
+        // Walk-in (no value selected) always shows it, since a
+        // walk-in has no account to defer payment to.
+        const clientAccountSelect = document.getElementById('client-account-select');
+        const paymentMethodSection = document.getElementById('payment-method-section');
+
+        function syncPaymentMethodVisibility() {
+            if (!paymentMethodSection) return;
+            const isCredit = clientAccountSelect.selectedOptions[0]?.dataset.paymentType === 'credit';
+            if (isCredit) {
+                paymentMethodSection.classList.add('hidden');
+                paymentMethodSection.querySelectorAll('input[name="payment_method"]').forEach(el => el.checked = false);
+            } else {
+                paymentMethodSection.classList.remove('hidden');
+            }
+        }
+
+        clientAccountSelect.addEventListener('change', syncPaymentMethodVisibility);
+        syncPaymentMethodVisibility();
     </script>
 
 </x-layouts.app>

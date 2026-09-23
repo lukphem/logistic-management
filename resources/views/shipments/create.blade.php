@@ -426,7 +426,7 @@
             </div>
 
             @if ((! $bookingOutlet || $bookingOutlet->can_collect_cash) || $paystackEnabled)
-                <div class="rounded-lg border border-dashed border-line p-4">
+                <div id="payment-method-section" class="rounded-lg border border-dashed border-line p-4">
                     <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Payment method <span class="normal-case text-ink-400">(for a walk-in paying now — leave unselected for an account-based shipment)</span></p>
                     <div class="flex flex-wrap gap-6">
                         @if (! $bookingOutlet || $bookingOutlet->can_collect_cash)
@@ -744,6 +744,22 @@
                 billingModelSelect.querySelectorAll('option').forEach(o => o.style.display = '');
                 serviceTypeSelect.querySelectorAll('option').forEach(o => o.style.display = '');
                 resetCodAndPickup();
+                applyPaymentMethodVisibility(false);
+            }
+
+            // A credit account is invoiced later, not paid at booking
+            // — the payment-method section (and whatever was picked
+            // in it) only makes sense for a walk-in or a genuinely
+            // non-credit account actually paying now.
+            function applyPaymentMethodVisibility(isCreditAccount) {
+                const section = document.getElementById('payment-method-section');
+                if (!section) return;
+                if (isCreditAccount) {
+                    section.classList.add('hidden');
+                    section.querySelectorAll('input[name="payment_method"]').forEach(el => el.checked = false);
+                } else {
+                    section.classList.remove('hidden');
+                }
             }
 
             function resetCodAndPickup() {
@@ -794,6 +810,7 @@
                 if (billingModelSelect.selectedOptions[0]?.style.display === 'none') billingModelSelect.value = '';
                 if (serviceTypeSelect.selectedOptions[0]?.style.display === 'none') { serviceTypeSelect.value = ''; syncFieldsForServiceType(); }
                 applyCodAndPickup(data);
+                applyPaymentMethodVisibility(data.is_credit_account);
             }
 
             function lookupAccount() {
