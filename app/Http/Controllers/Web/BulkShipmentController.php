@@ -246,7 +246,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => 'required|exists:cities,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'origin_outlet_id' => 'nullable|exists:outlets,id',
-            'payment_method' => 'nullable|string|in:cash,paystack',
+            'payment_method' => 'nullable|string|in:cash,paystack,deferred',
         ]);
 
         [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user, $data['origin_hub_id'] ?? null, $data['origin_outlet_id'] ?? null);
@@ -256,6 +256,14 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         }
 
         $account = ! empty($data['client_account_id']) ? ClientAccount::find($data['client_account_id']) : null;
+
+        // A credit account defaults to deferred but can still choose
+        // to pay this batch now — cash/paystack is respected either
+        // way. Everyone else (walk-in included) has no invoice to
+        // fall back on, so a real choice is required, not optional.
+        if (! $account?->isCreditAccount() && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack'], true)) {
+            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => 'A payment method (cash or online) is required — this account has no credit facility to defer payment to.'])->withInput();
+        }
 
         $batch = BulkShipmentBatch::create([
             'batch_number' => BulkShipmentBatch::generateBatchNumber(),
@@ -270,12 +278,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => $data['origin_city_id'],
             'origin_hub_id' => $originHubId,
             'origin_outlet_id' => $originOutletId,
-            // A credit account is invoiced later regardless of what
-            // was submitted here — the real enforcement is central,
-            // in ShipmentCreationService, but there's no reason for
-            // the batch's own record to carry a payment method that
-            // will never actually be used.
-            'payment_method' => $account?->isCreditAccount() ? null : ($data['payment_method'] ?? null),
+            'payment_method' => $data['payment_method'] ?? null,
             'created_by_user_id' => $user->id,
         ]);
 

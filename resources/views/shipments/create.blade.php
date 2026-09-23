@@ -427,20 +427,28 @@
 
             @if ((! $bookingOutlet || $bookingOutlet->can_collect_cash) || $paystackEnabled)
                 <div id="payment-method-section" class="rounded-lg border border-dashed border-line p-4">
-                    <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">Payment method <span class="normal-case text-ink-400">(for a walk-in paying now — leave unselected for an account-based shipment)</span></p>
+                    <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">
+                        Payment method
+                        <span id="payment-method-note-required" class="normal-case text-ink-400">— required; no credit facility to defer to</span>
+                        <span id="payment-method-note-credit" class="normal-case text-ink-400 hidden">— defaults to deferred (invoiced later), but this account can still pay a specific shipment now instead</span>
+                    </p>
                     <div class="flex flex-wrap gap-6">
                         @if (! $bookingOutlet || $bookingOutlet->can_collect_cash)
                             <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                                <input type="radio" name="payment_method" value="cash" @checked(old('payment_method') === 'cash') class="border-line">
+                                <input type="radio" name="payment_method" value="cash" @checked(old('payment_method') === 'cash') class="payment-method-option border-line">
                                 Cash — collected now
                             </label>
                         @endif
                         @if ($paystackEnabled)
                             <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
-                                <input type="radio" name="payment_method" value="paystack" @checked(old('payment_method') === 'paystack') class="border-line">
+                                <input type="radio" name="payment_method" value="paystack" @checked(old('payment_method') === 'paystack') class="payment-method-option border-line">
                                 Paystack — pay after booking
                             </label>
                         @endif
+                        <label id="payment-method-deferred-label" class="hidden cursor-pointer items-center gap-2 text-sm text-ink-900">
+                            <input type="radio" name="payment_method" value="deferred" id="payment-method-deferred" @checked(old('payment_method', 'deferred') === 'deferred') class="border-line">
+                            Deferred — invoiced later
+                        </label>
                     </div>
                 </div>
             @endif
@@ -754,11 +762,31 @@
             function applyPaymentMethodVisibility(isCreditAccount) {
                 const section = document.getElementById('payment-method-section');
                 if (!section) return;
+                const deferredLabel = document.getElementById('payment-method-deferred-label');
+                const deferredInput = document.getElementById('payment-method-deferred');
+                const requiredNote = document.getElementById('payment-method-note-required');
+                const creditNote = document.getElementById('payment-method-note-credit');
+                const options = section.querySelectorAll('.payment-method-option');
+
                 if (isCreditAccount) {
-                    section.classList.add('hidden');
-                    section.querySelectorAll('input[name="payment_method"]').forEach(el => el.checked = false);
+                    // Defaults to deferred (invoiced later), but a
+                    // credit client can still choose to pay this one
+                    // shipment now instead — all three options stay
+                    // available, nothing forced.
+                    if (deferredLabel) deferredLabel.classList.remove('hidden');
+                    if (deferredInput && !section.querySelector('input[name="payment_method"]:checked')) deferredInput.checked = true;
+                    options.forEach(el => el.required = false);
+                    requiredNote?.classList.add('hidden');
+                    creditNote?.classList.remove('hidden');
                 } else {
-                    section.classList.remove('hidden');
+                    // No credit facility to fall back on — a real
+                    // choice between the two actual payment methods
+                    // is required, deferred isn't offered at all.
+                    if (deferredLabel) deferredLabel.classList.add('hidden');
+                    if (deferredInput) deferredInput.checked = false;
+                    options.forEach(el => el.required = true);
+                    requiredNote?.classList.remove('hidden');
+                    creditNote?.classList.add('hidden');
                 }
             }
 
@@ -849,6 +877,14 @@
             // billing-model filtering would silently revert to showing
             // everything, even though the account is still the same one
             // just picked.
+            // Establishes the default (walk-in, two options required)
+            // immediately on load, regardless of whether an account
+            // number is already filled in — lookupAccount() below
+            // only overrides this when one actually is, so a fresh
+            // page load with nothing typed yet still gets the correct
+            // required state rather than none at all.
+            applyPaymentMethodVisibility(false);
+
             if (field.value.trim()) {
                 lookupAccount();
             }

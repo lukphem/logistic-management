@@ -11176,3 +11176,61 @@ app/Http/Controllers/Web/BulkShipmentController.php   (payment_method collected/
 resources/views/shipments/create.blade.php   (payment section hides for credit accounts)
 resources/views/shipments/bulk/create.blade.php   (new payment method section, same hide behavior)
 ```
+
+## Increment 188 — Payment Refinement: Credit Clients Can Still Pay a Specific Transaction Now
+
+Refines the previous round's rule, which was too rigid — it made
+credit accounts *always* deferred, with no way to pay a specific
+shipment or batch immediately. A credit client can genuinely want to
+do that occasionally (so that one transaction doesn't ride on the
+month-end invoice), so the options are now:
+
+- **Walk-in / non-credit account: 2 choices, one required.** Cash or
+  Online (Paystack) — no credit facility to fall back on, so a real
+  choice is mandatory, both client-side (native `required` on the
+  radios) and server-side.
+- **Credit account: 3 choices, Deferred pre-selected.** Cash, Online,
+  or Deferred (invoiced later) — defaults to Deferred so the common
+  case needs no extra thought, but a credit client can still pick
+  Cash or Online for one specific transaction without changing
+  anything about their account.
+
+`ShipmentCreationService::resolveCollectionMethod()` simplified back
+to just respecting whatever was actually submitted — no longer
+overrides a credit account's explicit choice. The "must choose
+something real" rule for non-credit accounts is enforced centrally
+in `createShipment()` itself (a `RuntimeException` if a non-credit
+account has no valid `cash`/`paystack` value), so it can't be
+skipped by a request that bypasses the form's own JS.
+
+### Caught and fixed while building this
+
+A copy-paste slip left a duplicated `value="deferred"` attribute on
+the single-shipment form's new radio input — fixed before it shipped.
+Also found a real gap in the single-shipment form specifically: the
+required-field JS only ever ran when an account number was already
+filled in on page load — a completely fresh page load (the most
+common case, nobody's typed anything yet) never established the
+default walk-in/required state at all, meaning the payment method
+could have been left blank and still submitted. Fixed to run that
+setup unconditionally on load.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every touched file. Full repo balance check: clean across 129 files.
+Simulated the full validation and collection-method resolution logic
+across all 8 real scenarios (both account types, both a real payment
+method and none/deferred submitted) — all correct, including the
+exact case described: a credit client explicitly choosing cash for
+one transaction is genuinely collected, not silently overridden back
+to deferred.
+
+### Files
+
+```
+app/Services/ShipmentCreationService.php   (resolveCollectionMethod() simplified; required-payment-method check added to createShipment())
+resources/views/shipments/create.blade.php   (Deferred option added, required/hidden JS logic, fixed initial-load gap)
+resources/views/shipments/bulk/create.blade.php   (Deferred option added, matching JS logic)
+app/Http/Controllers/Web/BulkShipmentController.php   (payment_method validation allows deferred, required-for-non-credit check, no longer null'd for credit)
+```

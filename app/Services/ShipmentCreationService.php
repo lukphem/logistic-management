@@ -73,7 +73,18 @@ class ShipmentCreationService
             }
         }
 
-        $collectionMethod = $this->resolveCollectionMethod($data, $resolvedAccount ?? null);
+        // A credit account defaults to deferred (invoiced later) but
+        // can still choose to pay a specific transaction now — see
+        // resolveCollectionMethod() below. Everyone else (a walk-in
+        // with no account at all, or a registered account that isn't
+        // on credit) has no invoice to fall back on, so one of the
+        // two real payment methods is required, not optional.
+        $isCreditAccount = isset($resolvedAccount) && $resolvedAccount->isCreditAccount();
+        if (! $isCreditAccount && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack'], true)) {
+            throw new \RuntimeException('A payment method (cash or online) is required — this account has no credit facility to defer payment to.');
+        }
+
+        $collectionMethod = $this->resolveCollectionMethod($data);
 
         return Shipment::create([
             ...$data,
@@ -85,18 +96,20 @@ class ShipmentCreationService
     }
 
     /**
-     * A credit account is invoiced later, not paid at booking — this
-     * is enforced here, once, for both the web form and bulk import,
-     * rather than trusted to whichever form happened to hide the
-     * option client-side. Whatever payment_method the caller sent is
-     * simply ignored for a credit account, deferred regardless.
+     * A credit client is normally invoiced later, not paid at
+     * booking — but they can still choose to pay a specific
+     * transaction immediately rather than have it added to their
+     * monthly invoice, so whichever payment_method was actually
+     * submitted is what's respected here, not overridden by the
+     * account's own default. 'deferred' (or nothing at all) means no
+     * collection now — that one transaction rides on the invoice
+     * instead. Enforcing that a non-credit/walk-in account can't
+     * leave this deferred is the calling form's job (it requires a
+     * real choice there), not this service's — this only interprets
+     * whatever was actually sent.
      */
-    private function resolveCollectionMethod(array $data, ?ClientAccount $account): array
+    private function resolveCollectionMethod(array $data): array
     {
-        if ($account?->isCreditAccount()) {
-            return [];
-        }
-
         if (($data['payment_method'] ?? null) === 'cash') {
             return ['collection_method' => 'cash', 'cash_collected_at' => now()];
         }
