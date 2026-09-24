@@ -11498,3 +11498,54 @@ resources/views/manifests/trips/create.blade.php   (window.confirmDialog)
   (bulk review + show), standard-billing, states, territories, units, users, vehicle-types,
   zone-mappings, zones
 ```
+
+## Increment 194 — Cancelling a Paid Shipment: Record the Refund First
+
+Closes the gap the previous round left open: `destroy()` correctly
+blocked cancellation once payment was collected, but nothing existed
+to get past that block — there was genuinely no way to cancel a paid
+shipment at all.
+
+### New: Record Refund & Cancel
+
+New `refunded_at`, `refunded_by_user_id`, and `refund_note` on
+`shipments`. `ShipmentController::refundAndCancel()` is the other
+half of the existing guard: same `booked`-only and
+`hasCollectedPayment()` preconditions, but this time requires a
+short, mandatory note describing how the refund was actually handled
+(cash returned, a Paystack refund reference) before it records the
+refund and cancels the shipment together, in one action.
+
+Still no actual refund *processing* here — no Paystack refund API
+call, no cash-settlement reversal. That's a separate, substantial
+feature of its own. This is the minimal, audit-safe interim: staff
+handle the refund itself outside the app (through Paystack's own
+dashboard, or by physically returning cash), then record that it
+happened. A paid shipment still can't be cancelled with no trace of
+what happened to the money — it now just requires that trace to
+exist, rather than having no path forward at all.
+
+The shipment page's previous disabled "Cancel Shipment" placeholder
+(shown whenever payment was already collected) is now a real,
+working form with the refund-note field, styled consistently with
+the rest of the cancellation flow.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked,
+missing-import-scanned across every touched file. Full repo balance
+check: clean across 235 files. Verified the complete flow against
+live MySQL — a booked, cash-collected shipment correctly blocked
+beforehand, then correctly transitioned to cancelled with the full
+refund audit trail (who, when, and the note) recorded atomically in
+one update.
+
+### Files
+
+```
+database/migrations/2026_04_02_000001_add_refund_tracking_to_shipments.php
+app/Models/Shipment.php   (refundedBy(), refund fields)
+app/Http/Controllers/Web/ShipmentController.php   (refundAndCancel())
+resources/views/shipments/show.blade.php   (Record Refund & Cancel form)
+routes/web.php   (shipments.refund-and-cancel)
+```

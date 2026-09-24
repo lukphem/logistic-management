@@ -301,6 +301,46 @@ class ShipmentController extends Controller
         return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled.");
     }
 
+    /**
+     * The other half of destroy()'s guard: once payment has actually
+     * been collected, plain cancellation is blocked outright, and
+     * this is the only way past that block. There's no in-app refund
+     * processing here (no Paystack refund API call, no cash-
+     * settlement reversal) — that's a separate, substantial feature
+     * of its own. This is the minimal, audit-safe interim: staff
+     * explicitly record how the refund was actually handled outside
+     * the app (cash handed back, a Paystack refund issued through
+     * their dashboard), and only then does the cancellation proceed
+     * — so a paid shipment still can't be cancelled with no trace of
+     * what happened to the money, it just requires that trace to
+     * exist first instead of being silently skipped.
+     */
+    public function refundAndCancel(Request $request, Shipment $shipment): RedirectResponse
+    {
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        if ($shipment->current_status !== 'booked') {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment can't be cancelled — it's already been picked up, dropped off, or otherwise processed."]);
+        }
+
+        if (! $shipment->hasCollectedPayment()) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment hasn't been paid for — use the regular Cancel Shipment action instead."]);
+        }
+
+        $data = $request->validate([
+            'refund_note' => 'required|string|max:255',
+        ]);
+
+        $shipment->update([
+            'current_status' => 'cancelled',
+            'refunded_at' => now(),
+            'refunded_by_user_id' => auth()->id(),
+            'refund_note' => $data['refund_note'],
+        ]);
+
+        return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled and refund recorded.");
+    }
+
     public function update(Request $request, Shipment $shipment): RedirectResponse
     {
         abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");

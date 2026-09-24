@@ -165,6 +165,7 @@ Route::middleware(['auth', 'staff'])->group(function () {
     // documented on the controller action itself.
     Route::middleware('can:shipments:delete')->group(function () {
         Route::delete('/shipments/{shipment}', [ShipmentController::class, 'destroy'])->name('shipments.destroy');
+        Route::post('/shipments/{shipment}/refund-and-cancel', [ShipmentController::class, 'refundAndCancel'])->name('shipments.refund-and-cancel');
     });
 
     // System setup — gated to whoever holds settings:update (Super Admin, Finance-read only sees nothing here).

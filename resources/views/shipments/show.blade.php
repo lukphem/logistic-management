@@ -59,7 +59,12 @@
             @can('shipments:delete')
                 @if ($shipment->current_status === 'booked')
                     @if ($shipment->hasCollectedPayment())
-                        <span class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-400" title="Already paid for — refund through finance first, then cancel.">Cancel Shipment</span>
+                        <form method="POST" action="{{ route('shipments.refund-and-cancel', $shipment) }}" class="flex items-center gap-2" data-confirm="Cancel {{ $shipment->tracking_number }} and record this refund? This only works before it's been picked up or dropped off.">
+                            @csrf
+                            <input type="text" name="refund_note" required maxlength="255" placeholder="How was it refunded? (e.g. cash returned, Paystack ref)"
+                                   class="w-64 rounded-md border border-line px-2.5 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            <button type="submit" class="whitespace-nowrap rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Record Refund &amp; Cancel</button>
+                        </form>
                     @else
                         <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" data-confirm="Cancel {{ $shipment->tracking_number }}? This only works before it's been picked up or dropped off.">
                             @csrf

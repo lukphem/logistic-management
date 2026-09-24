@@ -18,6 +18,7 @@ class Shipment extends Model
         'is_cod', 'cod_amount', 'cod_remitted_at', 'is_pickup_requested', 'pickup_amount',
         'payment_status', 'payment_reference', 'paid_at',
         'collection_method', 'cash_collected_at', 'cash_settlement_id',
+        'refunded_at', 'refunded_by_user_id', 'refund_note',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_unit_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
         'sla_breached', 'promised_delivery_at', 'transit_days', 'delivered_at',
@@ -31,6 +32,7 @@ class Shipment extends Model
         'cod_remitted_at' => 'datetime',
         'paid_at' => 'datetime',
         'cash_collected_at' => 'datetime',
+        'refunded_at' => 'datetime',
         'promised_delivery_at' => 'datetime',
         'delivered_at' => 'datetime',
     ];
@@ -296,6 +298,11 @@ class Shipment extends Model
     {
         return $this->cash_collected_at !== null
             || ($this->collection_method === 'paystack' && $this->payment_status === 'paid');
+    }
+
+    public function refundedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'refunded_by_user_id');
     }
 
     public function currentOutlet(): BelongsTo
