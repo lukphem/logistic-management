@@ -11693,3 +11693,63 @@ app/Models/Outlet.php   (can_use_wallet, can_collect_online)
 app/Http/Controllers/Web/OutletController.php   (validation + assignment)
 resources/views/outlets/form.blade.php   (two new checkboxes)
 ```
+
+## Increment 197 — Wallet System, Step 3: Wallet as a Real Payment Option at Booking
+
+Third step of the agreed sequence — the payoff of Steps 1 and 2:
+Wallet is now a real, working payment method in both the single-
+shipment and bulk-upload forms, alongside Cash, Online, and Deferred.
+
+### Two wallets, one choice: client's or outlet's
+
+Per the original request — "outlet can decide to pay from either the
+client wallet or theirs" — picking Wallet reveals a second choice:
+pay from the client's own account wallet, or from the booking
+outlet's own wallet. The client's wallet option only appears once a
+real client account is actually resolved (a walk-in has none); the
+outlet option draws from whichever outlet the logged-in staff member
+is assigned to.
+
+### Balance checked before anything is created, debited atomically after
+
+`ShipmentCreationService::createShipment()` checks the chosen
+wallet's balance against the shipment's priced total *before*
+creating anything — an insufficient wallet never gets as far as a
+half-created shipment. The actual debit happens after the shipment
+is created (so it can reference the shipment by tracking number),
+wrapped together with the creation itself in one database
+transaction — either both succeed, or neither does. A shipment can
+never exist without its wallet debit actually landing, and a wallet
+can never be debited for a shipment that didn't actually get created.
+
+### Bulk upload: same choice, made once for the whole batch
+
+`wallet_source` added to `bulk_shipment_batches` alongside the
+existing `payment_method`, validated at Step 1, and carried through
+`preview()`'s batch context exactly the way `payment_method` already
+was — no changes needed to `BulkShipmentImportService` itself, since
+it already generically spreads the batch context into every row.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every touched file. Full repo balance check: clean across 245 files.
+Verified the balance-sufficiency check against live MySQL for both a
+sufficient and an insufficient case. Verified the full linkage — a
+shipment correctly references the wallet that paid for it, and that
+wallet's balance reflects the exact debit. Re-verified the required-
+payment-method logic across every account type now that wallet is a
+third valid choice.
+
+### Files
+
+```
+database/migrations/2026_04_05_000001_add_wallet_collection_method_to_shipments.php
+database/migrations/2026_04_05_000002_add_wallet_source_to_bulk_shipment_batches.php
+app/Models/Shipment.php   (account_wallet_id, accountWallet(), hasCollectedPayment() recognizes wallet)
+app/Models/BulkShipmentBatch.php   (wallet_source fillable)
+app/Services/ShipmentCreationService.php   (wallet resolution, balance check, atomic debit)
+app/Http/Controllers/Web/BulkShipmentController.php   (canUseWallet, wallet_source validation/storage, batch context)
+resources/views/shipments/create.blade.php   (Wallet option + pay-from sub-selector)
+resources/views/shipments/bulk/create.blade.php   (same, for bulk)
+```

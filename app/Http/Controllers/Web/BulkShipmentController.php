@@ -92,6 +92,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             // specific outlet at all), paystack needs the company-
             // wide setting on.
             'canCollectCash' => ! $user->outlet_id || (Outlet::find($user->outlet_id)?->can_collect_cash ?? true),
+            'canUseWallet' => ! $user->outlet_id || (Outlet::find($user->outlet_id)?->can_use_wallet ?? true),
             'paystackEnabled' => Setting::current()->paystack_enabled,
         ]);
     }
@@ -261,7 +262,8 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => 'required|exists:cities,id',
             'origin_hub_id' => 'nullable|exists:hubs,id',
             'origin_outlet_id' => 'nullable|exists:outlets,id',
-            'payment_method' => 'nullable|string|in:cash,paystack,deferred',
+            'payment_method' => 'nullable|string|in:cash,paystack,wallet,deferred',
+            'wallet_source' => 'nullable|string|in:client,outlet',
         ]);
 
         [$originHubId, $originOutletId, $originError] = $this->resolveOrigin($user, $data['origin_hub_id'] ?? null, $data['origin_outlet_id'] ?? null);
@@ -273,11 +275,19 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
         $account = ! empty($data['client_account_id']) ? ClientAccount::find($data['client_account_id']) : null;
 
         // A credit account defaults to deferred but can still choose
-        // to pay this batch now — cash/paystack is respected either
-        // way. Everyone else (walk-in included) has no invoice to
-        // fall back on, so a real choice is required, not optional.
-        if (! $account?->isCreditAccount() && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack'], true)) {
-            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => 'A payment method (cash or online) is required — this account has no credit facility to defer payment to.'])->withInput();
+        // to pay this batch now — cash/paystack/wallet is respected
+        // either way. Everyone else (walk-in included) has no
+        // invoice to fall back on, so a real choice is required.
+        if (! $account?->isCreditAccount() && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack', 'wallet'], true)) {
+            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => 'A payment method (cash, online, or wallet) is required — this account has no credit facility to defer payment to.'])->withInput();
+        }
+
+        if (($data['payment_method'] ?? null) === 'wallet' && empty($data['wallet_source'])) {
+            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => "Choose which wallet to pay from — the client's, or the outlet's."])->withInput();
+        }
+
+        if (($data['wallet_source'] ?? null) === 'client' && ! $account) {
+            return redirect()->route('shipments.bulk.create')->withErrors(['sender_address' => "No client account to draw a wallet from — pick a registered account, or pay from the outlet's wallet instead."])->withInput();
         }
 
         $batch = BulkShipmentBatch::create([
@@ -294,6 +304,7 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_hub_id' => $originHubId,
             'origin_outlet_id' => $originOutletId,
             'payment_method' => $data['payment_method'] ?? null,
+            'wallet_source' => $data['wallet_source'] ?? null,
             'created_by_user_id' => $user->id,
         ]);
 
@@ -357,11 +368,13 @@ class BulkShipmentController extends \App\Http\Controllers\Controller
             'origin_city_id' => $batch->origin_city_id,
             'sender_name' => $batch->sender_name,
             'sender_phone' => $batch->sender_phone,
-            // Ignored entirely for a credit account regardless (see
-            // ShipmentCreationService::resolveCollectionMethod), but
-            // for a walk-in/non-credit account this is what actually
-            // marks every shipment the batch produces as paid now.
+            // A credit account defaults to deferred but can still
+            // explicitly choose to pay now (see
+            // ShipmentCreationService::resolveCollectionMethod) —
+            // whichever was actually picked at Step 1 is what marks
+            // every shipment the batch produces.
             'payment_method' => $batch->payment_method,
+            'wallet_source' => $batch->wallet_source,
         ];
 
         $result = $this->import->validateRows($rows, $batchContext);

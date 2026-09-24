@@ -139,7 +139,7 @@
                 <p class="mt-1 text-xs text-ink-500">Applies to every shipment in this batch.</p>
             </div>
 
-            @if ($canCollectCash || $paystackEnabled)
+            @if ($canCollectCash || $paystackEnabled || $canUseWallet)
                 <div id="payment-method-section" class="rounded-lg border border-dashed border-line p-4">
                     <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">
                         Payment method
@@ -159,11 +159,33 @@
                                 Paystack — pay after booking
                             </label>
                         @endif
+                        @if ($canUseWallet)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="wallet" id="payment-method-wallet" @checked(old('payment_method') === 'wallet') class="payment-method-option border-line">
+                                Wallet
+                            </label>
+                        @endif
                         <label id="payment-method-deferred-label" class="hidden cursor-pointer items-center gap-2 text-sm text-ink-900">
                             <input type="radio" name="payment_method" value="deferred" id="payment-method-deferred" @checked(old('payment_method', 'deferred') === 'deferred') class="border-line">
                             Deferred — invoiced later
                         </label>
                     </div>
+
+                    @if ($canUseWallet)
+                        <div id="wallet-source-section" class="mt-3 hidden border-t border-line pt-3">
+                            <p class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">Pay from</p>
+                            <div class="flex flex-wrap gap-6">
+                                <label id="wallet-source-client-label" class="hidden cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                    <input type="radio" name="wallet_source" value="client" class="border-line">
+                                    Client's wallet
+                                </label>
+                                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                    <input type="radio" name="wallet_source" value="outlet" class="border-line">
+                                    Outlet's wallet
+                                </label>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -247,11 +269,13 @@
         function syncPaymentMethodVisibility() {
             if (!paymentMethodSection) return;
             const isCredit = clientAccountSelect.selectedOptions[0]?.dataset.paymentType === 'credit';
+            const hasAccount = clientAccountSelect.value !== '';
             const deferredLabel = document.getElementById('payment-method-deferred-label');
             const deferredInput = document.getElementById('payment-method-deferred');
             const requiredNote = document.getElementById('payment-method-note-required');
             const creditNote = document.getElementById('payment-method-note-credit');
             const options = paymentMethodSection.querySelectorAll('.payment-method-option');
+            const clientWalletLabel = document.getElementById('wallet-source-client-label');
 
             if (isCredit) {
                 // Defaults to deferred (invoiced later), but a credit
@@ -271,7 +295,39 @@
                 requiredNote?.classList.remove('hidden');
                 creditNote?.classList.add('hidden');
             }
+
+            // The client's own wallet only exists to draw from once a
+            // real client account is picked — "Walk-in customer" has
+            // no account, so only the outlet's own wallet applies.
+            if (clientWalletLabel) {
+                if (hasAccount) {
+                    clientWalletLabel.classList.remove('hidden');
+                } else {
+                    clientWalletLabel.classList.add('hidden');
+                    const clientWalletInput = clientWalletLabel.querySelector('input');
+                    if (clientWalletInput?.checked) clientWalletInput.checked = false;
+                }
+            }
+
+            syncWalletSourceVisibility();
         }
+
+        // The "pay from" sub-choice only makes sense once Wallet
+        // itself is actually selected as the payment method.
+        function syncWalletSourceVisibility() {
+            const walletSourceSection = document.getElementById('wallet-source-section');
+            if (!walletSourceSection) return;
+            const walletSelected = document.getElementById('payment-method-wallet')?.checked;
+            walletSourceSection.classList.toggle('hidden', !walletSelected);
+            walletSourceSection.querySelectorAll('input[name="wallet_source"]').forEach(el => el.required = !!walletSelected);
+            if (!walletSelected) {
+                walletSourceSection.querySelectorAll('input[name="wallet_source"]').forEach(el => el.checked = false);
+            }
+        }
+
+        paymentMethodSection?.addEventListener('change', function (e) {
+            if (e.target.name === 'payment_method') syncWalletSourceVisibility();
+        });
 
         clientAccountSelect.addEventListener('change', syncPaymentMethodVisibility);
         syncPaymentMethodVisibility();

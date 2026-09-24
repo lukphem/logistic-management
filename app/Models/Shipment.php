@@ -17,7 +17,7 @@ class Shipment extends Model
         'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'chargeable_weight_kg', 'quantity', 'carton_size',
         'is_cod', 'cod_amount', 'cod_remitted_at', 'is_pickup_requested', 'pickup_amount',
         'payment_status', 'payment_reference', 'paid_at',
-        'collection_method', 'cash_collected_at', 'cash_settlement_id',
+        'collection_method', 'cash_collected_at', 'cash_settlement_id', 'account_wallet_id',
         'refunded_at', 'refunded_by_user_id', 'refund_note',
         'base_amount', 'surcharge_amount', 'onforwarding_amount', 'discount_amount', 'vat_amount', 'insurance_amount', 'total_amount',
         'current_status', 'assigned_rider_id', 'current_hub_id', 'current_unit_id', 'current_outlet_id', 'origin_hub_id', 'destination_hub_id',
@@ -297,7 +297,13 @@ class Shipment extends Model
     public function hasCollectedPayment(): bool
     {
         return $this->cash_collected_at !== null
+            || $this->collection_method === 'wallet'
             || ($this->collection_method === 'paystack' && $this->payment_status === 'paid');
+    }
+
+    public function accountWallet(): BelongsTo
+    {
+        return $this->belongsTo(AccountWallet::class);
     }
 
     public function refundedBy(): BelongsTo

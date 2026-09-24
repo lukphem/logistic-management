@@ -425,7 +425,7 @@
                 </div>
             </div>
 
-            @if ((! $bookingOutlet || $bookingOutlet->can_collect_cash) || $paystackEnabled)
+            @if ((! $bookingOutlet || $bookingOutlet->can_collect_cash) || $paystackEnabled || (! $bookingOutlet || $bookingOutlet->can_use_wallet))
                 <div id="payment-method-section" class="rounded-lg border border-dashed border-line p-4">
                     <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-500">
                         Payment method
@@ -445,11 +445,33 @@
                                 Paystack — pay after booking
                             </label>
                         @endif
+                        @if (! $bookingOutlet || $bookingOutlet->can_use_wallet)
+                            <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                <input type="radio" name="payment_method" value="wallet" id="payment-method-wallet" @checked(old('payment_method') === 'wallet') class="payment-method-option border-line">
+                                Wallet
+                            </label>
+                        @endif
                         <label id="payment-method-deferred-label" class="hidden cursor-pointer items-center gap-2 text-sm text-ink-900">
                             <input type="radio" name="payment_method" value="deferred" id="payment-method-deferred" @checked(old('payment_method', 'deferred') === 'deferred') class="border-line">
                             Deferred — invoiced later
                         </label>
                     </div>
+
+                    @if (! $bookingOutlet || $bookingOutlet->can_use_wallet)
+                        <div id="wallet-source-section" class="mt-3 hidden border-t border-line pt-3">
+                            <p class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">Pay from</p>
+                            <div class="flex flex-wrap gap-6">
+                                <label id="wallet-source-client-label" class="hidden cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                    <input type="radio" name="wallet_source" value="client" class="border-line">
+                                    Client's wallet
+                                </label>
+                                <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                    <input type="radio" name="wallet_source" value="outlet" class="border-line">
+                                    Outlet's wallet
+                                </label>
+                            </div>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -752,14 +774,14 @@
                 billingModelSelect.querySelectorAll('option').forEach(o => o.style.display = '');
                 serviceTypeSelect.querySelectorAll('option').forEach(o => o.style.display = '');
                 resetCodAndPickup();
-                applyPaymentMethodVisibility(false);
+                applyPaymentMethodVisibility(false, false);
             }
 
             // A credit account is invoiced later, not paid at booking
             // — the payment-method section (and whatever was picked
             // in it) only makes sense for a walk-in or a genuinely
             // non-credit account actually paying now.
-            function applyPaymentMethodVisibility(isCreditAccount) {
+            function applyPaymentMethodVisibility(isCreditAccount, hasAccount) {
                 const section = document.getElementById('payment-method-section');
                 if (!section) return;
                 const deferredLabel = document.getElementById('payment-method-deferred-label');
@@ -767,6 +789,7 @@
                 const requiredNote = document.getElementById('payment-method-note-required');
                 const creditNote = document.getElementById('payment-method-note-credit');
                 const options = section.querySelectorAll('.payment-method-option');
+                const clientWalletLabel = document.getElementById('wallet-source-client-label');
 
                 if (isCreditAccount) {
                     // Defaults to deferred (invoiced later), but a
@@ -788,7 +811,40 @@
                     requiredNote?.classList.remove('hidden');
                     creditNote?.classList.add('hidden');
                 }
+
+                // The client's own wallet only exists to draw from
+                // once there's an actual client account resolved — a
+                // walk-in has no account, so only the outlet's own
+                // wallet is a real option for them.
+                if (clientWalletLabel) {
+                    if (hasAccount) {
+                        clientWalletLabel.classList.remove('hidden');
+                    } else {
+                        clientWalletLabel.classList.add('hidden');
+                        const clientWalletInput = clientWalletLabel.querySelector('input');
+                        if (clientWalletInput?.checked) clientWalletInput.checked = false;
+                    }
+                }
+
+                syncWalletSourceVisibility();
             }
+
+            // The "pay from" sub-choice only makes sense once Wallet
+            // itself is actually selected as the payment method.
+            function syncWalletSourceVisibility() {
+                const walletSourceSection = document.getElementById('wallet-source-section');
+                if (!walletSourceSection) return;
+                const walletSelected = document.getElementById('payment-method-wallet')?.checked;
+                walletSourceSection.classList.toggle('hidden', !walletSelected);
+                walletSourceSection.querySelectorAll('input[name="wallet_source"]').forEach(el => el.required = !!walletSelected);
+                if (!walletSelected) {
+                    walletSourceSection.querySelectorAll('input[name="wallet_source"]').forEach(el => el.checked = false);
+                }
+            }
+
+            document.getElementById('payment-method-section')?.addEventListener('change', function (e) {
+                if (e.target.name === 'payment_method') syncWalletSourceVisibility();
+            });
 
             function resetCodAndPickup() {
                 const codSection = document.getElementById('cod-section');
@@ -838,7 +894,7 @@
                 if (billingModelSelect.selectedOptions[0]?.style.display === 'none') billingModelSelect.value = '';
                 if (serviceTypeSelect.selectedOptions[0]?.style.display === 'none') { serviceTypeSelect.value = ''; syncFieldsForServiceType(); }
                 applyCodAndPickup(data);
-                applyPaymentMethodVisibility(data.is_credit_account);
+                applyPaymentMethodVisibility(data.is_credit_account, true);
             }
 
             function lookupAccount() {
@@ -883,7 +939,7 @@
             // only overrides this when one actually is, so a fresh
             // page load with nothing typed yet still gets the correct
             // required state rather than none at all.
-            applyPaymentMethodVisibility(false);
+            applyPaymentMethodVisibility(false, false);
 
             if (field.value.trim()) {
                 lookupAccount();

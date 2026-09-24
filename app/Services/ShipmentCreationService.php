@@ -78,22 +78,84 @@ class ShipmentCreationService
         // resolveCollectionMethod() below. Everyone else (a walk-in
         // with no account at all, or a registered account that isn't
         // on credit) has no invoice to fall back on, so one of the
-        // two real payment methods is required, not optional.
+        // three real payment methods is required, not optional.
         $isCreditAccount = isset($resolvedAccount) && $resolvedAccount->isCreditAccount();
-        if (! $isCreditAccount && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack'], true)) {
-            throw new \RuntimeException('A payment method (cash or online) is required — this account has no credit facility to defer payment to.');
+        if (! $isCreditAccount && ! in_array($data['payment_method'] ?? null, ['cash', 'paystack', 'wallet'], true)) {
+            throw new \RuntimeException('A payment method (cash, online, or wallet) is required — this account has no credit facility to defer payment to.');
         }
 
-        $collectionMethod = $this->resolveCollectionMethod($data);
+        // Balance is checked here, before anything is created — an
+        // insufficient wallet should never even start creating a
+        // shipment. The actual debit happens after, inside the same
+        // transaction as Shipment::create() below, so a shipment and
+        // its wallet debit can never exist independently of each
+        // other — either both succeed or neither does.
+        $wallet = null;
+        if (($data['payment_method'] ?? null) === 'wallet') {
+            $wallet = $this->resolveWallet($data, $resolvedAccount ?? null);
 
-        return Shipment::create([
-            ...$data,
-            'shipping_type' => $quote['shipping_type'],
-            'promised_delivery_at' => null,
-            'transit_days' => $quote['transit_days'] ?? null,
-            ...$pricing,
-            ...$collectionMethod,
-        ]);
+            if ($wallet->balance < $pricing['total_amount']) {
+                throw new \RuntimeException('Insufficient wallet balance — this wallet has ' . number_format($wallet->balance, 2) . ' but ' . number_format($pricing['total_amount'], 2) . ' is needed.');
+            }
+        }
+
+        $collectionMethod = $this->resolveCollectionMethod($data, $wallet);
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $quote, $pricing, $collectionMethod, $wallet) {
+            $shipment = Shipment::create([
+                ...$data,
+                'shipping_type' => $quote['shipping_type'],
+                'promised_delivery_at' => null,
+                'transit_days' => $quote['transit_days'] ?? null,
+                ...$pricing,
+                ...$collectionMethod,
+            ]);
+
+            if ($wallet) {
+                $wallet->debit(
+                    amount: (float) $pricing['total_amount'],
+                    reference: $shipment->tracking_number,
+                    description: 'Shipment payment',
+                    recordedByUserId: auth()->id(),
+                );
+            }
+
+            return $shipment;
+        });
+    }
+
+    /**
+     * 'client' draws from the resolved ClientAccount's own wallet —
+     * there has to actually be one to draw from. 'outlet' draws from
+     * the wallet belonging to whichever outlet the logged-in staff
+     * member is assigned to — there has to actually be an outlet
+     * assignment for that to mean anything. Either way the wallet is
+     * created lazily if it doesn't exist yet (a brand new account or
+     * outlet starts at zero, not "doesn't have a wallet").
+     */
+    private function resolveWallet(array $data, ?ClientAccount $account): \App\Models\AccountWallet
+    {
+        $source = $data['wallet_source'] ?? null;
+
+        if ($source === 'client') {
+            if (! $account) {
+                throw new \RuntimeException("No client account to draw a wallet from — pick a registered account, or pay from the outlet's wallet instead.");
+            }
+
+            return $account->wallet()->firstOrCreate([]);
+        }
+
+        if ($source === 'outlet') {
+            $outletId = auth()->user()->outlet_id;
+
+            if (! $outletId) {
+                throw new \RuntimeException("You aren't assigned to a specific outlet, so there's no outlet wallet to draw from.");
+            }
+
+            return \App\Models\Outlet::findOrFail($outletId)->wallet()->firstOrCreate([]);
+        }
+
+        throw new \RuntimeException("Choose which wallet to pay from — the client's, or the outlet's.");
     }
 
     /**
@@ -109,7 +171,7 @@ class ShipmentCreationService
      * real choice there), not this service's — this only interprets
      * whatever was actually sent.
      */
-    private function resolveCollectionMethod(array $data): array
+    private function resolveCollectionMethod(array $data, ?\App\Models\AccountWallet $wallet): array
     {
         if (($data['payment_method'] ?? null) === 'cash') {
             return ['collection_method' => 'cash', 'cash_collected_at' => now()];
@@ -117,6 +179,10 @@ class ShipmentCreationService
 
         if (($data['payment_method'] ?? null) === 'paystack') {
             return ['collection_method' => 'paystack'];
+        }
+
+        if (($data['payment_method'] ?? null) === 'wallet' && $wallet) {
+            return ['collection_method' => 'wallet', 'account_wallet_id' => $wallet->id];
         }
 
         return [];
