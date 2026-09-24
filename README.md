@@ -11549,3 +11549,105 @@ app/Http/Controllers/Web/ShipmentController.php   (refundAndCancel())
 resources/views/shipments/show.blade.php   (Record Refund & Cancel form)
 routes/web.php   (shipments.refund-and-cancel)
 ```
+
+## Increment 195 — Wallet System, Step 1: Foundation
+
+First of a sequenced, multi-step build (plan discussed and agreed
+before starting): a wallet system where accounts and outlets can be
+funded and drawn against for shipments and other services. This step
+is the foundation everything else depends on — wallets existing,
+being fundable, and having a real, auditable ledger.
+
+### A different wallet system than the one that already existed
+
+Found `ClientWallet`/`WalletTransaction` already in the app — but
+scoped to an individual client portal login or API client, used only
+for a read-only balance API, never touching the actual payment flow.
+What this request describes is scoped to `ClientAccount` (the
+billing entity shipments are actually booked against) and to
+outlets — a different axis entirely. Built as a new, separate system
+(`AccountWallet`/`AccountWalletTransaction`/`AccountWalletFunding`,
+deliberately distinct names) rather than merging the two, since they
+represent genuinely different concepts.
+
+### Two funding methods, per the request
+
+- **Bank transfer** — a direct value update: staff records that a
+  transfer was received (amount + reference) and the wallet is
+  credited immediately. Same trust model already used for
+  `refund_note` on shipment cancellations — staff attests it,
+  recorded for audit, not independently verified by this app.
+- **Online (Paystack)** — extends the exact same reference-prefix-
+  dispatch pattern already protecting shipment and cash-settlement
+  payments (`SHIP-`/`SETTLE-`) with a third prefix, `WALLET-`. The
+  wallet is only actually credited once payment is confirmed — via
+  the callback, the webhook, or the scheduled requery command — never
+  at the moment checkout is initiated. All three existing
+  confirmation paths, plus the scheduled requery, were each extended
+  to recognize and handle this third case.
+
+### A real bug caught and fixed before shipping
+
+The webhook's dispatch logic had a catch-all `elseif` — adding the
+new `WALLET-` case without also excluding it from that catch-all
+would have silently misrouted every wallet-funding webhook to the
+shipment payment handler instead. Caught by cross-checking the exact
+same pattern already correctly handled in `checkStatus()`, and fixed
+in both places consistently.
+
+### What's built
+
+- `AccountWallet` — owned by a `ClientAccount` or an `Outlet`
+  (polymorphic), `credit()`/`debit()` that always writes a ledger
+  entry, `debit()` guards against ever going negative
+- `AccountWalletTransaction` — the ledger, capturing running balance
+  at each entry so it stays trustworthy even if the wallet's current
+  balance is corrected for some unrelated reason later
+- `AccountWalletFunding` — tracks each funding attempt; immediate
+  for bank transfer, pending-until-confirmed for Paystack
+- New `wallets` permission module — `Finance` role gets full access,
+  `Ops Manager` gets read-only, matching how this app already gates
+  other financial actions
+- Wallet list and detail pages (balance, fund forms, full
+  transaction history), new sidebar entry alongside Reconciliation
+  and Payment Reports
+
+### Deliberately not yet built (later steps in the agreed sequence)
+
+Per-outlet settlement method configuration, wallet as an actual
+payment option at shipment booking, admin transfers between wallets,
+and the separate cross-account booking restriction — all discussed
+and sequenced, none built yet.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 248 files. Simulated the complete credit-then-debit
+flow against live MySQL — running balance and ledger both correct at
+each step. Verified the debit overdraft guard across edge cases
+including the exact-balance boundary. Verified the three-way
+reference-prefix dispatch (`SETTLE-`/`WALLET-`/shipment) has no
+ambiguity.
+
+### Files
+
+```
+database/migrations/2026_04_03_000001_create_account_wallets_table.php
+database/migrations/2026_04_03_000002_create_account_wallet_transactions_table.php
+database/migrations/2026_04_03_000003_create_account_wallet_fundings_table.php
+app/Models/AccountWallet.php
+app/Models/AccountWalletTransaction.php
+app/Models/AccountWalletFunding.php
+app/Models/ClientAccount.php   (wallet())
+app/Models/Outlet.php   (wallet())
+app/Http/Controllers/Web/WalletController.php
+app/Http/Controllers/Web/PaymentController.php   (WALLET- prefix in callback/webhook/checkStatus)
+app/Services/PaystackService.php   (markWalletFundedIfDue())
+app/Console/Commands/RequeryPendingPayments.php   (wallet funding requery loop)
+database/seeders/RolePermissionSeeder.php   (wallets module)
+resources/views/wallets/index.blade.php
+resources/views/wallets/show.blade.php
+resources/views/components/layouts/app.blade.php   (Wallets nav entry)
+routes/web.php   (wallets.*)
+```

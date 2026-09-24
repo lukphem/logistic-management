@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountWalletFunding;
 use App\Models\CashSettlement;
 use App\Models\Setting;
 use App\Models\Shipment;
@@ -136,6 +137,10 @@ class PaymentController extends Controller
             return $this->handleSettlementCallback($reference);
         }
 
+        if (str_starts_with($reference, 'WALLET-')) {
+            return $this->handleWalletCallback($reference);
+        }
+
         $shipment = Shipment::where('payment_reference', $reference)->first();
 
         if (! $shipment) {
@@ -196,6 +201,37 @@ class PaymentController extends Controller
         return redirect()->route('reconciliation.index')->withErrors(['payment' => 'Settlement payment was not successful.']);
     }
 
+    private function handleWalletCallback(string $reference): RedirectResponse
+    {
+        $funding = AccountWalletFunding::where('payment_reference', $reference)->first();
+
+        if (! $funding) {
+            return redirect()->route('wallets.index')->withErrors(['payment' => 'Could not match this payment to a wallet funding.']);
+        }
+
+        if ($funding->status === 'paid') {
+            return redirect()->route('wallets.show', $funding->account_wallet_id)->with('status', 'This funding was already confirmed.');
+        }
+
+        $result = $this->paystack->verifyTransaction($reference);
+
+        if (! $result['success']) {
+            return redirect()->route('wallets.show', $funding->account_wallet_id)->withErrors(['payment' => $result['message']]);
+        }
+
+        if ($result['paid']) {
+            $applied = $this->paystack->markWalletFundedIfDue($reference, (int) round(((float) $funding->amount) * 100));
+
+            return redirect()->route('wallets.show', $funding->account_wallet_id)->with('status', $applied
+                ? 'Wallet funded with ' . number_format($funding->amount, 2) . '.'
+                : 'This funding was already confirmed.');
+        }
+
+        $funding->update(['status' => 'failed']);
+
+        return redirect()->route('wallets.show', $funding->account_wallet_id)->withErrors(['payment' => 'Wallet funding was not successful.']);
+    }
+
     /**
      * The authoritative source of truth for payment status — the
      * callback above is a convenience for whoever just paid, but this
@@ -226,6 +262,8 @@ class PaymentController extends Controller
 
             if ($reference && str_starts_with($reference, 'SETTLE-')) {
                 $this->paystack->markSettlementPaidIfDue($reference, $paidKobo, logMismatch: true);
+            } elseif ($reference && str_starts_with($reference, 'WALLET-')) {
+                $this->paystack->markWalletFundedIfDue($reference, $paidKobo, logMismatch: true);
             } elseif ($reference) {
                 $this->paystack->markShipmentPaidIfDue($reference, $paidKobo, logMismatch: true);
             }
@@ -270,6 +308,22 @@ class PaymentController extends Controller
             }
 
             return redirect()->route('reconciliation.index')->with('status', 'Checked — this settlement has not been paid yet.');
+        }
+
+        if (str_starts_with($reference, 'WALLET-')) {
+            $funding = AccountWalletFunding::where('payment_reference', $reference)->first();
+
+            if (! $funding) {
+                return redirect()->route('wallets.index')->withErrors(['payment' => 'Could not find this wallet funding.']);
+            }
+
+            if ($result['paid']) {
+                $this->paystack->markWalletFundedIfDue($reference, (int) round(((float) $funding->amount) * 100));
+
+                return redirect()->route('wallets.show', $funding->account_wallet_id)->with('status', 'Confirmed — wallet funded.');
+            }
+
+            return redirect()->route('wallets.show', $funding->account_wallet_id)->with('status', 'Checked — this funding has not gone through yet.');
         }
 
         $shipment = Shipment::where('payment_reference', $reference)->first();

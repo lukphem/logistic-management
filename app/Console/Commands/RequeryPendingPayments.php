@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\AccountWalletFunding;
 use App\Models\CashSettlement;
 use App\Models\Shipment;
 use App\Services\PaystackService;
@@ -83,6 +84,29 @@ class RequeryPendingPayments extends Command
                 if ($applied) {
                     $confirmed++;
                     $this->info("Confirmed settlement #{$settlement->id} ({$settlement->payment_reference}) — callback/webhook must have missed it.");
+                }
+            }
+        }
+
+        $walletFundings = AccountWalletFunding::whereNotNull('payment_reference')
+            ->where('status', 'pending')
+            ->where('updated_at', '<', $cutoff)
+            ->get();
+
+        foreach ($walletFundings as $funding) {
+            $checked++;
+            $result = $paystack->verifyTransaction($funding->payment_reference);
+
+            if (! $result['success']) {
+                continue;
+            }
+
+            if ($result['paid']) {
+                $applied = $paystack->markWalletFundedIfDue($funding->payment_reference, (int) round(((float) $funding->amount) * 100));
+
+                if ($applied) {
+                    $confirmed++;
+                    $this->info("Confirmed wallet funding #{$funding->id} ({$funding->payment_reference}) — callback/webhook must have missed it.");
                 }
             }
         }

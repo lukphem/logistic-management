@@ -25,6 +25,7 @@ use App\Http\Controllers\Web\ScanStatusController;
 use App\Http\Controllers\Web\ServiceTypeController;
 use App\Http\Controllers\Web\SettingsController;
 use App\Http\Controllers\Web\PaymentController;
+use App\Http\Controllers\Web\WalletController;
 use App\Http\Controllers\Web\PrintDocumentController;
 use App\Http\Controllers\Web\ManifestController;
 use App\Http\Controllers\Web\ManifestTripController;
@@ -105,6 +106,14 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::post('/payments/check-status', [PaymentController::class, 'checkStatus'])->name('payments.check-status');
     Route::middleware('can:payments:read')->group(function () {
         Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
+    });
+    Route::middleware('can:wallets:read')->group(function () {
+        Route::get('/wallets', [WalletController::class, 'index'])->name('wallets.index');
+        Route::get('/wallets/{wallet}', [WalletController::class, 'show'])->name('wallets.show');
+    });
+    Route::middleware('can:wallets:update')->group(function () {
+        Route::post('/wallets/{wallet}/fund/bank-transfer', [WalletController::class, 'fundBankTransfer'])->name('wallets.fund.bank-transfer');
+        Route::post('/wallets/{wallet}/fund/online', [WalletController::class, 'fundOnline'])->name('wallets.fund.online');
     });
     Route::middleware('can:manifests:create')->group(function () {
         Route::get('/manifest-trips/create', [ManifestTripController::class, 'create'])->name('manifest-trips.create');

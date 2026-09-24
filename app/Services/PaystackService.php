@@ -199,4 +199,44 @@ class PaystackService
             return true;
         });
     }
+
+    /**
+     * The wallet-funding equivalent of the two above. A wallet's
+     * balance is only ever actually credited here, once payment is
+     * confirmed — never at initializeTransaction() time — so a
+     * funding attempt that's initialized but never completed leaves
+     * the wallet exactly as it was before.
+     */
+    public function markWalletFundedIfDue(string $reference, int $paidKobo, bool $logMismatch = false): bool
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($reference, $paidKobo, $logMismatch) {
+            $funding = \App\Models\AccountWalletFunding::where('payment_reference', $reference)->lockForUpdate()->first();
+
+            if (! $funding || $funding->status === 'paid') {
+                return false;
+            }
+
+            $expectedKobo = (int) round(((float) $funding->amount) * 100);
+
+            if ($paidKobo < $expectedKobo) {
+                if ($logMismatch) {
+                    \Illuminate\Support\Facades\Log::warning("Paystack: wallet funding amount mismatch for {$reference} — paid {$paidKobo} kobo, expected {$expectedKobo} kobo.");
+                }
+
+                return false;
+            }
+
+            $funding->update(['status' => 'paid', 'paid_at' => now()]);
+
+            $funding->wallet->credit(
+                amount: (float) $funding->amount,
+                fundingMethod: 'paystack',
+                reference: $reference,
+                description: 'Paystack wallet funding',
+                recordedByUserId: $funding->initiated_by_user_id,
+            );
+
+            return true;
+        });
+    }
 }

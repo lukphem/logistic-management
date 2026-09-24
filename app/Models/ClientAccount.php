@@ -57,6 +57,11 @@ class ClientAccount extends Model
         return $this->payment_type === 'credit';
     }
 
+    public function wallet(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(\App\Models\AccountWallet::class, 'owner');
+    }
+
     public const ID_TYPES = [
         'national_id' => 'National ID',
         'passport' => 'Passport',

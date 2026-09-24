@@ -48,6 +48,11 @@ class Outlet extends Model
         return $this->belongsTo(Hub::class);
     }
 
+    public function wallet(): \Illuminate\Database\Eloquent\Relations\MorphOne
+    {
+        return $this->morphOne(\App\Models\AccountWallet::class, 'owner');
+    }
+
     /**
      * Same "null/empty = unrestricted" shape as
      * ClientAccount::usesBillingModel() — an outlet that's never had

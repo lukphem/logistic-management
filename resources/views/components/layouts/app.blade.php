@@ -74,6 +74,7 @@
                     $paymentItems = [
                         ['label' => 'Reconciliation', 'route' => 'reconciliation.index', 'icon' => 'wallet', 'permission' => null],
                         ['label' => 'Payment Reports', 'route' => 'payment-reports.index', 'icon' => 'list-check', 'permission' => 'payments:read'],
+                        ['label' => 'Wallets', 'route' => 'wallets.index', 'icon' => 'wallet', 'permission' => 'wallets:read'],
                     ];
 
                     // Operational Scans — five single-purpose scan
