@@ -73,6 +73,16 @@
             Can collect cash
         </label>
 
+        <label class="flex items-center gap-2 text-sm text-ink-900">
+            <input type="checkbox" name="can_use_wallet" value="1" @checked(old('can_use_wallet', $outlet->can_use_wallet ?? true)) class="rounded border-line">
+            Can settle with wallet
+        </label>
+
+        <label class="flex items-center gap-2 text-sm text-ink-900">
+            <input type="checkbox" name="can_collect_online" value="1" @checked(old('can_collect_online', $outlet->can_collect_online ?? true)) class="rounded border-line">
+            Can collect online (Paystack)
+        </label>
+
         <div>
             <label class="mb-2 block text-sm font-medium text-ink-900">Billing methods available here</label>
             <div class="flex flex-wrap gap-4">

@@ -11651,3 +11651,45 @@ resources/views/wallets/show.blade.php
 resources/views/components/layouts/app.blade.php   (Wallets nav entry)
 routes/web.php   (wallets.*)
 ```
+
+## Increment 196 — Wallet System, Step 2: Outlet Settlement Method Configuration
+
+Second step of the agreed sequence — the configuration layer Step 3
+(wallet as an actual payment option at booking) depends on. Purely
+that layer this round: the flags exist and are editable, nothing
+consumes them in the booking flow yet — that's Step 3's job, kept
+deliberately out of scope here to stay within the agreed sequence.
+
+### Two new per-outlet flags, mirroring the existing one
+
+`can_collect_cash` already existed as a per-outlet restriction. Added
+`can_use_wallet` and `can_collect_online` alongside it, same shape,
+same default (`true`) and same reasoning — existing outlets keep
+full functionality unless someone explicitly restricts them, rather
+than silently losing a settlement method the moment this ships.
+`can_collect_online` is deliberately separate from the global
+`paystack_enabled` company setting: that one gates whether Paystack
+is configured at all; this one gates whether a *specific* outlet is
+allowed to use it even when it is.
+
+Added to the outlet admin form (two new checkboxes next to the
+existing "Can collect cash") and the shared `validated()` helper
+already used by both `store()` and `update()`, so one change covers
+both create and edit.
+
+### Verified
+
+Balance-checked, duplicate-checked across every touched file. Full
+repo balance check: clean across 243 files. Verified against live
+MySQL that both new columns default to `true` for a newly-inserted
+outlet with neither explicitly set, confirming existing outlets
+won't lose any functionality when this migration runs.
+
+### Files
+
+```
+database/migrations/2026_04_04_000001_add_settlement_methods_to_outlets_table.php
+app/Models/Outlet.php   (can_use_wallet, can_collect_online)
+app/Http/Controllers/Web/OutletController.php   (validation + assignment)
+resources/views/outlets/form.blade.php   (two new checkboxes)
+```

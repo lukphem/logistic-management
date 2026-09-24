@@ -62,6 +62,8 @@ class OutletController extends Controller
             'longitude' => 'nullable|numeric',
             'is_active' => 'sometimes|boolean',
             'can_collect_cash' => 'sometimes|boolean',
+            'can_use_wallet' => 'sometimes|boolean',
+            'can_collect_online' => 'sometimes|boolean',
             'enabled_billing_models' => 'nullable|array',
             'enabled_billing_models.*' => 'in:' . implode(',', array_keys(\App\Models\Setting::BILLING_MODELS)),
             'enabled_service_type_ids' => 'nullable|array',
@@ -74,6 +76,8 @@ class OutletController extends Controller
         $data = $validator->validated();
         $data['is_active'] = $request->boolean('is_active', true);
         $data['can_collect_cash'] = $request->boolean('can_collect_cash', true);
+        $data['can_use_wallet'] = $request->boolean('can_use_wallet', true);
+        $data['can_collect_online'] = $request->boolean('can_collect_online', true);
 
         // Same inversion as ClientController::updateDisabledBillingModels()
         // — checkboxes that are UNCHECKED submit nothing, so the array of

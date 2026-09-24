@@ -7,11 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Outlet extends Model
 {
-    protected $fillable = ['hub_id', 'name', 'code', 'short_code', 'address', 'latitude', 'longitude', 'is_active', 'can_collect_cash', 'disabled_billing_models', 'disabled_service_type_ids', 'discount_percentage'];
+    protected $fillable = ['hub_id', 'name', 'code', 'short_code', 'address', 'latitude', 'longitude', 'is_active', 'can_collect_cash', 'can_use_wallet', 'can_collect_online', 'disabled_billing_models', 'disabled_service_type_ids', 'discount_percentage'];
 
     protected $casts = [
         'is_active' => 'boolean',
         'can_collect_cash' => 'boolean',
+        'can_use_wallet' => 'boolean',
+        'can_collect_online' => 'boolean',
         'disabled_billing_models' => 'array',
         'disabled_service_type_ids' => 'array',
         'discount_percentage' => 'float',
