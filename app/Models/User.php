@@ -324,6 +324,39 @@ class User extends Authenticatable
     }
 
     /**
+     * A walk-in (no account at all) is never restricted — there's
+     * nothing to check. shipments:cross-account is a deliberate
+     * escape hatch, separate from the ordinary shipments
+     * permissions, for staff who legitimately need to book across
+     * outlet lines. Otherwise this mirrors canAccessShipment()'s own
+     * scoping exactly: global access always passes, outlet-scoped
+     * staff need an exact outlet match, hub/region-scoped staff need
+     * the account's outlet to fall within one of their own hubs. An
+     * account with no outlet of its own (never explicitly tied to
+     * one) isn't restricted either — there's no boundary to enforce.
+     */
+    public function canBookForAccount(?ClientAccount $account): bool
+    {
+        if (! $account || $this->can('shipments:cross-account')) {
+            return true;
+        }
+
+        if ($this->hasGlobalAccess()) {
+            return true;
+        }
+
+        if (! $account->outlet_id) {
+            return true;
+        }
+
+        if ($this->hasOutletAccess()) {
+            return $account->outlet_id === $this->outlet_id;
+        }
+
+        return in_array($account->outlet?->hub_id, $this->accessibleHubIds());
+    }
+
+    /**
      * Whichever of suspended/locked/terminated a status represents, all
      * three block login identically today — they exist as distinct values
      * for audit and reporting ("why can't this person sign in" should

@@ -629,6 +629,18 @@ class ShipmentController extends Controller
             ? \App\Models\ClientAccount::find($resolvedClientAccountId)?->client_user_id
             : ($data['client_user_id'] ?? null);
 
+        // Same cross-account restriction createShipment() enforces on
+        // the regular booking path — this quote-based path has its
+        // own separate creation code, so it needs the same check
+        // applied explicitly here rather than inheriting it for free.
+        if ($resolvedClientAccountId) {
+            $resolvedAccountForScopeCheck = \App\Models\ClientAccount::find($resolvedClientAccountId);
+
+            if ($resolvedAccountForScopeCheck && ! auth()->user()->canBookForAccount($resolvedAccountForScopeCheck)) {
+                return redirect()->route('shipments.create')->withErrors(['quote_number' => "\"{$resolvedAccountForScopeCheck->account_name}\" belongs to a different outlet — you don't have permission to book shipments against it."])->withInput();
+            }
+        }
+
         // Pickup, same reasoning as insurance just above — a booking-time
         // add-on, never part of a quote's frozen context, layered on
         // top rather than recalculated through the whole pipeline.

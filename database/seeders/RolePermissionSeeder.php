@@ -16,9 +16,16 @@ class RolePermissionSeeder extends Seeder
     private array $modules = ['shipments', 'rates', 'riders', 'reports', 'settings', 'roles', 'locations', 'billing', 'users', 'clients', 'payments', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan', 'wallets'];
     private array $actions = ['create', 'read', 'update', 'delete'];
 
+    /**
+     * A one-off, outside the modules × actions grid — cross-outlet
+     * booking isn't a create/read/update/delete action, and doesn't
+     * belong on every module the way those four do, just this one.
+     */
+    private array $extraPermissions = ['shipments:cross-account'];
+
     private array $defaultRoles = [
         'Super Admin' => '*', // gets every permission
-        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read', 'clients', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan', 'wallets:read'],
+        'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read', 'clients', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan', 'wallets:read', 'shipments:cross-account'],
         'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan'],
         'Finance' => ['reports:read', 'settings:read', 'rates', 'billing', 'clients', 'payments', 'wallets'],
         'Support' => ['shipments:read', 'clients:read'],
@@ -45,6 +52,13 @@ class RolePermissionSeeder extends Seeder
                         'guard_name' => $guard,
                     ]);
                 }
+            }
+
+            foreach ($this->extraPermissions as $permissionName) {
+                Permission::firstOrCreate([
+                    'name' => $permissionName,
+                    'guard_name' => $guard,
+                ]);
             }
 
             foreach ($this->defaultRoles as $roleName => $scope) {

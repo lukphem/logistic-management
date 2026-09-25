@@ -11878,3 +11878,78 @@ resources/views/wallets/index.blade.php   (Transfer Funds link)
 resources/views/wallets/show.blade.php   (Transfer Funds link, pre-selects this wallet)
 routes/web.php   (wallets.transfer.form, wallets.transfer)
 ```
+
+## Increment 200 — Wallet System, Step 5: Cross-Account Booking Restriction
+
+Fifth and final step of the agreed sequence: "users under one
+outlet/unit/hub can not create a shipment under another account
+except they have permission set for such." This is the one genuinely
+new access-control rule of the five — nothing like it existed for
+shipment booking before, even though origin locations already had
+similar scoping.
+
+### One rule, matching the scoping already used for shipment access
+
+New `User::canBookForAccount()` mirrors the exact structure of the
+already-existing `canAccessShipment()`: global access always passes;
+outlet-scoped staff need an exact match against the account's own
+`outlet_id`; hub or region-scoped staff need the account's outlet to
+fall within one of their own accessible hubs. A walk-in (no account
+at all) is never restricted — there's nothing to check — and neither
+is an account that was never tied to a specific outlet to begin
+with.
+
+### The escape hatch: a genuinely new permission
+
+New `shipments:cross-account` — added outside the usual modules ×
+actions grid this app's permissions are normally generated from,
+since it isn't a create/read/update/delete action and doesn't belong
+on every module, just this one. Granted to `Ops Manager` by default
+(oversees multiple outlets already) and `Super Admin` (gets
+everything); withheld from `Hub Staff` and `Support` by default,
+matching the "reserve this for supervisors" reasoning already used
+throughout this app's other sensitive actions.
+
+### Enforced on every path that lets staff pick a client account
+
+Found and fixed the same gap the wallet-payment bug fix surfaced
+last round: this restriction needed enforcing in three separate
+places, since shipment creation doesn't have one single code path.
+`ShipmentCreationService::createShipment()` covers the regular web
+form and bulk upload; `ShipmentController::storeFromQuote()` — its
+own, completely separate creation code for quote-based bookings —
+needed the same check added explicitly. Confirmed the API
+`ShipmentController` (mobile/rider app) is genuinely unaffected: it
+runs on an older, separate billing mechanism
+(`client_user_id`/`ClientBillingProfile`) that never uses
+`client_account_id` at all, so there's no cross-account concern to
+enforce there.
+
+### Verified
+
+Balance-checked, duplicate-checked across every touched file. Full
+repo balance check: clean across 140 files. Confirmed the new
+permission's scope logic (containing `:`) passes through the
+seeder's existing literal-vs-expand check correctly rather than
+being wrongly expanded into four meaningless sub-permissions.
+Simulated `canBookForAccount()` across all 8 real scenarios — global,
+outlet-scoped (both matching and mismatched), hub-scoped (both
+within and outside reach), the cross-account override, a walk-in,
+and an account with no outlet — all correct. Verified outlet-to-hub
+resolution against live MySQL data.
+
+### Files
+
+```
+app/Models/User.php   (canBookForAccount())
+app/Services/ShipmentCreationService.php   (restriction enforced)
+app/Http/Controllers/Web/ShipmentController.php   (same restriction added to storeFromQuote())
+database/seeders/RolePermissionSeeder.php   (shipments:cross-account)
+```
+
+---
+
+**This closes the wallet system sequence agreed at the start — all
+five steps delivered: wallet foundation, outlet settlement
+configuration, wallet as a real payment option, admin transfers, and
+the cross-account booking restriction.**

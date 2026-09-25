@@ -71,6 +71,15 @@ class ShipmentCreationService
             if ($resolvedAccount?->isSuspended()) {
                 throw new \RuntimeException("\"{$resolvedAccount->account_name}\" is suspended and can't book new shipments." . ($resolvedAccount->suspension_reason ? " Reason: {$resolvedAccount->suspension_reason}" : ''));
             }
+
+            // Staff scoped to one outlet/hub/unit can't book against a
+            // client account that belongs to a different one, unless
+            // explicitly granted shipments:cross-account — closes the
+            // gap where booking a shipment had no such restriction at
+            // all, even though origin locations already did.
+            if ($resolvedAccount && ! auth()->user()->canBookForAccount($resolvedAccount)) {
+                throw new \RuntimeException("\"{$resolvedAccount->account_name}\" belongs to a different outlet — you don't have permission to book shipments against it.");
+            }
         }
 
         // A credit account defaults to deferred (invoiced later) but
