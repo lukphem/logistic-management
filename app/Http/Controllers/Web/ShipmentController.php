@@ -359,7 +359,7 @@ class ShipmentController extends Controller
             'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
             'receiver_email' => 'nullable|email|max:255',
             'destination_address' => 'required|string|max:150',
-            'package_description' => 'required|string|max:100',
+            'package_description' => 'required|string|max:225',
             'special_instructions' => 'nullable|string|max:500',
             'carton_size' => 'nullable|in:small,medium,large',
             'quantity' => 'required|integer|min:1|max:200',
@@ -648,7 +648,22 @@ class ShipmentController extends Controller
             }
         }
 
-        $shipment = Shipment::create([
+        // Same balance-check-before-anything-is-created rule as the
+        // main createShipment() path — an insufficient wallet must
+        // never get as far as a half-created shipment or a used-up
+        // quote.
+        $wallet = null;
+        if (($data['payment_method'] ?? null) === 'wallet') {
+            $resolvedAccount = $resolvedClientAccountId ? \App\Models\ClientAccount::find($resolvedClientAccountId) : null;
+            $wallet = $this->creationService->resolveWallet($data, $resolvedAccount);
+
+            if ($wallet->balance < ($result['total_amount'] ?? 0)) {
+                return redirect()->route('shipments.create')->withErrors(['payment_method' => 'Insufficient wallet balance — this wallet has ' . number_format($wallet->balance, 2) . ' but ' . number_format($result['total_amount'] ?? 0, 2) . ' is needed.'])->withInput();
+            }
+        }
+
+        $shipment = \Illuminate\Support\Facades\DB::transaction(function () use ($data, $context, $result, $resolvedClientUserId, $resolvedClientAccountId, $pickupAmount, $wallet, $quote) {
+            $shipment = Shipment::create([
             'client_user_id' => $resolvedClientUserId,
             'client_account_id' => $resolvedClientAccountId,
             'sender_name' => $data['sender_name'],
@@ -688,14 +703,26 @@ class ShipmentController extends Controller
             'total_amount' => $result['total_amount'] ?? 0,
             'promised_delivery_at' => null,
             'transit_days' => $result['transit_days'] ?? null,
-            ...$this->resolveCollectionMethod($data),
-        ]);
+            ...$this->resolveCollectionMethod($data, $wallet),
+            ]);
 
-        $quote->update([
-            'status' => 'used',
-            'used_by_shipment_id' => $shipment->id,
-            'used_at' => now(),
-        ]);
+            if ($wallet) {
+                $wallet->debit(
+                    amount: (float) ($result['total_amount'] ?? 0),
+                    reference: $shipment->tracking_number,
+                    description: 'Shipment payment',
+                    recordedByUserId: auth()->id(),
+                );
+            }
+
+            $quote->update([
+                'status' => 'used',
+                'used_by_shipment_id' => $shipment->id,
+                'used_at' => now(),
+            ]);
+
+            return $shipment;
+        });
 
         return redirect()->route('shipments.show', $shipment)->with('status', "Shipment {$shipment->tracking_number} created from quote {$quote->quote_number}.");
     }
@@ -710,7 +737,7 @@ class ShipmentController extends Controller
      * the existing "Pay with Paystack" button on the shipment page,
      * same as it already did before this feature existed.
      */
-    private function resolveCollectionMethod(array $data): array
+    private function resolveCollectionMethod(array $data, ?\App\Models\AccountWallet $wallet = null): array
     {
         if (($data['payment_method'] ?? null) === 'cash') {
             return ['collection_method' => 'cash', 'cash_collected_at' => now()];
@@ -718,6 +745,10 @@ class ShipmentController extends Controller
 
         if (($data['payment_method'] ?? null) === 'paystack') {
             return ['collection_method' => 'paystack'];
+        }
+
+        if (($data['payment_method'] ?? null) === 'wallet' && $wallet) {
+            return ['collection_method' => 'wallet', 'account_wallet_id' => $wallet->id];
         }
 
         return [];
@@ -763,7 +794,7 @@ class ShipmentController extends Controller
             'receiver_phone' => self::PHONE_RULE,
             'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
             'receiver_email' => 'nullable|email|max:255',
-            'package_description' => 'required|string|max:100',
+            'package_description' => 'required|string|max:225',
             'special_instructions' => 'nullable|string|max:500',
             'destination_address' => 'required|string|max:150',
             'destination_zone_id' => 'nullable|exists:zones,id',
@@ -786,7 +817,8 @@ class ShipmentController extends Controller
             'cod_amount' => 'nullable|numeric|min:0',
             'insured' => 'sometimes|boolean',
             'declared_value' => 'nullable|numeric|min:0',
-            'payment_method' => 'nullable|in:cash,paystack',
+            'payment_method' => 'nullable|in:cash,paystack,wallet,deferred',
+            'wallet_source' => 'nullable|in:client,outlet',
         ]);
 
         if ($validator->fails()) {

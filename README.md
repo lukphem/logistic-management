@@ -11753,3 +11753,77 @@ app/Http/Controllers/Web/BulkShipmentController.php   (canUseWallet, wallet_sour
 resources/views/shipments/create.blade.php   (Wallet option + pay-from sub-selector)
 resources/views/shipments/bulk/create.blade.php   (same, for bulk)
 ```
+
+## Increment 198 — Fix: Wallet Payment Rejected on the Quote-Based Booking Path; Package Description Widened to 225
+
+### The reported bug
+
+"The selected payment method is invalid" — a leftover validation
+rule (`'payment_method' => 'nullable|in:cash,paystack'`) in the
+shared `validateShipment()` method never got updated when Wallet and
+Deferred were added as real options across Steps 3 and the earlier
+payment-refinement round. Fixed to accept all four values.
+
+### A second, more serious bug found while fixing the first
+
+The quote-based booking path (`storeFromQuote()`, used whenever a
+shipment is booked from a "Check price" quote — exactly what the
+screenshot showed) has always had its own, completely separate
+shipment-creation code, never going through
+`ShipmentCreationService`. It has its own local
+`resolveCollectionMethod()`, which — even once the validation error
+above was fixed — still didn't know how to handle `'wallet'` at all.
+Fixing only the validation rule would have let a wallet payment
+through the form, silently create the shipment with no
+`collection_method` set at all (treated as deferred), and never
+actually debit anything. Fixed by making
+`ShipmentCreationService::resolveWallet()` public and reusing it
+here instead of writing a second, divergence-prone copy of the same
+rules, and by wrapping the quote-based shipment creation, the wallet
+debit, and marking the quote used all in one database transaction —
+the same balance-check-before-anything-is-created guarantee the main
+booking path already had.
+
+### Package description: 100 → 225 characters
+
+Updated in all five places that enforce it — the web create and edit
+forms, both API controllers, and (found only by specifically
+searching for it, not part of the original four) bulk upload's own
+separate character check, which was still using its own hardcoded
+100-character message. Also fixed the create and edit forms' HTML
+`maxlength` attributes, which had been stuck at a stale `1000` since
+before the field was ever limited to begin with — letting someone
+type well past what the server would accept and only finding out at
+submit time.
+
+The label's own physical-fit truncation is untouched, per the
+request — already implemented independently of the stored field's
+length (`Str::limit($shipment->package_description, 70)` on the
+three 4×6 label templates; the smaller 2×1 labels don't display the
+package description at all), so it already handles a longer stored
+value correctly with no change needed. Confirmed the database column
+itself is already a `text` type (widened in an earlier increment),
+so no schema change was needed either — only the application-level
+limits governed the actual cap.
+
+### Verified
+
+Balance-checked, duplicate-checked across every touched file. Full
+repo balance check: clean across 133 files. Confirmed zero remaining
+references to the old 100-character limit anywhere in the app.
+Verified the payment-method validation set and the exact 225-
+character boundary (224 allowed, 225 allowed, 226 rejected).
+Confirmed the database column already supports far more than 225
+characters, so this was purely an application-level fix.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentController.php   (payment_method validation fixed; storeFromQuote() wallet support + atomic transaction)
+app/Services/ShipmentCreationService.php   (resolveWallet() made public for reuse)
+app/Services/BulkShipmentImportService.php   (225-character limit)
+app/Http/Controllers/Api/ShipmentController.php   (225-character limit)
+app/Http/Controllers/Api/ClientShipmentController.php   (225-character limit)
+resources/views/shipments/create.blade.php   (maxlength fixed: 1000 → 225)
+resources/views/shipments/edit.blade.php   (maxlength fixed: 1000 → 225)
+```

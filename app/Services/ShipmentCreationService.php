@@ -133,7 +133,14 @@ class ShipmentCreationService
      * created lazily if it doesn't exist yet (a brand new account or
      * outlet starts at zero, not "doesn't have a wallet").
      */
-    private function resolveWallet(array $data, ?ClientAccount $account): \App\Models\AccountWallet
+    /**
+     * Public — reused directly by ShipmentController::storeFromQuote(),
+     * which has its own separate creation path (a quote's frozen
+     * price is applied outside createShipment() above) but needs the
+     * exact same wallet-resolution rules, not a second, divergence-
+     * prone copy of them.
+     */
+    public function resolveWallet(array $data, ?ClientAccount $account): \App\Models\AccountWallet
     {
         $source = $data['wallet_source'] ?? null;
 

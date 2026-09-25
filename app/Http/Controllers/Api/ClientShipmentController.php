@@ -56,7 +56,7 @@ class ClientShipmentController extends Controller
             'receiver_phone' => self::PHONE_RULE,
             'receiver_alternate_phone' => self::OPTIONAL_PHONE_RULE,
             'receiver_email' => 'nullable|email|max:255',
-            'package_description' => 'required|string|max:100',
+            'package_description' => 'required|string|max:225',
             'special_instructions' => 'nullable|string|max:500',
             'origin_address' => 'required|string|max:150',
             'origin_zone_id' => 'nullable|exists:zones,id',

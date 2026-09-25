@@ -101,8 +101,8 @@ class BulkShipmentImportService
             }
             if ($packageDescription === '') {
                 $errors[] = 'Package description is required.';
-            } elseif (mb_strlen($packageDescription) > 100) {
-                $errors[] = 'Package description is over the 100-character limit.';
+            } elseif (mb_strlen($packageDescription) > 225) {
+                $errors[] = 'Package description is over the 225-character limit.';
             }
             if (! is_numeric($quantity) || (int) $quantity < 1) {
                 $errors[] = 'Quantity is required and must be at least 1.';
