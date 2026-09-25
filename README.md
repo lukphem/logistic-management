@@ -11827,3 +11827,54 @@ app/Http/Controllers/Api/ClientShipmentController.php   (225-character limit)
 resources/views/shipments/create.blade.php   (maxlength fixed: 1000 → 225)
 resources/views/shipments/edit.blade.php   (maxlength fixed: 1000 → 225)
 ```
+
+## Increment 199 — Wallet System, Step 4: Admin Fund Transfers Between Wallets
+
+Fourth step of the agreed sequence — "admin can move funds from one
+wallet to another." A dedicated transfer form (`/wallets/transfer`),
+gated behind the same `wallets:update` permission as funding (Finance
+role, per the earlier scoping), lets any wallet's balance be moved
+directly into any other — client-to-outlet, outlet-to-client, or
+between two client accounts — with an optional note for why.
+
+### A first-class, correlated record — not just two loose ledger entries
+
+New `AccountWalletTransfer` records each transfer as its own row
+(source, destination, amount, note, who initiated it), separate from
+the two individual debit/credit entries it produces on each wallet's
+own ledger. Both of those ledger entries carry the transfer's own
+generated reference (`XFER-...`), so following that reference from
+either wallet's transaction history finds the matching entry on the
+other side — the same correlation pattern `WALLET-`/`SETTLE-`
+references already give shipment and settlement payments.
+
+Wrapped in one database transaction, same guarantee as every other
+money-moving action in this system: the debit and the credit either
+both happen or neither does — a transfer can never leave one wallet
+short without the other actually receiving it.
+
+Reachable two ways: a general "Transfer Funds" link from the wallet
+list (pick both sides freely), or the same link from a specific
+wallet's own page, which pre-selects it as the source.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 247 files. Simulated route resolution to confirm
+`/wallets/transfer` isn't shadowed by the `/wallets/{wallet}`
+wildcard. Verified the complete transfer flow against live MySQL —
+both wallets' balances update exactly as expected, and both ledger
+entries correctly share the same reference for full correlation.
+
+### Files
+
+```
+database/migrations/2026_04_06_000001_create_account_wallet_transfers_table.php
+app/Models/AccountWalletTransfer.php
+app/Http/Controllers/Web/WalletController.php   (transferForm(), transfer())
+resources/views/wallets/transfer.blade.php
+resources/views/wallets/index.blade.php   (Transfer Funds link)
+resources/views/wallets/show.blade.php   (Transfer Funds link, pre-selects this wallet)
+routes/web.php   (wallets.transfer.form, wallets.transfer)
+```

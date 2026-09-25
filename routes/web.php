@@ -109,9 +109,14 @@ Route::middleware(['auth', 'staff'])->group(function () {
     });
     Route::middleware('can:wallets:read')->group(function () {
         Route::get('/wallets', [WalletController::class, 'index'])->name('wallets.index');
+        // Registered before the {wallet} wildcard below, same route-
+        // shadowing rule as everywhere else in this app — {wallet}
+        // would otherwise capture "transfer" as a wallet ID.
+        Route::get('/wallets/transfer', [WalletController::class, 'transferForm'])->name('wallets.transfer.form');
         Route::get('/wallets/{wallet}', [WalletController::class, 'show'])->name('wallets.show');
     });
     Route::middleware('can:wallets:update')->group(function () {
+        Route::post('/wallets/transfer', [WalletController::class, 'transfer'])->name('wallets.transfer');
         Route::post('/wallets/{wallet}/fund/bank-transfer', [WalletController::class, 'fundBankTransfer'])->name('wallets.fund.bank-transfer');
         Route::post('/wallets/{wallet}/fund/online', [WalletController::class, 'fundOnline'])->name('wallets.fund.online');
     });

@@ -1,8 +1,13 @@
 <x-layouts.app title="Wallets">
 
-    <div class="mb-6">
-        <p class="text-2xl font-semibold text-ink-900">Wallets</p>
-        <p class="mt-1 text-sm text-ink-500">Every client account and outlet wallet — fund one, or open it to see its full transaction history.</p>
+    <div class="mb-6 flex items-start justify-between">
+        <div>
+            <p class="text-2xl font-semibold text-ink-900">Wallets</p>
+            <p class="mt-1 text-sm text-ink-500">Every client account and outlet wallet — fund one, or open it to see its full transaction history.</p>
+        </div>
+        @can('wallets:update')
+            <a href="{{ route('wallets.transfer.form') }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Transfer Funds</a>
+        @endcan
     </div>
 
     <div class="rounded-xl border border-line bg-surface-0 shadow-sm overflow-hidden">

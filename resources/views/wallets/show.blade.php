@@ -4,9 +4,14 @@
         <div class="mb-5 rounded-lg border border-line bg-surface-50 p-3 text-sm text-ink-700">{{ session('status') }}</div>
     @endif
 
-    <div class="mb-6">
-        <p class="text-2xl font-semibold text-ink-900">{{ $wallet->label() }}</p>
-        <p class="mt-1 text-sm text-ink-500">{{ $wallet->owner_type === \App\Models\ClientAccount::class ? 'Client account wallet' : 'Outlet wallet' }}</p>
+    <div class="mb-6 flex items-start justify-between">
+        <div>
+            <p class="text-2xl font-semibold text-ink-900">{{ $wallet->label() }}</p>
+            <p class="mt-1 text-sm text-ink-500">{{ $wallet->owner_type === \App\Models\ClientAccount::class ? 'Client account wallet' : 'Outlet wallet' }}</p>
+        </div>
+        @can('wallets:update')
+            <a href="{{ route('wallets.transfer.form') }}?from={{ $wallet->id }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Transfer Funds</a>
+        @endcan
     </div>
 
     <div class="mb-6 rounded-xl border border-line bg-surface-0 shadow-sm p-5">
