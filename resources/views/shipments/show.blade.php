@@ -38,8 +38,15 @@
             <a href="{{ route('shipments.label', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Label</a>
             <a href="{{ route('shipments.waybill', $shipment) }}" target="_blank" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Print Waybill</a>
             @if (\App\Models\Setting::current()->paystack_enabled)
-                @if ($shipment->payment_status === 'paid')
-                    <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-3 py-1 text-sm font-medium text-status-delivered">Paid</span>
+                @if ($shipment->hasCollectedPayment())
+                    {{-- hasCollectedPayment() covers cash and wallet
+                         too, not just a confirmed Paystack payment —
+                         payment_status alone only ever gets set by
+                         Paystack's own confirmation, so a shipment
+                         already paid by wallet or cash would
+                         otherwise still show "Pay with Paystack" as
+                         if nothing had been paid yet. --}}
+                    <span class="inline-flex items-center rounded-full bg-status-delivered/10 px-3 py-1 text-sm font-medium text-status-delivered">Paid{{ $shipment->collection_method ? ' via ' . ucfirst($shipment->collection_method) : '' }}</span>
                 @else
                     <a href="{{ route('payments.pay', $shipment) }}" class="rounded-md bg-[var(--brand-primary)] px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90">Pay with Paystack</a>
                     @if ($shipment->payment_reference)

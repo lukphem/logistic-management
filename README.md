@@ -11953,3 +11953,54 @@ database/seeders/RolePermissionSeeder.php   (shipments:cross-account)
 five steps delivered: wallet foundation, outlet settlement
 configuration, wallet as a real payment option, admin transfers, and
 the cross-account booking restriction.**
+
+## Increment 201 — Fix: "Pay with Paystack" Still Showing After Wallet (or Cash) Payment
+
+### The reported bug
+
+A shipment paid for via wallet still showed the "Pay with Paystack"
+button on its own page, as if it hadn't been paid at all.
+
+### The cause
+
+The shipment page's paid/unpaid gate checked `payment_status ===
+'paid'` directly — but `payment_status` is a Paystack-specific field,
+only ever set by Paystack's own confirmation. A shipment paid by
+wallet or cash never touches it at all (those methods use
+`collection_method` + `cash_collected_at`/`account_wallet_id`
+instead), so both would always fail that check and fall through to
+"still needs paying," regardless of how thoroughly they'd actually
+been paid for.
+
+### The fix
+
+Switched the gate to `Shipment::hasCollectedPayment()` — the helper
+already built specifically to answer "has this actually been paid
+for, by any method" correctly across cash, wallet, and confirmed
+Paystack. Also improved the "Paid" badge itself to name the method
+(`Paid via Wallet`, `Paid via Cash`, `Paid via Paystack`) rather than
+a bare "Paid," so staff can see how at a glance instead of wondering.
+
+Checked every other place in the app that references `payment_status`
+or shows a "Pay" action, to make sure this wasn't a wider pattern:
+Payment Reports' own paid/unpaid column is deliberately scoped to
+cash-collected shipments' settlement status (a genuinely different
+question — "has the outlet handed this cash in," not "did the
+customer pay") and was already correct as-is; the wallet page's own
+"Pay with Paystack" button is for funding the wallet itself, an
+unrelated action that correctly has no "already paid" state to guard
+against.
+
+### Verified
+
+Balance-checked. Full repo balance check: clean across 134 files.
+Simulated the fixed condition across all 5 real payment scenarios —
+cash-paid, wallet-paid, confirmed Paystack, still-pending Paystack,
+and a genuinely unpaid deferred shipment — button correctly hidden
+for the first three, correctly still shown for the last two.
+
+### Files
+
+```
+resources/views/shipments/show.blade.php   (paid/unpaid gate fixed, badge shows the method)
+```
