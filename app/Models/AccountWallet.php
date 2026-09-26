@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\HasEncryptedRouteKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class AccountWallet extends Model
 {
+    use HasEncryptedRouteKey;
+
     protected $fillable = ['owner_type', 'owner_id', 'balance', 'currency'];
 
     protected $casts = ['balance' => 'float'];

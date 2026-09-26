@@ -182,6 +182,13 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::post('/shipments/{shipment}/refund-and-cancel', [ShipmentController::class, 'refundAndCancel'])->name('shipments.refund-and-cancel');
     });
 
+    // A dedicated, more unusual permission than shipments:delete —
+    // reversing a payment made in error while leaving the shipment
+    // live, restricted to admin/finance specifically, per the request.
+    Route::middleware('can:shipments:refund-only')->group(function () {
+        Route::post('/shipments/{shipment}/refund-only', [ShipmentController::class, 'refundOnly'])->name('shipments.refund-only');
+    });
+
     // System setup — gated to whoever holds settings:update (Super Admin, Finance-read only sees nothing here).
     Route::middleware('can:settings:update')->group(function () {
         Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.edit');

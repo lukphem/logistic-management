@@ -12062,3 +12062,80 @@ app/Models/Shipment.php   (refund_destination, refund_wallet_id, refundWallet())
 app/Http/Controllers/Web/ShipmentController.php   (refundAndCancel() rebuilt for all three cases)
 resources/views/shipments/show.blade.php   (Cancel & Refund modal)
 ```
+
+## Increment 203 — Refund-Only (Without Cancelling); Encrypted Wallet URLs
+
+Two of the four things requested — the other two (editable bulk
+upload Step 1, and wallet-shortfall fallback during bulk creation)
+follow separately.
+
+### Refund without cancelling — for payment made in error
+
+New "Refund Only (Don't Cancel)" option, alongside "Cancel & Refund"
+in the same modal, for the case where payment itself was the
+mistake — wrong method, double-charged — but the shipment should
+keep moving normally. Reverses the payment exactly the same way a
+cancellation-refund does (wallet auto-refunds to itself; cash/
+Paystack gives the bank-vs-wallet choice), but leaves
+`current_status` completely untouched — this corrects a payment,
+it isn't a cancellation.
+
+New `shipments:refund-only` permission, deliberately separate from
+`shipments:delete` — undoing a payment while keeping the shipment
+live is a meaningfully different, more unusual action than either a
+plain cancel or a cancel-with-refund, and is granted to `Finance`
+by default (not `Ops Manager`, `Hub Staff`, or `Support`), per "this
+action can only be done by an admin/finance person with such right."
+
+Extracted the actual money-movement logic (`processRefund()`) into
+one shared method both this and the existing cancel-with-refund flow
+call — the transaction itself is identical either way, only what
+else changes on the shipment differs. Caught a real gap while
+wiring up the permission check: the whole modal, including this new
+button, had been gated behind `shipments:delete` only — a pure
+Finance user with `shipments:refund-only` but not `shipments:delete`
+would never have been able to reach it. Fixed to `@canany` both
+places, with the individual buttons inside still gated per-action.
+
+### Encrypted wallet URLs
+
+New reusable `HasEncryptedRouteKey` trait — `/wallets/1` becomes an
+opaque token instead, so a wallet can't be enumerated just by
+changing a number in the address bar, even though every route
+already authorizes correctly regardless. The real numeric ID is
+still used everywhere else (relations, queries, the database) —
+only what appears in the URL changes, and nothing else in the app
+needed to change to get this, since Laravel's own URL generation and
+route-model-binding both call the two methods this trait overrides
+automatically. Applied to `AccountWallet` as the explicitly named
+example; the same trait can be dropped onto any other sensitive
+model the same way.
+
+Laravel's own route-parameter pattern never matches a literal slash,
+so standard base64 (which can contain `/`) would silently break
+route matching — used the base64url variant instead (`-`/`_` in
+place of `+`/`/`, padding stripped) specifically to stay one safe URL
+segment.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked across
+every touched file. Full repo balance check: clean across 255 files.
+Verified `refundOnly()`'s money movement against live MySQL — the
+wallet correctly receives the exact refund, while `current_status`
+stays completely untouched. Verified the base64url encode/decode
+round-trip across 9 real payloads of varying length (including ones
+that genuinely contain `+`, `/`, and multiple padding characters) —
+confirmed no unsafe character ever survives into the URL-facing
+form, and every one round-trips back to its exact original value.
+
+### Files
+
+```
+app/Traits/HasEncryptedRouteKey.php
+app/Models/AccountWallet.php   (trait applied)
+app/Http/Controllers/Web/ShipmentController.php   (processRefund() extracted, refundOnly() added)
+resources/views/shipments/show.blade.php   (Refund Only button, @canany fix)
+database/seeders/RolePermissionSeeder.php   (shipments:refund-only)
+routes/web.php   (shipments.refund-only)
+```

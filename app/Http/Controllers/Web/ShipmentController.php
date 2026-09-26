@@ -327,42 +327,108 @@ class ShipmentController extends Controller
             return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment hasn't been paid for — use the regular Cancel Shipment action instead."]);
         }
 
-        // A wallet payment refunds itself automatically, back to the
-        // exact wallet it was debited from — there's no real choice
-        // to make (nowhere else for it to sensibly go), and no manual
-        // attestation needed since the whole thing happens inside
-        // this app, unlike a cash or Paystack refund which happens
-        // somewhere the app can't see.
-        if ($shipment->collection_method === 'wallet') {
-            return \Illuminate\Support\Facades\DB::transaction(function () use ($shipment) {
-                $wallet = $shipment->accountWallet;
+        try {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $shipment) {
+                $refundFields = $this->processRefund($request, $shipment);
 
-                $wallet->credit(
-                    amount: (float) $shipment->total_amount,
-                    fundingMethod: null,
-                    reference: 'REFUND-' . $shipment->tracking_number,
-                    description: "Refund for cancelled shipment {$shipment->tracking_number}",
-                    recordedByUserId: auth()->id(),
-                );
+                $shipment->update([...$refundFields, 'current_status' => 'cancelled']);
 
-                $shipment->update([
-                    'current_status' => 'cancelled',
-                    'refunded_at' => now(),
-                    'refunded_by_user_id' => auth()->id(),
-                    'refund_destination' => 'wallet',
-                    'refund_wallet_id' => $wallet->id,
-                ]);
+                $message = $refundFields['refund_destination'] === 'wallet'
+                    ? "Shipment {$shipment->tracking_number} cancelled — refunded to " . $shipment->refundWallet->label() . '.'
+                    : "Shipment {$shipment->tracking_number} cancelled and refund recorded.";
 
-                return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled — {$wallet->label()} refunded " . number_format($shipment->total_amount, 2) . '.');
+                return redirect()->route('shipments.index')->with('status', $message);
             });
+        } catch (\RuntimeException $e) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Reverses a payment made in error without touching the shipment
+     * itself at all — current_status is deliberately left exactly as
+     * it was; this corrects a mistaken payment, it isn't a
+     * cancellation. A dedicated permission, separate from
+     * shipments:delete, since undoing a payment while leaving the
+     * shipment live is a meaningfully different, more unusual action
+     * than either a normal cancel or a cancel-with-refund — reserved
+     * for admin/finance specifically, per the request.
+     *
+     * One known, accepted gap: nothing currently re-blocks a non-
+     * credit shipment from proceeding to pickup once this clears its
+     * payment fields — the isPaymentPending() guard is Paystack-
+     * specific (awaiting confirmation), not a general "still owes
+     * money" check, and this doesn't need to add one, since the
+     * point here is exactly that the shipment keeps moving while
+     * finance sorts out the correct payment separately.
+     */
+    public function refundOnly(Request $request, Shipment $shipment): RedirectResponse
+    {
+        abort_unless(auth()->user()->can('shipments:refund-only'), 403, "You don't have permission to refund a shipment without cancelling it.");
+        abort_unless(auth()->user()->canAccessShipment($shipment), 403, "This shipment isn't somewhere you have access to.");
+
+        if (! $shipment->hasCollectedPayment()) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment hasn't been paid for — there's nothing to refund."]);
         }
 
-        // Cash or Paystack: the money left this app entirely (a
-        // physical cash drawer, or a real Paystack settlement), so
+        try {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $shipment) {
+                $refundFields = $this->processRefund($request, $shipment);
+
+                $shipment->update([
+                    ...$refundFields,
+                    'collection_method' => null,
+                    'cash_collected_at' => null,
+                    'account_wallet_id' => null,
+                    'payment_status' => null,
+                    'payment_reference' => null,
+                ]);
+
+                return redirect()->route('shipments.show', $shipment)->with('status', "Payment for {$shipment->tracking_number} refunded — the shipment itself is unchanged, just unpaid again.");
+            });
+        } catch (\RuntimeException $e) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * The actual money movement, identical whether the shipment ends
+     * up cancelled or just corrected back to unpaid — only what else
+     * changes on the shipment differs between the two callers above.
+     * Returns the refund_* fields to merge into the caller's own
+     * update(); throws for the caller to turn into a friendly
+     * message rather than a 500.
+     */
+    private function processRefund(Request $request, Shipment $shipment): array
+    {
+        // A wallet payment refunds itself automatically, back to the
+        // exact wallet it was debited from — there's no real choice
+        // to make, and no manual attestation needed since the whole
+        // thing happens inside this app, unlike a cash or Paystack
+        // refund which happens somewhere the app can't see.
+        if ($shipment->collection_method === 'wallet') {
+            $wallet = $shipment->accountWallet;
+
+            $wallet->credit(
+                amount: (float) $shipment->total_amount,
+                fundingMethod: null,
+                reference: 'REFUND-' . $shipment->tracking_number,
+                description: "Refund for shipment {$shipment->tracking_number}",
+                recordedByUserId: auth()->id(),
+            );
+
+            return [
+                'refunded_at' => now(),
+                'refunded_by_user_id' => auth()->id(),
+                'refund_destination' => 'wallet',
+                'refund_wallet_id' => $wallet->id,
+            ];
+        }
+
+        // Cash or Paystack: the money left this app entirely, so
         // there's a genuine choice — send it back the way it came
-        // (bank/cash, handled outside this app, same trust-the-staff-
-        // attestation model as before) or convert it into wallet
-        // credit instead (the outlet's own wallet, or the client's).
+        // (bank/cash, handled outside this app) or convert it into
+        // wallet credit instead (the outlet's own, or the client's).
         $data = $request->validate([
             'refund_destination' => 'required|in:bank,wallet',
             'refund_note' => 'required_if:refund_destination,bank|nullable|string|max:255',
@@ -370,42 +436,30 @@ class ShipmentController extends Controller
         ]);
 
         if ($data['refund_destination'] === 'bank') {
-            $shipment->update([
-                'current_status' => 'cancelled',
+            return [
                 'refunded_at' => now(),
                 'refunded_by_user_id' => auth()->id(),
                 'refund_note' => $data['refund_note'],
                 'refund_destination' => 'bank',
-            ]);
-
-            return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled and refund recorded.");
+            ];
         }
 
-        try {
-            $wallet = $this->creationService->resolveWallet($data, $shipment->clientAccount);
-        } catch (\RuntimeException $e) {
-            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => $e->getMessage()]);
-        }
+        $wallet = $this->creationService->resolveWallet($data, $shipment->clientAccount);
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($shipment, $wallet) {
-            $wallet->credit(
-                amount: (float) $shipment->total_amount,
-                fundingMethod: null,
-                reference: 'REFUND-' . $shipment->tracking_number,
-                description: "Refund for cancelled shipment {$shipment->tracking_number}",
-                recordedByUserId: auth()->id(),
-            );
+        $wallet->credit(
+            amount: (float) $shipment->total_amount,
+            fundingMethod: null,
+            reference: 'REFUND-' . $shipment->tracking_number,
+            description: "Refund for shipment {$shipment->tracking_number}",
+            recordedByUserId: auth()->id(),
+        );
 
-            $shipment->update([
-                'current_status' => 'cancelled',
-                'refunded_at' => now(),
-                'refunded_by_user_id' => auth()->id(),
-                'refund_destination' => 'wallet',
-                'refund_wallet_id' => $wallet->id,
-            ]);
-
-            return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled — {$wallet->label()} credited " . number_format($shipment->total_amount, 2) . '.');
-        });
+        return [
+            'refunded_at' => now(),
+            'refunded_by_user_id' => auth()->id(),
+            'refund_destination' => 'wallet',
+            'refund_wallet_id' => $wallet->id,
+        ];
     }
 
     public function update(Request $request, Shipment $shipment): RedirectResponse

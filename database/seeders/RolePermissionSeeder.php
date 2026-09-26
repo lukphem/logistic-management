@@ -21,13 +21,13 @@ class RolePermissionSeeder extends Seeder
      * booking isn't a create/read/update/delete action, and doesn't
      * belong on every module the way those four do, just this one.
      */
-    private array $extraPermissions = ['shipments:cross-account'];
+    private array $extraPermissions = ['shipments:cross-account', 'shipments:refund-only'];
 
     private array $defaultRoles = [
         'Super Admin' => '*', // gets every permission
         'Ops Manager' => ['shipments', 'riders', 'reports', 'locations:read', 'rates:read', 'clients', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan', 'wallets:read', 'shipments:cross-account'],
         'Hub Staff' => ['shipments:read', 'shipments:update', 'locations:read', 'payments:read', 'manifests', 'pickup-scan', 'dropoff-scan', 'arrival-scan', 'departure-scan', 'delivery-scan', 'exception-scan'],
-        'Finance' => ['reports:read', 'settings:read', 'rates', 'billing', 'clients', 'payments', 'wallets'],
+        'Finance' => ['reports:read', 'settings:read', 'rates', 'billing', 'clients', 'payments', 'wallets', 'shipments:refund-only'],
         'Support' => ['shipments:read', 'clients:read'],
     ];
 

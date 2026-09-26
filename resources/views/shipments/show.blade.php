@@ -63,19 +63,27 @@
                     <a href="{{ route('shipments.edit', $shipment) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 transition hover:bg-surface-50">Edit</a>
                 @endif
             @endcan
-            @can('shipments:delete')
-                @if ($shipment->current_status === 'booked')
-                    @if ($shipment->hasCollectedPayment())
+            @if ($shipment->current_status === 'booked')
+                @if ($shipment->hasCollectedPayment())
+                    {{-- Either permission unlocks the modal — a pure
+                         Finance user (shipments:refund-only but not
+                         shipments:delete) still needs to reach
+                         "Refund Only" even though plain cancellation
+                         isn't theirs to do; the modal itself gates
+                         each button separately. --}}
+                    @canany(['shipments:delete', 'shipments:refund-only'])
                         <button type="button" id="cancel-refund-open" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
-                    @else
+                    @endcanany
+                @else
+                    @can('shipments:delete')
                         <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" data-confirm="Cancel {{ $shipment->tracking_number }}? This only works before it's been picked up or dropped off.">
                             @csrf
                             @method('DELETE')
                             <button type="submit" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
                         </form>
-                    @endif
+                    @endcan
                 @endif
-            @endcan
+            @endif
             <x-status-pill :status="$shipment->current_status" class="!text-sm !px-3 !py-1" />
         </div>
     </div>
@@ -299,7 +307,7 @@
         </div>
     </div>
 
-    @can('shipments:delete')
+    @canany(['shipments:delete', 'shipments:refund-only'])
         @if ($shipment->current_status === 'booked' && $shipment->hasCollectedPayment())
             {{-- Cancel-with-refund modal — a real form, not just a
                  yes/no confirm, since a paid shipment's cancellation
@@ -353,8 +361,17 @@
                             </div>
                         @endif
 
-                        <div class="mt-4 flex justify-end gap-2">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2">
                             <button type="button" id="cancel-refund-close" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Back</button>
+                            @can('shipments:refund-only')
+                                {{-- Same form, same fields — this button
+                                     just points the submit at a
+                                     different action: reverse the
+                                     payment (e.g. it was taken in
+                                     error) without cancelling the
+                                     shipment itself at all. --}}
+                                <button type="submit" formaction="{{ route('shipments.refund-only', $shipment) }}" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Refund Only (Don't Cancel)</button>
+                            @endcan
                             <button type="submit" class="rounded-md bg-status-exception px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">Cancel &amp; Refund</button>
                         </div>
                     </form>
@@ -396,6 +413,6 @@
                 })();
             </script>
         @endif
-    @endcan
+    @endcanany
 
 </x-layouts.app>
