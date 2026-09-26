@@ -63,6 +63,9 @@
             </form>
 
             <p class="mt-6 text-center text-sm text-ink-500">
+                New here? <a href="{{ route('portal.register.show') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Create an account</a>
+            </p>
+            <p class="mt-2 text-center text-sm text-ink-500">
                 Looking to track a shipment? <a href="{{ route('tracking.search') }}" class="font-medium text-[var(--brand-primary)] hover:underline">Track here</a>
             </p>
         </div>

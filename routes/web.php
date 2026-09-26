@@ -503,6 +503,8 @@ Route::prefix('portal')->group(function () {
     Route::middleware('guest')->group(function () {
         Route::get('/login', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'show'])->name('portal.login');
         Route::post('/login', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'login']);
+        Route::get('/register', [\App\Http\Controllers\Web\Portal\PortalRegisterController::class, 'show'])->name('portal.register.show');
+        Route::post('/register', [\App\Http\Controllers\Web\Portal\PortalRegisterController::class, 'store'])->name('portal.register.store');
     });
 
     Route::post('/logout', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'logout'])->name('portal.logout')->middleware('auth');

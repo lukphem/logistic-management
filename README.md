@@ -12405,3 +12405,55 @@ resources/views/components/layouts/portal.blade.php
 bootstrap/app.php   (client-portal middleware alias)
 routes/web.php   (portal.* routes)
 ```
+
+## Increment 208 — Client Portal, Step 2: Self-Service Signup
+
+Second step of the agreed sequence — anyone can now create an
+individual account without staff involvement.
+
+### Mirrors the staff-side creation shape exactly
+
+`PortalRegisterController` produces the same three records
+`ClientController::store()` already does for a staff-created client
+(`User`, a default `ClientAccount`, a linking `ClientProfile`) — a
+self-registered account needs to end up in the identical state a
+staff-created one would, just reached without a staff member
+involved. Individual only, deliberately — an organization account is
+never created directly through signup; it's requested afterward
+through the upgrade flow (Step 3), which needs admin approval.
+
+`ClientAccount::generateAccountNumber()` requires a "creator" `User`
+to derive part of the account number from (built for the staff
+flow, where that's whoever's logged in) — with no staff member
+involved here, the newly-created client stands in for their own
+creator, since the method only ever reads `name`/`staff_short_code`
+off whatever's passed.
+
+### Signed up, but not in yet — matches Step 1's verification design
+
+Registration logs the new user in immediately (so a session exists)
+but sends them straight to the verification notice page rather than
+the dashboard — the same "login succeeds, `verified` middleware
+gates the rest" pattern Step 1 already established, not a second,
+inconsistent way of enforcing it.
+
+The login page's "Create an account" link, deliberately left out in
+Step 1 since the route didn't exist yet, is back now that it does.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 144 files. Verified the full record chain against live
+MySQL — a `User`, its default `ClientAccount` (correctly flagged
+`is_default`, `individual`), and the linking `ClientProfile` all
+resolve together exactly as the controller constructs them.
+
+### Files
+
+```
+app/Http/Controllers/Web/Portal/PortalRegisterController.php
+resources/views/portal/auth/register.blade.php
+resources/views/portal/auth/login.blade.php   ("Create an account" link restored)
+routes/web.php   (portal.register.show, portal.register.store)
+```
