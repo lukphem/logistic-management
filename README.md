@@ -12204,3 +12204,70 @@ resources/views/payment-activity/index.blade.php
 resources/views/components/layouts/app.blade.php   (Payment Activity nav entry)
 routes/web.php   (payment-activity.index, payment-activity.export)
 ```
+
+## Increment 205 — Shipment Status Report (Reports Module, Part 2 of 2)
+
+Second of the two requested reports — "general report that oversees
+all shipment status," access-level scoped. New "Reports" nav group
+(the module the request specifically named), gated on `reports:read`
+— already correctly scoped to `Finance`, `Ops Manager`, and
+`Super Admin` by default, no seeder changes needed.
+
+### Column mapping — the reference list, applied to what this app actually tracks
+
+Most of the requested columns map directly: waybill number, origin/
+destination codes (the hub's own `code`) and state/town (via
+`originCity`/`destinationCity`), receiver details, weight, pieces,
+description, amounts, dates, product type (service type), delivery
+type (`shipping_type`). Two needed real decisions, made and flagged
+rather than guessed silently:
+
+- **Actual Recipient / POD Posted By Name** — resolved from the
+  delivery scan itself (`scan_events.receiver_name` and the scan's
+  `handled_by` user), not the shipment's own stated receiver — this
+  is who actually signed for it and which staff member recorded it.
+- **Department Code** — this app's only "Department" concept belongs
+  to a client account's own internal sub-structure and has no code
+  of its own; used the booking hub's own code as the closest real
+  proxy instead of inventing one.
+
+### Pickup date, last scan, and POD handler — resolved without N+1
+
+Each comes from `scan_events`, but pulling that relation per
+shipment (even eager-loaded) would still mean scanning every event
+in PHP to find "the first pickup scan" or "the most recent scan" for
+each row. Instead, each is its own correlated SQL subquery, resolved
+by the database in the same pass as the main query — the same
+reasoning as the payment activity report's `UNION ALL` approach, just
+applied to subqueries here instead.
+
+### Same streaming export as the payment activity report
+
+`cursor()` rather than `get()` for the Excel export — a report
+covering every shipment's full lifecycle is exactly the kind of
+export someone runs for a whole month or quarter at once, potentially
+tens of thousands of rows; memory stays flat regardless of size. The
+row-building logic is shared between the web table and the Excel
+export (`rowFor()`), so the two can't drift apart on what a column
+actually means.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 139 files. Caught and fixed a real bug before shipping
+— "Actual Recipient" was left as dead code (`null ? null : null`, a
+paste-over artifact) in an early draft; caught on review, wired to
+its actual subquery. Verified all four scan-derived subqueries
+(pickup date, last scan, POD handler, actual recipient) against live
+MySQL data — all four resolved correctly.
+
+### Files
+
+```
+app/Services/ShipmentStatusReportService.php
+app/Http/Controllers/Web/ShipmentStatusReportController.php
+resources/views/shipment-status-report/index.blade.php
+resources/views/components/layouts/app.blade.php   (new Reports nav group)
+routes/web.php   (shipment-status-report.index, shipment-status-report.export)
+```

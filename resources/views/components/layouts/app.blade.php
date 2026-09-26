@@ -71,6 +71,10 @@
                     // paid/unpaid history) are different views of the
                     // same underlying money, so they sit together as one
                     // group rather than as two unrelated flat items.
+                    $reportItems = [
+                        ['label' => 'Shipment Status', 'route' => 'shipment-status-report.index', 'icon' => 'list-check', 'permission' => 'reports:read'],
+                    ];
+
                     $paymentItems = [
                         ['label' => 'Reconciliation', 'route' => 'reconciliation.index', 'icon' => 'wallet', 'permission' => null],
                         ['label' => 'Payment Reports', 'route' => 'payment-reports.index', 'icon' => 'list-check', 'permission' => 'payments:read'],
@@ -179,6 +183,11 @@
                     );
                     $topSetupItemVisible = ! $topSetupItem['permission'] || auth()->user()->can($topSetupItem['permission']);
 
+                    $visibleReportItems = collect($reportItems)->filter(
+                        fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
+                    );
+                    $reportsActive = collect($reportItems)->contains(fn ($item) => request()->routeIs($item['route'] . '*'));
+
                     $visiblePaymentItems = collect($paymentItems)->filter(
                         fn ($item) => ! $item['permission'] || auth()->user()->can($item['permission'])
                     );
@@ -241,6 +250,28 @@
 
                         <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
                             @foreach ($visibleShippingItems as $item)
+                                @php $active = request()->routeIs($item['route'] . '*'); @endphp
+                                <a href="{{ route($item['route']) }}"
+                                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+                                          {{ $active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white' }}">
+                                    <x-icon :name="$item['icon']" class="h-4 w-4 shrink-0" />
+                                    {{ $item['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
+
+                @if ($visibleReportItems->isNotEmpty())
+                    <details class="group/reports" @if($reportsActive) open @endif>
+                        <summary class="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white">
+                            <x-icon name="list-check" class="h-[18px] w-[18px] shrink-0" />
+                            <span class="flex-1">Reports</span>
+                            <x-icon name="chevron" class="h-4 w-4 shrink-0 transition-transform group-open/reports:rotate-180" />
+                        </summary>
+
+                        <div class="mt-1 space-y-1 border-l border-white/10 pl-4">
+                            @foreach ($visibleReportItems as $item)
                                 @php $active = request()->routeIs($item['route'] . '*'); @endphp
                                 <a href="{{ route($item['route']) }}"
                                    class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors

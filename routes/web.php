@@ -32,6 +32,7 @@ use App\Http\Controllers\Web\ManifestTripController;
 use App\Http\Controllers\Web\OperationalScanController;
 use App\Http\Controllers\Web\PaymentActivityReportController;
 use App\Http\Controllers\Web\PaymentReportController;
+use App\Http\Controllers\Web\ShipmentStatusReportController;
 use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
 use App\Http\Controllers\Web\StandardBillingController;
@@ -109,6 +110,10 @@ Route::middleware(['auth', 'staff'])->group(function () {
         Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
         Route::get('/payment-activity', [PaymentActivityReportController::class, 'index'])->name('payment-activity.index');
         Route::get('/payment-activity/export', [PaymentActivityReportController::class, 'export'])->name('payment-activity.export');
+    });
+    Route::middleware('can:reports:read')->group(function () {
+        Route::get('/shipment-status-report', [ShipmentStatusReportController::class, 'index'])->name('shipment-status-report.index');
+        Route::get('/shipment-status-report/export', [ShipmentStatusReportController::class, 'export'])->name('shipment-status-report.export');
     });
     Route::middleware('can:wallets:read')->group(function () {
         Route::get('/wallets', [WalletController::class, 'index'])->name('wallets.index');
