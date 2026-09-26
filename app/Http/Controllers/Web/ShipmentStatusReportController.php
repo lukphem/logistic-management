@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Models\Outlet;
 use App\Services\ShipmentStatusReportService;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -52,14 +52,22 @@ class ShipmentStatusReportController extends \App\Http\Controllers\Controller
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Shipment Status');
 
+        // The reference list given was a minimum baseline, not the
+        // final set — these additions cover what else a shipment
+        // status report genuinely needs: who sent it, which account
+        // it's billed to, how it was actually paid for (the specific
+        // ask), whether it carries COD, who's carrying it, and where
+        // it currently sits.
         $headers = [
             'Waybill No', 'Origin Code', 'Origin State', 'Origin Town',
             'Destination Code', 'Destination State', 'Destination Town',
-            'Receiver Name', 'Receiver Phone', 'Actual Recipient',
+            'Sender Name', 'Sender Phone', 'Receiver Name', 'Receiver Phone', 'Actual Recipient',
             'Chargeable Weight', 'Pieces', 'Item Description', 'Reference Number',
-            'Amount Due', 'Amount Paid', 'Date Created', 'Pickup Date', 'Pickup Status',
+            'Client Account', 'Billing Model', 'Amount Due', 'Amount Paid', 'Payment Method', 'COD Amount',
+            'Date Created', 'Pickup Date', 'Pickup Status',
             'Last Scan', 'Delivery Status', 'POD Posted By Name', 'Delivery Type',
             'Product Type', 'Expected Delivery Date', 'Delivery Date', 'Created By', 'Department Code',
+            'Assigned Rider', 'Current Location',
         ];
         foreach ($headers as $i => $header) {
             $sheet->setCellValueByColumnAndRow($i + 1, 1, $header);
@@ -100,6 +108,8 @@ class ShipmentStatusReportController extends \App\Http\Controllers\Controller
             $shipment->destinationHub?->code,
             $shipment->destinationCity?->state?->name,
             $shipment->destinationCity?->name,
+            $shipment->sender_name,
+            $shipment->sender_phone,
             $shipment->receiver_name,
             $shipment->receiver_phone,
             $shipment->actual_recipient,
@@ -107,8 +117,12 @@ class ShipmentStatusReportController extends \App\Http\Controllers\Controller
             $shipment->quantity,
             $shipment->package_description,
             $shipment->payment_reference,
+            $shipment->clientAccount ? $shipment->clientAccount->account_name . ' (' . $shipment->clientAccount->account_number . ')' : null,
+            $shipment->serviceType?->billing_model,
             $shipment->total_amount,
             $shipment->hasCollectedPayment() ? $shipment->total_amount : 0,
+            $shipment->collection_method ? ucfirst($shipment->collection_method) : 'Deferred',
+            $shipment->is_cod ? $shipment->cod_amount : null,
             optional($shipment->created_at)->format('Y-m-d H:i'),
             $shipment->pickup_date ? \Illuminate\Support\Carbon::parse($shipment->pickup_date)->format('Y-m-d H:i') : null,
             $shipment->pickup_date ? 'Picked Up' : 'Not Picked Up',
@@ -121,6 +135,8 @@ class ShipmentStatusReportController extends \App\Http\Controllers\Controller
             optional($shipment->delivered_at)->format('Y-m-d H:i'),
             $shipment->createdBy?->name,
             $this->report->departmentCode($shipment),
+            $shipment->assignedRider?->name,
+            $shipment->currentOutlet?->name ?? $shipment->currentHub?->name,
         ];
     }
 

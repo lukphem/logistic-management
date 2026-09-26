@@ -26,7 +26,7 @@ class ShipmentStatusReportService
     public function query(array $filters): Builder
     {
         $query = Shipment::query()
-            ->with(['originHub', 'destinationHub', 'originCity.state', 'destinationCity.state', 'serviceType', 'createdBy'])
+            ->with(['originHub', 'destinationHub', 'originCity.state', 'destinationCity.state', 'serviceType', 'createdBy', 'assignedRider', 'currentHub', 'currentOutlet', 'clientAccount'])
             ->addSelect('shipments.*')
             ->addSelect(['last_scan_status' => DB::table('scan_events')
                 ->select('status')

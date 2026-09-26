@@ -45,6 +45,7 @@
                         <th class="p-3">Receiver</th>
                         <th class="p-3">Amount Due</th>
                         <th class="p-3">Amount Paid</th>
+                        <th class="p-3">Payment Method</th>
                         <th class="p-3">Pickup Status</th>
                         <th class="p-3">Delivery Status</th>
                         <th class="p-3">Expected Delivery</th>
@@ -61,6 +62,7 @@
                             <td class="p-3 text-ink-700">{{ $shipment->receiver_name }}</td>
                             <td class="p-3 text-ink-700">{{ number_format($shipment->total_amount, 2) }}</td>
                             <td class="p-3 text-ink-700">{{ number_format($shipment->hasCollectedPayment() ? $shipment->total_amount : 0, 2) }}</td>
+                            <td class="p-3 text-ink-700">{{ $shipment->collection_method ? ucfirst($shipment->collection_method) : 'Deferred' }}</td>
                             <td class="p-3 text-ink-700">{{ $shipment->pickup_date ? 'Picked Up' : 'Not Picked Up' }}</td>
                             <td class="p-3"><x-status-pill :status="$shipment->current_status" /></td>
                             <td class="p-3 text-ink-700">{{ $shipment->promised_delivery_at?->format('d M Y') ?? '—' }}</td>

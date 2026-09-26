@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Models\Outlet;
 use App\Services\PaymentActivityReportService;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;

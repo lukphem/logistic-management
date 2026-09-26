@@ -12271,3 +12271,54 @@ resources/views/shipment-status-report/index.blade.php
 resources/views/components/layouts/app.blade.php   (new Reports nav group)
 routes/web.php   (shipment-status-report.index, shipment-status-report.export)
 ```
+
+## Increment 206 — Fix: Export Crash on Both Reports; Payment Method Added, Columns Expanded
+
+### The reported crash
+
+Both new reports' Excel exports threw a `TypeError` — `export()` was
+type-hinted to return `Illuminate\Http\Response`, but
+`response()->download(...)` actually returns a
+`Symfony\Component\HttpFoundation\BinaryFileResponse`, a sibling
+class, not a subtype of `Illuminate\Http\Response`. Fixed by
+type-hinting against `Symfony\Component\HttpFoundation\Response`
+instead — the actual common ancestor both classes share, so either
+one satisfies it. Confirmed nothing else in either controller
+depended on the more specific `Illuminate\Http\Response` import
+before changing it.
+
+### The reference column list was a baseline, not the final set
+
+Per the follow-up: the list given for the shipment status report was
+meant to establish a minimum, not to be the finished column set —
+and **Payment Method** specifically was missing and needed adding as
+a priority. Added, along with several other columns a genuinely
+comprehensive shipment report should carry: Sender Name/Phone,
+Client Account, Billing Model, Payment Method, COD Amount, Assigned
+Rider, and Current Location — none of these needed new queries,
+since every one is either a direct column on `Shipment` already
+being loaded, or reached through a relation now eager-loaded
+alongside the ones already there.
+
+The report now carries 36 columns in the Excel export (up from 28),
+with Payment Method also added to the web table specifically as the
+called-out priority. Verified the header list and the row-building
+list line up exactly — 36 entries each, same order — since a
+mismatch there would silently misalign every column in the actual
+export.
+
+### Verified
+
+Balance-checked, duplicate-checked across every touched file. Full
+repo balance check: clean across 139 files. Confirmed by direct
+count that the export's headers and its row values match exactly,
+position for position.
+
+### Files
+
+```
+app/Http/Controllers/Web/ShipmentStatusReportController.php   (Response fix, expanded columns)
+app/Http/Controllers/Web/PaymentActivityReportController.php   (Response fix)
+app/Services/ShipmentStatusReportService.php   (eager-loads the new relations)
+resources/views/shipment-status-report/index.blade.php   (Payment Method column)
+```
