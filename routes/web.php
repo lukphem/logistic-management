@@ -495,3 +495,28 @@ Route::middleware(['auth', 'staff'])->group(function () {
 // staff session involved. Trust comes from signature verification
 // inside the controller, not from auth/staff middleware.
 Route::post('/payments/webhook', [PaymentController::class, 'webhook'])->name('payments.webhook');
+
+// The client portal — its own login, its own session-guard middleware
+// (client-portal, mirroring staff's own EnsureStaffUser), entirely
+// separate URL space from the staff app above.
+Route::prefix('portal')->group(function () {
+    Route::middleware('guest')->group(function () {
+        Route::get('/login', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'show'])->name('portal.login');
+        Route::post('/login', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'login']);
+    });
+
+    Route::post('/logout', [\App\Http\Controllers\Web\Portal\PortalAuthController::class, 'logout'])->name('portal.logout')->middleware('auth');
+
+    // Reachable while logged in but not yet verified — this is
+    // deliberately not behind 'verified' itself, or an unverified
+    // person could never reach the page that lets them get verified.
+    Route::middleware('auth')->group(function () {
+        Route::get('/email/verify', [\App\Http\Controllers\Web\Portal\PortalVerificationController::class, 'notice'])->name('verification.notice');
+        Route::get('/email/verify/{id}/{hash}', [\App\Http\Controllers\Web\Portal\PortalVerificationController::class, 'verify'])->middleware('signed')->name('verification.verify');
+        Route::post('/email/verification-notification', [\App\Http\Controllers\Web\Portal\PortalVerificationController::class, 'resend'])->middleware('throttle:6,1')->name('verification.send');
+    });
+
+    Route::middleware(['client-portal', 'verified'])->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\Web\Portal\PortalDashboardController::class, 'index'])->name('portal.dashboard');
+    });
+});

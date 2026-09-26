@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,10 +13,20 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+/**
+ * Implements MustVerifyEmail (previously scaffolded but never
+ * finished — the import was commented out, the trait unused) so the
+ * client portal can require a verified email before login. Staff
+ * sign-in is deliberately untouched by this — nothing in the staff
+ * LoginController checks hasVerifiedEmail(), only the new
+ * PortalAuthController does, so implementing the interface here
+ * doesn't change staff behavior at all, it just makes the check
+ * possible where it's actually wanted.
+ */
+class User extends Authenticatable implements MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, HasRoles;
+    use HasFactory, Notifiable, HasApiTokens, HasRoles, MustVerifyEmail;
 
     /**
      * The attributes that are mass assignable.

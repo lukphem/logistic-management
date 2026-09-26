@@ -12322,3 +12322,86 @@ app/Http/Controllers/Web/PaymentActivityReportController.php   (Response fix)
 app/Services/ShipmentStatusReportService.php   (eager-loads the new relations)
 resources/views/shipment-status-report/index.blade.php   (Payment Method column)
 ```
+
+## Increment 207 — Client Portal, Step 1: Foundation
+
+First of a sequenced, multi-step build (plan and two decisions agreed
+before starting: in-app-only admin notifications, and email
+verification required at signup). This step: the portal exists, has
+its own login separate from staff, and a basic dashboard — signup
+and the organization-upgrade-with-approval workflow follow in later
+steps.
+
+### Same session guard as staff, kept apart by middleware
+
+The `web` guard was originally documented as staff-only ("riders and
+clients never get a web session"). Rather than stand up a second
+guard and session cookie, the client portal reuses the same guard —
+a standard, well-supported pattern — with a new `EnsureClientUser`
+middleware mirroring `EnsureStaffUser` exactly, just checking for
+`user_type === 'client'` instead of `'staff'`. Neither can ever reach
+the other's side.
+
+### Email verification, actually finished this time
+
+Found `MustVerifyEmail` half-scaffolded on `User` — the interface
+import was commented out, the trait never applied, even though
+`email_verified_at` already existed as a real column with a cast.
+Finished wiring it up: `User` now properly implements the interface
+and uses the trait. Deliberately isolated to the portal — nothing in
+the existing staff login or API touches `hasVerifiedEmail()` at all,
+so this changes nothing about how staff or API auth already worked.
+
+Caught a design mistake before it shipped: an early draft blocked
+*login itself* for an unverified user, logging them straight back
+out — which would have meant they could never reach the "please
+verify" page or its resend button in the first place. Fixed to match
+the standard pattern instead: login succeeds regardless, and a
+separate `verified` middleware gates the dashboard specifically,
+redirecting an unverified session to the verification notice page
+rather than locking them out entirely.
+
+### What's built
+
+- `EnsureClientUser` middleware, registered as `client-portal`
+- `PortalAuthController` (login/logout), `PortalVerificationController`
+  (notice, verify-link handler, resend), `PortalDashboardController`
+- A separate portal layout and three views (login, verify-email
+  notice, dashboard) — their own branding-aware header, no shared
+  chrome with the staff app at all
+- Routes under `/portal/*`, entirely separate from the staff app's
+  URL space
+
+### Deliberately not yet built (later steps in the agreed sequence)
+
+Self-service signup, the organization-upgrade request form, and the
+admin approval queue + in-app notification — all discussed and
+sequenced, none built yet. The login page's "Create an account" link
+was left out of this round specifically to avoid pointing at a route
+that doesn't exist until signup is built next.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 145 files. Confirmed no existing staff or API code
+references `verified` middleware or `hasVerifiedEmail()` anywhere,
+so the `User` model change is fully isolated to the new portal.
+Confirmed `email_verified_at` already exists as a real database
+column from Laravel's original scaffolding — no new migration needed.
+
+### Files
+
+```
+app/Http/Middleware/EnsureClientUser.php
+app/Http/Controllers/Web/Portal/PortalAuthController.php
+app/Http/Controllers/Web/Portal/PortalVerificationController.php
+app/Http/Controllers/Web/Portal/PortalDashboardController.php
+app/Models/User.php   (MustVerifyEmail properly implemented)
+resources/views/portal/auth/login.blade.php
+resources/views/portal/auth/verify-email.blade.php
+resources/views/portal/dashboard.blade.php
+resources/views/components/layouts/portal.blade.php
+bootstrap/app.php   (client-portal middleware alias)
+routes/web.php   (portal.* routes)
+```

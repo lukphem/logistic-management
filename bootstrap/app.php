@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'user_type' => \App\Http\Middleware\UserType::class,
             'staff' => \App\Http\Middleware\EnsureStaffUser::class,
+            'client-portal' => \App\Http\Middleware\EnsureClientUser::class,
         ]);
 
         // Paystack's own webhook POST carries no CSRF token — it's not
