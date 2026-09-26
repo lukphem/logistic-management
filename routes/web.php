@@ -520,5 +520,7 @@ Route::prefix('portal')->group(function () {
 
     Route::middleware(['client-portal', 'verified'])->group(function () {
         Route::get('/dashboard', [\App\Http\Controllers\Web\Portal\PortalDashboardController::class, 'index'])->name('portal.dashboard');
+        Route::get('/upgrade', [\App\Http\Controllers\Web\Portal\PortalUpgradeController::class, 'show'])->name('portal.upgrade.show');
+        Route::post('/upgrade', [\App\Http\Controllers\Web\Portal\PortalUpgradeController::class, 'store'])->name('portal.upgrade.store');
     });
 });

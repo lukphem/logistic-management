@@ -12457,3 +12457,46 @@ resources/views/portal/auth/register.blade.php
 resources/views/portal/auth/login.blade.php   ("Create an account" link restored)
 routes/web.php   (portal.register.show, portal.register.store)
 ```
+
+## Increment 209 — Client Portal, Step 3: Organization Upgrade Request
+
+Third step of the agreed sequence — an individual client can now
+submit their organization's details for review, without it applying
+to their account until an admin actually approves it.
+
+### Same fields the staff-side upgrade already uses, deliberately separate from it
+
+New `ClientUpgradeRequest` — company name, RC number, TIN, industry,
+contact person — the exact same fields
+`ClientController::upgrade()` already validates and applies directly
+for a staff-initiated upgrade. Submitting here never touches
+`client_accounts` at all; approving what's submitted (Step 4) is
+what will actually apply it, by copying these same fields onto the
+account the same way the staff-side flow already does.
+
+### Guarded against the obvious edge cases
+
+Already an organization account — nothing to request, told plainly.
+Already has a pending request — blocked from submitting a second one
+until the first is reviewed, rather than silently accumulating
+duplicate requests for the same account.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 262 files. Verified the pending-request guard against
+live MySQL for both cases — correctly blocks when a pending request
+exists, correctly allows when it doesn't.
+
+### Files
+
+```
+database/migrations/2026_04_09_000001_create_client_upgrade_requests_table.php
+app/Models/ClientUpgradeRequest.php
+app/Models/ClientAccount.php   (upgradeRequests())
+app/Http/Controllers/Web/Portal/PortalUpgradeController.php
+resources/views/portal/upgrade.blade.php
+resources/views/portal/dashboard.blade.php   (Upgrade link, shown for individual accounts)
+routes/web.php   (portal.upgrade.show, portal.upgrade.store)
+```

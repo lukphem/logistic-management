@@ -62,6 +62,11 @@ class ClientAccount extends Model
         return $this->morphOne(\App\Models\AccountWallet::class, 'owner');
     }
 
+    public function upgradeRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(\App\Models\ClientUpgradeRequest::class);
+    }
+
     public const ID_TYPES = [
         'national_id' => 'National ID',
         'passport' => 'Passport',

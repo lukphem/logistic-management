@@ -8,6 +8,9 @@
         <p class="text-2xl font-semibold text-ink-900">Welcome, {{ $user->name }}</p>
         @if ($account)
             <p class="mt-1 text-sm text-ink-500">{{ $account->account_name }} ({{ $account->account_number }}) — {{ ucfirst($account->account_type) }} account</p>
+            @if ($account->account_type === 'individual')
+                <a href="{{ route('portal.upgrade.show') }}" class="mt-1 inline-block text-sm font-medium text-[var(--brand-primary)] hover:underline">Upgrade to an organization account</a>
+            @endif
         @endif
     </div>
 
