@@ -12139,3 +12139,68 @@ resources/views/shipments/show.blade.php   (Refund Only button, @canany fix)
 database/seeders/RolePermissionSeeder.php   (shipments:refund-only)
 routes/web.php   (shipments.refund-only)
 ```
+
+## Increment 204 — Payment Activity Report (Reports Module, Part 1 of 2)
+
+First of two new reports requested — "account for all payment-related
+activity on the system." The second (general shipment status report)
+follows separately.
+
+### One unified feed across five genuinely different tables
+
+A shipment's own payment/refund, wallet fundings, wallet transfers,
+and cash settlements are five different schemas — rather than
+pulling each into PHP and merging/sorting/paginating there (which
+gets slower as data grows, and means holding far more in memory than
+any one page actually needs), `PaymentActivityReportService`
+normalizes each into the same column set at the SQL level and
+combines them with `UNION ALL`. Sorting, filtering, and pagination
+all happen inside the database engine itself, the same way they
+would for one ordinary table — this is the "won't drag system
+performance during query/generation" part of the request.
+
+Filterable by date range, activity type, and outlet — the same
+access-scope narrowing already used everywhere in this app applies
+automatically (outlet-scoped staff see only their own outlet;
+hub/region-scoped staff see their own reach; global access sees
+everything), not just offered as a UI convenience filter.
+
+### Excel export, streamed rather than loaded whole
+
+The export path uses a database cursor rather than a single `get()`
+call — reads one row at a time from the database as it writes to the
+spreadsheet, so memory use stays flat regardless of how large the
+filtered result actually is, rather than pulling the whole result
+set into one Collection first.
+
+### Foundation added for the second report too
+
+New `created_by_user_id` on `shipments`, populated at every creation
+point (the web form, bulk upload, and the quote-based booking path)
+— nothing tracked this before. Worth being upfront: this can only be
+populated going forward; existing shipments will show blank for
+"created by" in the upcoming shipment status report, since that data
+was never captured.
+
+### Verified
+
+Balance-checked, duplicate-checked, duplicate-route-checked, missing-
+import-scanned across every touched file. Full repo balance check:
+clean across 252 files. Verified the `UNION ALL` merge against live
+MySQL across three genuinely different table schemas — correctly
+combined and sorted into one result set exactly as the service
+constructs it.
+
+### Files
+
+```
+database/migrations/2026_04_08_000001_add_created_by_to_shipments.php
+app/Models/Shipment.php   (created_by_user_id, createdBy())
+app/Services/ShipmentCreationService.php   (populates created_by_user_id)
+app/Http/Controllers/Web/ShipmentController.php   (storeFromQuote() populates created_by_user_id)
+app/Services/PaymentActivityReportService.php
+app/Http/Controllers/Web/PaymentActivityReportController.php
+resources/views/payment-activity/index.blade.php
+resources/views/components/layouts/app.blade.php   (Payment Activity nav entry)
+routes/web.php   (payment-activity.index, payment-activity.export)
+```

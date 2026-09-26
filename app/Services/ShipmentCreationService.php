@@ -116,6 +116,7 @@ class ShipmentCreationService
                 'shipping_type' => $quote['shipping_type'],
                 'promised_delivery_at' => null,
                 'transit_days' => $quote['transit_days'] ?? null,
+                'created_by_user_id' => auth()->id(),
                 ...$pricing,
                 ...$collectionMethod,
             ]);

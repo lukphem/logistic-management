@@ -30,6 +30,7 @@ use App\Http\Controllers\Web\PrintDocumentController;
 use App\Http\Controllers\Web\ManifestController;
 use App\Http\Controllers\Web\ManifestTripController;
 use App\Http\Controllers\Web\OperationalScanController;
+use App\Http\Controllers\Web\PaymentActivityReportController;
 use App\Http\Controllers\Web\PaymentReportController;
 use App\Http\Controllers\Web\ReconciliationController;
 use App\Http\Controllers\Web\ShipmentController;
@@ -106,6 +107,8 @@ Route::middleware(['auth', 'staff'])->group(function () {
     Route::post('/payments/check-status', [PaymentController::class, 'checkStatus'])->name('payments.check-status');
     Route::middleware('can:payments:read')->group(function () {
         Route::get('/payment-reports', [PaymentReportController::class, 'index'])->name('payment-reports.index');
+        Route::get('/payment-activity', [PaymentActivityReportController::class, 'index'])->name('payment-activity.index');
+        Route::get('/payment-activity/export', [PaymentActivityReportController::class, 'export'])->name('payment-activity.export');
     });
     Route::middleware('can:wallets:read')->group(function () {
         Route::get('/wallets', [WalletController::class, 'index'])->name('wallets.index');

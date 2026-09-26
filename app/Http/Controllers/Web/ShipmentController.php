@@ -836,6 +836,7 @@ class ShipmentController extends Controller
             'total_amount' => $result['total_amount'] ?? 0,
             'promised_delivery_at' => null,
             'transit_days' => $result['transit_days'] ?? null,
+            'created_by_user_id' => auth()->id(),
             ...$this->resolveCollectionMethod($data, $wallet),
             ]);
 
