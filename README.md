@@ -12004,3 +12004,61 @@ for the first three, correctly still shown for the last two.
 ```
 resources/views/shipments/show.blade.php   (paid/unpaid gate fixed, badge shows the method)
 ```
+
+## Increment 202 — Real Refund Handling on Cancellation, in a Modal
+
+Extends the "record a refund, then cancel" flow from a manual note
+into actual, automatic money movement — with a proper modal form for
+choosing where it goes, per the request.
+
+### Wallet payments: automatic, no choice to make
+
+A shipment paid from a wallet now refunds itself automatically back
+to that exact same wallet the moment it's cancelled — the full
+shipment amount, credited with a generated `REFUND-{tracking
+number}` reference for audit, linking directly back to the original
+debit. No manual attestation needed, since the whole transaction
+happens inside this app where it can be trusted directly, unlike a
+cash or Paystack refund which happens somewhere this app can't see.
+
+### Cash and Paystack payments: admin chooses the destination
+
+A real choice now, not just a free-text note: **refund to bank/cash**
+(the existing manual-attestation flow, staff records how it was
+handled outside the app) or **credit to a wallet instead** — the
+outlet's own, or the client's, reusing the exact same wallet-
+resolution logic already built for booking. Either way, the amount
+and a `REFUND-{tracking number}` reference are recorded the same
+way a wallet-payment refund is, fully auditable from either side of
+the transaction.
+
+### A real modal, not a yes/no confirm
+
+Per the specific request — clicking "Cancel Shipment" on a paid
+shipment now opens an actual modal with real form fields (not the
+plain confirmation dialog used everywhere else), since a genuine
+choice needs to be made here, not just acknowledged. Its content
+adapts to how the shipment was actually paid: a wallet payment shows
+a one-line explanation of the automatic refund; a cash/Paystack
+payment shows the bank-vs-wallet choice with the right fields
+appearing as each option is picked.
+
+### Verified
+
+Balance-checked, duplicate-checked, missing-import-scanned across
+every touched file. Full repo balance check: clean across 248 files.
+Verified against live MySQL: a wallet correctly receives its exact
+refund amount back; a cash-paid shipment refunded to an unrelated
+wallet (the outlet's, since cash has no source wallet of its own)
+lands correctly. Verified the conditional validation (bank requires
+a note, wallet requires a source) across all 5 real input
+combinations.
+
+### Files
+
+```
+database/migrations/2026_04_07_000001_add_refund_destination_to_shipments.php
+app/Models/Shipment.php   (refund_destination, refund_wallet_id, refundWallet())
+app/Http/Controllers/Web/ShipmentController.php   (refundAndCancel() rebuilt for all three cases)
+resources/views/shipments/show.blade.php   (Cancel & Refund modal)
+```

@@ -66,12 +66,7 @@
             @can('shipments:delete')
                 @if ($shipment->current_status === 'booked')
                     @if ($shipment->hasCollectedPayment())
-                        <form method="POST" action="{{ route('shipments.refund-and-cancel', $shipment) }}" class="flex items-center gap-2" data-confirm="Cancel {{ $shipment->tracking_number }} and record this refund? This only works before it's been picked up or dropped off.">
-                            @csrf
-                            <input type="text" name="refund_note" required maxlength="255" placeholder="How was it refunded? (e.g. cash returned, Paystack ref)"
-                                   class="w-64 rounded-md border border-line px-2.5 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
-                            <button type="submit" class="whitespace-nowrap rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Record Refund &amp; Cancel</button>
-                        </form>
+                        <button type="button" id="cancel-refund-open" class="rounded-md border border-status-exception/30 px-3 py-1.5 text-sm font-medium text-status-exception transition hover:bg-status-exception/5">Cancel Shipment</button>
                     @else
                         <form method="POST" action="{{ route('shipments.destroy', $shipment) }}" class="inline" data-confirm="Cancel {{ $shipment->tracking_number }}? This only works before it's been picked up or dropped off.">
                             @csrf
@@ -303,5 +298,104 @@
             @endforelse
         </div>
     </div>
+
+    @can('shipments:delete')
+        @if ($shipment->current_status === 'booked' && $shipment->hasCollectedPayment())
+            {{-- Cancel-with-refund modal — a real form, not just a
+                 yes/no confirm, since a paid shipment's cancellation
+                 needs an actual destination chosen for the money,
+                 not merely acknowledged. --}}
+            <div id="cancel-refund-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+                <div class="w-full max-w-sm rounded-xl bg-surface-0 p-5 shadow-xl">
+                    <p class="text-sm font-semibold text-ink-900">Cancel {{ $shipment->tracking_number }}</p>
+                    <p class="mt-1 text-xs text-ink-500">This only works before it's been picked up or dropped off.</p>
+
+                    <form method="POST" action="{{ route('shipments.refund-and-cancel', $shipment) }}" class="mt-4 space-y-3">
+                        @csrf
+
+                        @if ($shipment->collection_method === 'wallet')
+                            <p class="rounded-md bg-surface-50 p-3 text-xs text-ink-700">This shipment was paid from <strong>{{ $shipment->accountWallet?->label() }}</strong> — cancelling refunds {{ $shipment->currency ?? 'NGN' }} {{ number_format($shipment->total_amount, 2) }} back to it automatically.</p>
+                        @else
+                            <div>
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">Refund to</p>
+                                <div class="flex flex-wrap gap-4">
+                                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                        <input type="radio" name="refund_destination" value="bank" id="refund-dest-bank" checked class="border-line">
+                                        Bank / cash (outside this app)
+                                    </label>
+                                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                        <input type="radio" name="refund_destination" value="wallet" id="refund-dest-wallet" class="border-line">
+                                        A wallet instead
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="refund-bank-fields">
+                                <label class="mb-1 block text-xs font-medium text-ink-900">How was it refunded?</label>
+                                <input type="text" name="refund_note" maxlength="255" placeholder="e.g. cash returned, Paystack ref"
+                                       class="w-full rounded-md border border-line px-2.5 py-1.5 text-xs outline-none focus:border-[var(--brand-primary)] focus:ring-2 focus:ring-[var(--brand-primary)]/20">
+                            </div>
+
+                            <div id="refund-wallet-fields" class="hidden">
+                                <p class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-500">Which wallet</p>
+                                <div class="flex flex-wrap gap-4">
+                                    @if ($shipment->clientAccount)
+                                        <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                            <input type="radio" name="wallet_source" value="client" class="border-line">
+                                            Client's wallet
+                                        </label>
+                                    @endif
+                                    <label class="flex cursor-pointer items-center gap-2 text-sm text-ink-900">
+                                        <input type="radio" name="wallet_source" value="outlet" class="border-line">
+                                        Outlet's wallet
+                                    </label>
+                                </div>
+                            </div>
+                        @endif
+
+                        <div class="mt-4 flex justify-end gap-2">
+                            <button type="button" id="cancel-refund-close" class="rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50">Back</button>
+                            <button type="submit" class="rounded-md bg-status-exception px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90">Cancel &amp; Refund</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <script>
+                (function () {
+                    const modal = document.getElementById('cancel-refund-modal');
+                    document.getElementById('cancel-refund-open')?.addEventListener('click', function () {
+                        modal.classList.remove('hidden');
+                        modal.classList.add('flex');
+                    });
+                    document.getElementById('cancel-refund-close')?.addEventListener('click', function () {
+                        modal.classList.add('hidden');
+                        modal.classList.remove('flex');
+                    });
+                    modal?.addEventListener('click', function (e) {
+                        if (e.target === modal) {
+                            modal.classList.add('hidden');
+                            modal.classList.remove('flex');
+                        }
+                    });
+
+                    const bankFields = document.getElementById('refund-bank-fields');
+                    const walletFields = document.getElementById('refund-wallet-fields');
+                    const bankRadio = document.getElementById('refund-dest-bank');
+                    const walletRadio = document.getElementById('refund-dest-wallet');
+
+                    function syncRefundDestination() {
+                        if (!bankFields || !walletFields) return;
+                        const toWallet = walletRadio?.checked;
+                        bankFields.classList.toggle('hidden', !!toWallet);
+                        walletFields.classList.toggle('hidden', !toWallet);
+                    }
+
+                    bankRadio?.addEventListener('change', syncRefundDestination);
+                    walletRadio?.addEventListener('change', syncRefundDestination);
+                })();
+            </script>
+        @endif
+    @endcan
 
 </x-layouts.app>

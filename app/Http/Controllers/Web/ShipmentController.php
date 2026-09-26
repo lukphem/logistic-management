@@ -327,18 +327,85 @@ class ShipmentController extends Controller
             return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => "This shipment hasn't been paid for — use the regular Cancel Shipment action instead."]);
         }
 
+        // A wallet payment refunds itself automatically, back to the
+        // exact wallet it was debited from — there's no real choice
+        // to make (nowhere else for it to sensibly go), and no manual
+        // attestation needed since the whole thing happens inside
+        // this app, unlike a cash or Paystack refund which happens
+        // somewhere the app can't see.
+        if ($shipment->collection_method === 'wallet') {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($shipment) {
+                $wallet = $shipment->accountWallet;
+
+                $wallet->credit(
+                    amount: (float) $shipment->total_amount,
+                    fundingMethod: null,
+                    reference: 'REFUND-' . $shipment->tracking_number,
+                    description: "Refund for cancelled shipment {$shipment->tracking_number}",
+                    recordedByUserId: auth()->id(),
+                );
+
+                $shipment->update([
+                    'current_status' => 'cancelled',
+                    'refunded_at' => now(),
+                    'refunded_by_user_id' => auth()->id(),
+                    'refund_destination' => 'wallet',
+                    'refund_wallet_id' => $wallet->id,
+                ]);
+
+                return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled — {$wallet->label()} refunded " . number_format($shipment->total_amount, 2) . '.');
+            });
+        }
+
+        // Cash or Paystack: the money left this app entirely (a
+        // physical cash drawer, or a real Paystack settlement), so
+        // there's a genuine choice — send it back the way it came
+        // (bank/cash, handled outside this app, same trust-the-staff-
+        // attestation model as before) or convert it into wallet
+        // credit instead (the outlet's own wallet, or the client's).
         $data = $request->validate([
-            'refund_note' => 'required|string|max:255',
+            'refund_destination' => 'required|in:bank,wallet',
+            'refund_note' => 'required_if:refund_destination,bank|nullable|string|max:255',
+            'wallet_source' => 'required_if:refund_destination,wallet|nullable|in:client,outlet',
         ]);
 
-        $shipment->update([
-            'current_status' => 'cancelled',
-            'refunded_at' => now(),
-            'refunded_by_user_id' => auth()->id(),
-            'refund_note' => $data['refund_note'],
-        ]);
+        if ($data['refund_destination'] === 'bank') {
+            $shipment->update([
+                'current_status' => 'cancelled',
+                'refunded_at' => now(),
+                'refunded_by_user_id' => auth()->id(),
+                'refund_note' => $data['refund_note'],
+                'refund_destination' => 'bank',
+            ]);
 
-        return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled and refund recorded.");
+            return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled and refund recorded.");
+        }
+
+        try {
+            $wallet = $this->creationService->resolveWallet($data, $shipment->clientAccount);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('shipments.show', $shipment)->withErrors(['shipment' => $e->getMessage()]);
+        }
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($shipment, $wallet) {
+            $wallet->credit(
+                amount: (float) $shipment->total_amount,
+                fundingMethod: null,
+                reference: 'REFUND-' . $shipment->tracking_number,
+                description: "Refund for cancelled shipment {$shipment->tracking_number}",
+                recordedByUserId: auth()->id(),
+            );
+
+            $shipment->update([
+                'current_status' => 'cancelled',
+                'refunded_at' => now(),
+                'refunded_by_user_id' => auth()->id(),
+                'refund_destination' => 'wallet',
+                'refund_wallet_id' => $wallet->id,
+            ]);
+
+            return redirect()->route('shipments.index')->with('status', "Shipment {$shipment->tracking_number} cancelled — {$wallet->label()} credited " . number_format($shipment->total_amount, 2) . '.');
+        });
     }
 
     public function update(Request $request, Shipment $shipment): RedirectResponse
